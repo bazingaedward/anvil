@@ -56,8 +56,8 @@ monaco.editor.defineTheme("anvil", {
   inherit: true,
   rules: [],
   colors: {
-    "editor.background": "#171b22",
-    "editorGutter.background": "#171b22",
+    "editor.background": "#1b1b1b",
+    "editorGutter.background": "#1b1b1b",
     "editor.lineHighlightBackground": "#202733",
     "editorLineNumber.foreground": "#6a778a",
     "editor.selectionBackground": "#33496a",
@@ -232,7 +232,7 @@ function TerminalPanel({
       cursorBlink: true,
       scrollback: 4000,
       theme: {
-        background: "#171b22",
+        background: "#1b1b1b",
         foreground: "#dce4ef",
         cursor: "#87b7f5",
         selectionBackground: "#33496a",
@@ -390,12 +390,14 @@ function App() {
       setBusy(false);
     }
   }
-  async function openRepository() {
+  async function openRepository(selected?: string) {
     if (busy) return;
     setBusy(true);
     setError("");
     try {
-      const next = await api.openRepository();
+      const next = selected
+        ? await api.selectDirectory(selected)
+        : await api.openRepository();
       if (next) {
         if (next.root !== repo?.root) {
           setTerminalStarted(false);
@@ -477,8 +479,8 @@ function App() {
       <div className="sidebar-heading">
         <span title={repo.root}>{repo.name}</span>
         <button
-          aria-label="Refresh repository"
-          title="Refresh repository"
+          aria-label="Refresh folder"
+          title="Refresh folder"
           onClick={() => {
             void refresh();
             setRevision((value) => value + 1);
@@ -672,7 +674,7 @@ function App() {
         />
         <aside
           className="review-panel"
-          aria-label="Repository review"
+          aria-label="Files and changes"
           style={{ width: sidebarWidth }}
         >
           <div className="sidebar-tabs">
@@ -688,6 +690,7 @@ function App() {
             </button>
             <button
               className={view === "changes" ? "active" : ""}
+              disabled={repo?.git === false}
               onClick={() => {
                 setView("changes");
                 setReviewDetail(false);
@@ -749,15 +752,11 @@ function App() {
         <div className="brand">
           <Hammer size={19} strokeWidth={1.7} />
           <strong>Anvil</strong>
-          <span className="preview-badge">Preview</span>
         </div>
         {repo && (
           <div className="repo-title">
             <Folder size={14} />
             <span>{repo.name}</span>
-            <span className="header-divider" />
-            <GitBranch size={14} />
-            <span>{repo.branch}</span>
           </div>
         )}
         <button
@@ -766,7 +765,7 @@ function App() {
           disabled={busy}
         >
           <FolderOpen size={15} />
-          Open repository
+          Add folders
         </button>
       </header>
       {error && (
@@ -778,9 +777,9 @@ function App() {
         </div>
       )}
       <ConversationWorkspace
-        key={repo?.root || "welcome"}
         repo={repo}
         onOpen={() => void openRepository()}
+        onSelectDirectory={(root) => void openRepository(root)}
         terminalOpen={!terminalHidden}
         onTerminal={toggleTerminal}
         terminal={terminalView}
@@ -798,8 +797,13 @@ function App() {
             </button>
             <button
               onClick={() => toggleReview("changes")}
-              disabled={!repo}
+              disabled={!repo || repo.git === false}
               aria-label="Review changes"
+              title={
+                repo?.git === false
+                  ? "Select a Git repository folder to review changes"
+                  : "Review changes"
+              }
               aria-pressed={reviewOpen && view === "changes"}
             >
               <GitCompareArrows size={15} />
@@ -815,8 +819,8 @@ function App() {
         <span>
           {repo ? (
             <>
-              <GitBranch size={12} />
-              {repo.branch}
+              {repo.git !== false && <GitBranch size={12} />}
+              {repo.branch || "Folder"}
               <span className="status-separator" />
               {changes.length} changed {changes.length === 1 ? "file" : "files"}
             </>
@@ -831,7 +835,7 @@ function App() {
               ? "Unsaved changes"
               : document
                 ? `${language(document.path)} · UTF-8`
-                : "Anvil desktop preview"}
+                : ""}
         </span>
       </footer>
     </div>

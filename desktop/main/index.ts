@@ -4,11 +4,33 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import * as pty from "node-pty";
 import { Workspace } from "./workspace";
+import { Agent } from "./agent";
 import type { FileDocument, DiffSide, TerminalEvent } from "../shared/api";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 let window: BrowserWindow;
 let workspace: Workspace | undefined;
+let directories: string[] = [];
+let agent: Agent | undefined;
+const providerCredentials = {
+  BYTEPLUS_ARK_API_KEY: process.env.BYTEPLUS_ARK_API_KEY,
+  BYTEPLUS_ARK_RESPONSES_URL: process.env.BYTEPLUS_ARK_RESPONSES_URL,
+};
+delete process.env.BYTEPLUS_ARK_API_KEY;
+delete process.env.BYTEPLUS_ARK_RESPONSES_URL;
+function currentAgent() {
+  return (agent ??= new Agent(
+    workspace?.root || app.getPath("userData"),
+    path.join(app.getPath("userData"), "tasks"),
+    app.isPackaged
+      ? path.join(process.resourcesPath, "runtime/anvil-runtime.exe")
+      : path.resolve(here, "../../runtime/opencode/dist/anvil-runtime.exe"),
+    (task) => {
+      if (!window.isDestroyed()) window.webContents.send("agent:task", task);
+    },
+    providerCredentials,
+  ));
+}
 let terminal: pty.IPty | undefined;
 let dirty = false;
 let closing = false;
@@ -23,7 +45,7 @@ function stopTerminal() {
   old?.kill();
 }
 function current() {
-  if (!workspace) throw new Error("Open a Git repository first.");
+  if (!workspace) throw new Error("Add a working directory first.");
   return workspace;
 }
 async function discardChanges() {
@@ -42,12 +64,20 @@ async function discardChanges() {
 async function selectRepository(root: string) {
   const next = await Workspace.open(root);
   const status = await next.status();
-  await writeFile(settingsFile(), JSON.stringify({ root: next.root }), "utf8");
-  if (workspace?.root !== next.root) stopTerminal();
+  if (!directories.includes(next.root)) directories.push(next.root);
+  await writeFile(
+    settingsFile(),
+    JSON.stringify({ root: next.root, directories }),
+    "utf8",
+  );
+  if (workspace?.root !== next.root) {
+    stopTerminal();
+  }
   workspace = next;
   dirty = false;
   window.setTitle(`${status.name} — Anvil`);
-  return status;
+  currentAgent().includeDirectory(next.root);
+  return { ...status, directories: [...directories] };
 }
 function registerIPC() {
   const trusted = (
@@ -68,6 +98,11 @@ function registerIPC() {
   handle("workspace:restore", async () => {
     try {
       const stored = JSON.parse(await readFile(settingsFile(), "utf8"));
+      directories = Array.isArray(stored.directories)
+        ? stored.directories.filter(
+            (value: unknown) => typeof value === "string",
+          )
+        : [];
       return await selectRepository(stored.root);
     } catch {
       return null;
@@ -76,14 +111,36 @@ function registerIPC() {
   handle("workspace:open", async () => {
     if (!(await discardChanges())) return null;
     const result = await dialog.showOpenDialog(window, {
-      title: "Open Git repository",
-      properties: ["openDirectory"],
+      title: "Add working directories",
+      properties: ["openDirectory", "multiSelections"],
     });
     if (result.canceled || !result.filePaths[0]) return null;
-    return selectRepository(result.filePaths[0]);
+    const opened = await Promise.all(
+      result.filePaths.map((root) => Workspace.open(root)),
+    );
+    for (const item of opened)
+      if (!directories.includes(item.root)) directories.push(item.root);
+    return selectRepository(opened[0].root);
+  });
+  handle("workspace:select", async (root: string) => {
+    if (!directories.includes(root))
+      throw new Error("Directory has not been added.");
+    if (!(await discardChanges())) return null;
+    return selectRepository(root);
   });
   handle("editor:discard", discardChanges);
-  handle("workspace:status", () => current().status());
+  handle("workspace:status", async () => ({
+    ...(await current().status()),
+    directories: [...directories],
+  }));
+  handle("agent:tasks", () => currentAgent().list());
+  handle("agent:start", (id: string, text: string) =>
+    currentAgent().start(id, text, directories, current().root),
+  );
+  handle("agent:cancel", (id: string) => currentAgent().cancel(id));
+  handle("agent:permission", (task: string, id: string, allow: boolean) =>
+    currentAgent().reply(task, id, allow),
+  );
   handle("workspace:list", (relative: string) => current().list(relative));
   handle("workspace:read", (relative: string) => current().read(relative));
   handle("workspace:save", (document: FileDocument) =>
@@ -181,7 +238,7 @@ app.whenReady().then(() => {
     height: 900,
     minWidth: 900,
     minHeight: 620,
-    backgroundColor: "#171b22",
+    backgroundColor: "#1b1b1b",
     title: "Anvil",
     webPreferences: {
       preload: path.join(here, "../preload/index.cjs"),
@@ -216,7 +273,10 @@ app.whenReady().then(() => {
         prompting = false;
       });
   });
-  window.on("closed", stopTerminal);
+  window.on("closed", () => {
+    stopTerminal();
+    agent?.stop();
+  });
   registerIPC();
   Menu.setApplicationMenu(
     Menu.buildFromTemplate([

@@ -4,5 +4,6 @@ node_modules/
 .env.*
 out/
 release/
+runtime/opencode/dist/
 test-results/
 playwright-report/

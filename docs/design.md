@@ -148,3 +148,29 @@ Anvil 要构建一个专注 coding 的 harness，让模型可以替换，让执�
 2026-10-30 验证结果：`npm test` 共 16 项通过（包含此前的 7 项 OAuth 协议测试）；CLI 帮助入口与差异检查通过。失败测试反馈、真实文件修改、验收测试通过的完整流程已在临时项目中验证。本轮未调用真实模型服务。
 
 Responses 工具调用协议参考：[官方说明](https://developers.openai.com/api/docs/guides/function-calling)。
+
+### Windows 执行内核验证（2026-10-31）
+
+新增独立实验 `experiments/opencode-runtime`：固定 OpenCode SDK 2.0.0 与 Bun 1.4.2，已通过 Windows x64 独立 EXE 的健康检查、会话创建、关闭和 SQLite 跨进程恢复；Electron 45.1.0 的 Node 模式父进程启动该 EXE 同样通过。源码、锁文件、复现命令和限制见实验 README。当前结论支持继续验证 Bun 独立执行进程路线，尚不代表真实模型、工具权限、任务取消、流式事件、桌面 IPC 或安装包接入已完成。产品依赖和打包配置尚未更改。
+
+CI 补充：提交 `5bb5f41` 的 [运行 41106437444](https://github.com/bazingaedward/anvil/actions/runs/41106437444) 中 macOS 通过，Windows 仍在 PTY 文件断言超时。本机修正参数后通过的结果不能推广为 CI 已修复；CI 环境中的剩余原因仍待定位。
+
+### 桌面真实模型接入（2026-10-31，后续验证）
+
+已将上述实验推进到产品：`runtime/opencode` 固定 SDK 2.0.0 / Bun 1.4.2，编译 Windows x64 独立进程；Windows 安装目录包含该 EXE。`desktop/main/agent.ts` 持有 Anvil 自己的任务 ID、对话关联、状态、持久化和权限请求；渲染层只接触自有 DTO，SDK 类型与事件仅在执行进程适配。任务完成表示模型执行结束，暂不代表验收测试通过。
+
+已接通发送、流式文本、逐次工具授权、取消、历史恢复及跨进程继续同一会话。每个仓库同时运行一项任务；切换仓库或关闭应用会停止任务，异常退出后的旧 running 状态恢复为 cancelled。取消先调用 SDK interrupt，五秒未退出则结束执行进程。密钥经 keygrant 注入启动进程，主进程与执行进程在启动下游进程前移除凭据环境变量；任务数据不包含凭据，原始 SDK stderr 不落盘或传给页面。SDK 状态隔离，项目 OpenCode 配置禁用。执行进程不是操作系统沙箱。
+
+真实供应商验证：BytePlus Ark Responses + `deepseek-v4-1-flash-261017`。纯模型回复、授权后读取临时 proof.txt、跨轮记住上下文均通过；扫描本轮生成的 SDK/任务数据未发现 API key 明文。实际 Electron 桌面测试进一步验证了 pending 权限取消、重启历史恢复；打包后的 `release/win-unpacked/Anvil.exe` 同一测试也通过。
+
+本轮检查：typecheck、10 项桌面单测、开发版常规 E2E、真实模型 E2E、打包版两项 E2E 全部通过。Windows 本机构建仍使用已验证的 node-pty 预编译文件（electron-builder npmRebuild=false）及本地 Electron；这不代表原有 Windows CI PTY 超时已修复。CI 已增加 Windows runtime 的安装与构建步骤，尚未推送触发远端验证。
+
+限制：当前供应商/模型固定；macOS agent runtime 未打包；没有独立验收检查、成本预算或执行沙箱。原 CLI 继续保留为内部实验，桌面只走 OpenCode 内核。复现命令见 `runtime/opencode/README.md`；本轮未提交或推送。
+
+### 会话与工作目录解耦、界面收敛（2026-10-31）
+
+根据产品调整，会话不再按仓库分组存储或在切换目录时重建。任务索引改为用户数据目录下的全局 conversations；旧按仓库保存的历史在选择对应目录时导入，并保留原 SDK 数据库路径。草稿迁移到统一会话列表。每轮任务接收所有已添加工作目录的绝对路径；同一会话保留最初执行目录与 SDK session，切换浏览目录不中断任务。原生目录选择器支持多选，普通目录不依赖 Git，文件编辑边界严格保留所选目录，不再自动扩展到 Git 根目录。Git 分支和 Diff 仅在所选目录本身为仓库根目录时启用。
+
+界面采用中性深灰、弱边框、较紧凑的顶栏和侧栏；删除重复标识与说明文案，对话和输入区统一阅读宽度，工具授权区分主次操作，增加 Ctrl/Command+Enter 发送。工作目录入口独立放在侧栏底部。
+
+验证：typecheck、11 项桌面单测、构建通过；真实 DeepSeek 任务在同一会话中读取一个 Git 仓库和另一个普通目录的文件，并保留上一轮上下文，通过。目录选择提供任务上下文与文件浏览范围，不等同于 OS 沙箱，也不自动替代工具执行授权。本轮不运行浏览器视觉验收，视觉效果由用户在应用中查看。

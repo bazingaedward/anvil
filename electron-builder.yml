@@ -12,6 +12,9 @@ mac:
   target: dmg
 win:
   target: nsis
+  extraResources:
+    - from: runtime/opencode/dist/anvil-runtime.exe
+      to: runtime/anvil-runtime.exe
 nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true

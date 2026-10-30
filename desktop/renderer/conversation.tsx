@@ -1,13 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import {
-  ArrowUp,
-  Folder,
-  GitBranch,
-  MessageSquare,
-  Plus,
-  TerminalSquare,
-} from "lucide-react";
-import type { RepoState } from "../shared/api";
+import { ArrowUp, Folder, Plus, TerminalSquare } from "lucide-react";
+import type { RepoState, AgentTask } from "../shared/api";
 
 type Draft = { id: string; text: string };
 const fresh = (): Draft => ({ id: crypto.randomUUID(), text: "" });
@@ -22,6 +15,7 @@ export function ConversationWorkspace({
   terminalOpen,
   onTerminal,
   onOpen,
+  onSelectDirectory,
 }: {
   repo: RepoState | null;
   tools: ReactNode;
@@ -30,11 +24,24 @@ export function ConversationWorkspace({
   terminalOpen: boolean;
   onTerminal: () => void;
   onOpen: () => void;
+  onSelectDirectory: (root: string) => void;
 }) {
-  const key = `anvil:drafts:${repo?.root || "welcome"}`;
+  const key = "anvil:conversations:v2";
   const [drafts, setDrafts] = useState<Draft[]>(() => {
     try {
-      const data: unknown = JSON.parse(localStorage.getItem(key) || "null");
+      const saved = localStorage.getItem(key);
+      const data: unknown = saved
+        ? JSON.parse(saved)
+        : Object.keys(localStorage)
+            .filter((name) => name.startsWith("anvil:drafts:"))
+            .flatMap((name) => {
+              try {
+                const items = JSON.parse(localStorage.getItem(name) || "[]");
+                return Array.isArray(items) ? items : [];
+              } catch {
+                return [];
+              }
+            });
       if (
         Array.isArray(data) &&
         data.length &&
@@ -43,7 +50,10 @@ export function ConversationWorkspace({
             typeof value?.id === "string" && typeof value?.text === "string",
         )
       )
-        return data;
+        return data.filter(
+          (item, index) =>
+            data.findIndex((other) => other.id === item.id) === index,
+        );
     } catch {
       /* A malformed local draft must not prevent the workspace opening. */
     }
@@ -51,6 +61,69 @@ export function ConversationWorkspace({
   });
   const [selected, setSelected] = useState(drafts[0].id);
   const [storageError, setStorageError] = useState(false);
+  const [tasks, setTasks] = useState<AgentTask[]>([]);
+  const [agentError, setAgentError] = useState("");
+  const [sending, setSending] = useState(false);
+  const conversationTasks = tasks.filter(
+    (task) => task.conversationID === selected,
+  );
+  const running = tasks.find((task) => task.status === "running");
+  useEffect(() => {
+    if (!repo) return;
+    let live = true;
+    const merge = (incoming: AgentTask) =>
+      setTasks((items) => {
+        const existing = items.find((item) => item.id === incoming.id);
+        if (existing && existing.updated > incoming.updated) return items;
+        return existing
+          ? items.map((item) => (item.id === incoming.id ? incoming : item))
+          : [...items, incoming];
+      });
+    const unsubscribe = window.anvil.onTask(merge);
+    void window.anvil
+      .tasks()
+      .then((items) => {
+        if (!live) return;
+        items.forEach(merge);
+        setDrafts((drafts) => {
+          const missing = [
+            ...new Set(items.map((item) => item.conversationID)),
+          ].filter((id) => !drafts.some((d) => d.id === id));
+          return [...drafts, ...missing.map((id) => ({ id, text: "" }))];
+        });
+      })
+      .catch((error) => {
+        if (live) setAgentError(String(error));
+      });
+    return () => {
+      live = false;
+      unsubscribe();
+    };
+  }, [repo?.root]);
+  async function send() {
+    setSending(true);
+    setAgentError("");
+    try {
+      await window.anvil.startTask(selected, draft.text);
+      update("");
+    } catch (error) {
+      setAgentError(String(error));
+    } finally {
+      setSending(false);
+    }
+  }
+  async function action(run: () => Promise<void>) {
+    try {
+      await run();
+      setAgentError("");
+    } catch (error) {
+      setAgentError(String(error));
+    }
+  }
+  const conversationTitle = (item: Draft) =>
+    tasks
+      .find((task) => task.conversationID === item.id)
+      ?.prompt.slice(0, 48) || title(item);
   const input = useRef<HTMLTextAreaElement>(null);
   const draft = drafts.find((item) => item.id === selected)!;
   useEffect(() => {
@@ -68,7 +141,11 @@ export function ConversationWorkspace({
     );
   }
   function create() {
-    const empty = drafts.find((item) => !item.text.trim());
+    const empty = drafts.find(
+      (item) =>
+        !item.text.trim() &&
+        !tasks.some((task) => task.conversationID === item.id),
+    );
     if (empty) setSelected(empty.id);
     else {
       const next = fresh();
@@ -84,10 +161,7 @@ export function ConversationWorkspace({
           <Plus size={16} />
           New conversation
         </button>
-        <div className="project-heading">
-          <Folder size={14} />
-          <span title={repo?.root}>{repo?.name || "No project open"}</span>
-        </div>
+        <div className="project-heading">Conversations</div>
         <div className="draft-list">
           {repo ? (
             drafts.map((item) => (
@@ -96,22 +170,47 @@ export function ConversationWorkspace({
                 className={`draft-item ${item.id === selected ? "selected" : ""}`}
                 onClick={() => setSelected(item.id)}
               >
-                <MessageSquare size={14} />
-                <span>{title(item)}</span>
-                <small>Draft</small>
+                <span>{conversationTitle(item)}</span>
+                {tasks.some(
+                  (task) =>
+                    task.conversationID === item.id &&
+                    task.status === "running",
+                ) && <span className="activity-dot" aria-label="Running" />}
               </button>
             ))
           ) : (
-            <p>Open a repository to start a coding conversation.</p>
+            <p>Add working folders to get started.</p>
           )}
         </div>
-        <p className="sidebar-footnote">
-          Your conversations belong to your project.
-        </p>
+        <section className="working-folders" aria-label="Working folders">
+          <div className="folders-heading">
+            <span>Working folders</span>
+            <button
+              aria-label="Add working folders"
+              title="Add working folders"
+              onClick={onOpen}
+            >
+              <Plus size={14} />
+            </button>
+          </div>
+          {(repo?.directories || []).map((root) => (
+            <button
+              key={root}
+              className={`folder-item ${repo?.root === root ? "selected" : ""}`}
+              title={root}
+              aria-pressed={repo?.root === root}
+              onClick={() => onSelectDirectory(root)}
+            >
+              <Folder size={14} />
+              <span>{root.split(/[\\/]/).filter(Boolean).pop()}</span>
+            </button>
+          ))}
+          {!repo && <p>No folders added</p>}
+        </section>
       </aside>
       <main className="conversation-main" aria-label="Conversation">
         <header className="conversation-toolbar">
-          <span className="conversation-title">{title(draft)}</span>
+          <span className="conversation-title">{conversationTitle(draft)}</span>
           <div className="workspace-tools">
             {tools}
             <button
@@ -125,27 +224,81 @@ export function ConversationWorkspace({
             </button>
           </div>
         </header>
-        <section className="conversation-body">
-          <div className="conversation-intro">
-            <div className="conversation-mark">
-              <MessageSquare size={24} strokeWidth={1.4} />
+        <section
+          className={`conversation-body ${conversationTasks.length ? "has-tasks" : ""}`}
+        >
+          {conversationTasks.length === 0 && (
+            <div className="conversation-intro">
+              <h1>What are we working on?</h1>
+              <p>
+                {repo
+                  ? "Ask about your code, plan a change, or start building."
+                  : "Add working folders to start a conversation."}
+              </p>
+              {!repo && (
+                <button className="primary-button" onClick={onOpen}>
+                  Add folders
+                </button>
+              )}
             </div>
-            <h1>What are we working on?</h1>
-            <p>
-              {repo
-                ? `Start with a task in ${repo.name}. Keep the conversation here and review code alongside it.`
-                : "Open your project, describe the task, and work through it with Anvil."}
-            </p>
-            {!repo && (
-              <button className="primary-button" onClick={onOpen}>
-                Open repository
-              </button>
-            )}
-          </div>
-          {repo && (
+          )}
+          {conversationTasks.map((task) => (
+            <article className="agent-task" key={task.id}>
+              <p className="agent-prompt">{task.prompt}</p>
+              <div className="response-heading">Anvil</div>
+              <div className="agent-response">
+                {task.text ||
+                  (task.status === "running" ? "Working…" : "No response")}
+              </div>
+              <small className={`task-state ${task.status}`} role="status">
+                {task.status}
+              </small>
+              {task.error && <p role="alert">{task.error}</p>}
+              {task.permissions.map((permission) => (
+                <section
+                  className="agent-permission"
+                  key={permission.id}
+                  aria-label="Tool approval"
+                >
+                  <strong>Allow {permission.action}?</strong>
+                  <pre>{permission.resources.join("\n")}</pre>
+                  {permission.message && <p>{permission.message}</p>}
+                  <button
+                    className="permission-deny"
+                    onClick={() =>
+                      void action(() =>
+                        window.anvil.replyPermission(
+                          task.id,
+                          permission.id,
+                          false,
+                        ),
+                      )
+                    }
+                  >
+                    Deny
+                  </button>
+                  <button
+                    className="permission-allow"
+                    onClick={() =>
+                      void action(() =>
+                        window.anvil.replyPermission(
+                          task.id,
+                          permission.id,
+                          true,
+                        ),
+                      )
+                    }
+                  >
+                    Allow once
+                  </button>
+                </section>
+              ))}
+            </article>
+          ))}
+          {repo && conversationTasks.length === 0 && (
             <div className="task-suggestions">
               {[
-                "Explain this repository",
+                "Explore these folders",
                 "Fix failing tests",
                 "Review current changes",
               ].map((task) => (
@@ -170,24 +323,52 @@ export function ConversationWorkspace({
               placeholder={
                 repo
                   ? "Describe a task, ask about your code, or plan a change…"
-                  : "Open a repository to prepare a task…"
+                  : "Add a working folder to prepare a task…"
               }
               value={draft.text}
               onChange={(event) => update(event.target.value)}
+              onKeyDown={(event) => {
+                if (
+                  event.key === "Enter" &&
+                  (event.ctrlKey || event.metaKey) &&
+                  !event.nativeEvent.isComposing &&
+                  repo &&
+                  draft.text.trim() &&
+                  !running &&
+                  !sending
+                ) {
+                  event.preventDefault();
+                  void send();
+                }
+              }}
               disabled={!repo}
-              rows={3}
+              rows={2}
             />
             <div className="composer-footer">
               <span className="composer-context">
-                <GitBranch size={13} />
-                {repo?.branch || "No repository"}
+                <Folder size={13} />
+                {repo
+                  ? `${repo.directories?.length || 1} working folder${(repo.directories?.length || 1) > 1 ? "s" : ""}`
+                  : "No folders"}
               </span>
-              <span className="connection-status">Agent not connected</span>
+              <span className="connection-status">
+                {running ? "Working" : "DeepSeek"}
+              </span>
+              {running && (
+                <button
+                  onClick={() =>
+                    void action(() => window.anvil.cancelTask(running.id))
+                  }
+                >
+                  Cancel task
+                </button>
+              )}
               <button
                 className="send-button"
                 aria-label="Send message"
-                title="Agent execution is not connected yet"
-                disabled
+                title="Send task"
+                onClick={() => void send()}
+                disabled={!repo || !draft.text.trim() || !!running || sending}
               >
                 <ArrowUp size={17} />
               </button>
@@ -199,7 +380,7 @@ export function ConversationWorkspace({
           >
             {storageError
               ? "Could not save this draft locally. Keep this window open to preserve it."
-              : "Drafts are saved on this device. Sending will be available when the agent is connected."}
+              : agentError || "Ctrl / ⌘ + Enter to send"}
           </p>
         </div>
         {terminal}

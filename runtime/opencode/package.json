@@ -1,0 +1,12 @@
+{
+  "name": "anvil-opencode-runtime",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@opencode/sdk": "2.0.0",
+    "@oven/bun-windows-x64": "1.4.2"
+  },
+  "scripts": {
+    "build": "node build.mjs"
+  }
+}

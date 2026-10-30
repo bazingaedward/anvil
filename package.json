@@ -13,6 +13,7 @@
     "chatgpt:probe": "node scripts/chatgpt-probe.mjs",
     "test": "node --test test/*.test.mjs && npm run test:desktop",
     "dev": "electron-vite dev",
+    "runtime:build": "node runtime/opencode/build.mjs",
     "build": "electron-vite build",
     "typecheck": "tsc --noEmit",
     "preview": "electron-vite preview",

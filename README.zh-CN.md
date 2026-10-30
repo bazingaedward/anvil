@@ -19,7 +19,7 @@
 - 按需打开 xterm.js 与 node-pty 交互终端，收起时保持进程运行。
 - 调整审阅面板和终端尺寸，启动时恢复上次打开的仓库。
 
-桌面**尚未接入 agent 执行**：发送按钮禁用，对话目前仅保存草稿。下一阶段重点是 harness；暂存、提交和推送目前通过终端完成。Git Graph、完整 Git 客户端、插件市场和独立浏览器产品不在本阶段范围。
+Windows x64 桌面已接入第一版 OpenCode 执行进程，支持流式回复、对话持久化、工具授权和取消。首个验证通过的供应商为 BytePlus Ark Responses，使用 DeepSeek 模型。构建执行进程和通过 keygrant 启动的步骤见[运行说明](runtime/opencode/README.md)。macOS 的 agent 打包仍待接入；暂存、提交和推送目前通过终端完成。
 
 开发需要 Node.js 22.12+ 与 Git。安装包用户无需安装 Node.js 或 npm，但需另外安装 Git 和项目所需开发工具。
 

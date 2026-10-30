@@ -19,7 +19,7 @@ The desktop preview puts coding conversations at the center, with code review al
 - Open an interactive terminal on demand using xterm.js and node-pty; collapsing it keeps the process running.
 - Resize the review panel and terminal; restore the last repository on launch.
 
-The desktop **does not run the agent yet**: sending is disabled and conversations are drafts only. Agent integration is next; the core investment is the harness, not a full Git client. Stage, commit, and push through the terminal for now. There is no Git Graph, plugin marketplace, or separate browser product.
+The Windows x64 desktop now has an initial OpenCode-backed agent integration: streaming replies, persistent conversations, tool approval and cancellation. The first validated provider is BytePlus Ark Responses with DeepSeek. See the [runtime setup](runtime/opencode/README.md) for building the runtime and launching through keygrant. macOS agent packaging is still pending. Stage, commit, and push through the terminal for now.
 
 Development requires Node.js 22.12+ and Git. End users of packaged builds do not need Node.js or npm; Git and the project's development tools must be installed separately.
 

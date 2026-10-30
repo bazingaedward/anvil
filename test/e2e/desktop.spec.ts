@@ -73,7 +73,7 @@ test("real desktop opens, saves safely, reviews both diffs and runs a PTY", asyn
       });
     }, root);
     await page
-      .getByRole("button", { name: "Open repository", exact: true })
+      .getByRole("button", { name: "Add folders", exact: true })
       .first()
       .click();
     await expect(
@@ -184,9 +184,7 @@ test("real desktop opens, saves safely, reviews both diffs and runs a PTY", asyn
     await page.keyboard.insertText(command.trimEnd());
     // The renderer dispatches input before the native shell finishes processing it.
     await expect
-      .poll(async () =>
-        (await terminalBody.innerText()).replace(/\s/g, ""),
-      )
+      .poll(async () => (await terminalBody.innerText()).replace(/\s/g, ""))
       .toContain(command.replace(/\s/g, ""));
     await page.keyboard.press("Enter");
     await expect
@@ -197,7 +195,7 @@ test("real desktop opens, saves safely, reviews both diffs and runs a PTY", asyn
     await page.screenshot({ path: "test-results/desktop-workspace.png" });
     // Reopening the same repository must not silently kill its terminal.
     await page
-      .getByRole("button", { name: "Open repository", exact: true })
+      .getByRole("button", { name: "Add folders", exact: true })
       .first()
       .click();
     await rm(output);
@@ -250,7 +248,10 @@ test("real desktop opens, saves safely, reviews both diffs and runs a PTY", asyn
       ),
     );
     console.error("PTY output", JSON.stringify(terminalOutput.join("")));
-    console.error("Proof bytes", await readFile(path.join(root, "terminal-proof.txt")).catch(String));
+    console.error(
+      "Proof bytes",
+      await readFile(path.join(root, "terminal-proof.txt")).catch(String),
+    );
     throw error;
   } finally {
     await app

@@ -1,6 +1,18 @@
 import { contextBridge, ipcRenderer } from "electron";
-import type { DesktopAPI, TerminalEvent } from "../shared/api";
+import type { DesktopAPI, TerminalEvent, AgentTask } from "../shared/api";
 const api: DesktopAPI = {
+  selectDirectory: (root) => ipcRenderer.invoke("workspace:select", root),
+  tasks: () => ipcRenderer.invoke("agent:tasks"),
+  startTask: (id, text) => ipcRenderer.invoke("agent:start", id, text),
+  cancelTask: (id) => ipcRenderer.invoke("agent:cancel", id),
+  replyPermission: (task, id, allow) =>
+    ipcRenderer.invoke("agent:permission", task, id, allow),
+  onTask: (listener) => {
+    const handler = (_event: Electron.IpcRendererEvent, task: AgentTask) =>
+      listener(task);
+    ipcRenderer.on("agent:task", handler);
+    return () => ipcRenderer.removeListener("agent:task", handler);
+  },
   restore: () => ipcRenderer.invoke("workspace:restore"),
   openRepository: () => ipcRenderer.invoke("workspace:open"),
   status: () => ipcRenderer.invoke("workspace:status"),

@@ -29,13 +29,16 @@ async function fixture(
   return { root, workspace: await Workspace.open(root) };
 }
 
-test("opens repository roots from nested directories and handles unborn HEAD", async (t) => {
+test("preserves the selected directory boundary and handles unborn HEAD", async (t) => {
   const { root, workspace } = await fixture(t, false);
   await mkdir(path.join(root, "nested"));
   assert.equal(
     (await Workspace.open(path.join(root, "nested"))).root,
-    workspace.root,
+    path.join(workspace.root, "nested"),
   );
+  const nested = await Workspace.open(path.join(root, "nested"));
+  assert.equal((await nested.status()).git, false);
+  await assert.rejects(nested.read("../hello.ts"), /outside/);
   assert.equal((await workspace.status()).branch, "main");
   await git(root, ["add", "hello.ts"]);
   assert.deepEqual(await workspace.diff("hello.ts", "index"), {
@@ -43,6 +46,18 @@ test("opens repository roots from nested directories and handles unborn HEAD", a
     original: "",
     modified: "export const hello = 1;\n",
   });
+});
+
+test("ordinary directories support file editing without Git", async (t) => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "anvil-folder-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await writeFile(path.join(root, "note.txt"), "hello");
+  const folder = await Workspace.open(root);
+  assert.equal((await folder.status()).git, false);
+  assert.equal((await folder.status()).branch, "");
+  const note = await folder.read("note.txt");
+  await folder.save({ ...note, content: "updated" });
+  assert.equal((await folder.read("note.txt")).content, "updated");
 });
 
 test("diffs index and worktree independently and preserves unrelated staged edits on save", async (t) => {

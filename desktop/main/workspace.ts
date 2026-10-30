@@ -76,14 +76,25 @@ export class Workspace {
 
   static async open(directory: string) {
     const selected = await realpath(directory);
-    // Resolve the root via Git so opening a subdirectory still opens its repository.
-    const root = (await git(selected, ["rev-parse", "--show-toplevel"]))
-      .toString()
-      .trimEnd();
-    return new Workspace(await realpath(root));
+    if (!(await lstat(selected)).isDirectory())
+      throw new Error("Select a directory.");
+    // The picker authorizes exactly this directory, never its parent repository.
+    return new Workspace(selected);
   }
 
   async status(): Promise<RepoState> {
+    const gitRoot = await git(this.root, ["rev-parse", "--show-toplevel"]).then(
+      (result) => realpath(result.toString().trimEnd()),
+      () => null,
+    );
+    if (gitRoot !== this.root)
+      return {
+        root: this.root,
+        name: path.basename(this.root),
+        branch: "",
+        changes: [],
+        git: false,
+      };
     const [raw, branch] = await Promise.all([
       git(this.root, [
         "status",
@@ -100,6 +111,7 @@ export class Workspace {
       name: path.basename(this.root),
       branch: branch.toString().trim(),
       changes: parseStatus(raw),
+      git: true,
     };
   }
 
