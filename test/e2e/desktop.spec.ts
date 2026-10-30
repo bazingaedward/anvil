@@ -33,8 +33,28 @@ test("real desktop opens, saves safely, reviews both diffs and runs a PTY", asyn
     env,
   });
   let page;
+  const terminalOutput: string[] = [];
   try {
     page = await app.firstWindow();
+    // Capture only this fixture's PTY traffic to diagnose platform-specific failures.
+    await app.evaluate(({ ipcMain }) => {
+      const state = globalThis as unknown as { anvilTestInput: string[] };
+      state.anvilTestInput = [];
+      ipcMain.on("terminal:input", (_event, data) =>
+        state.anvilTestInput.push(data),
+      );
+    });
+    await page.exposeFunction("recordTestTerminal", (data: string) =>
+      terminalOutput.push(data),
+    );
+    await page.evaluate(() => {
+      window.anvil.onTerminal((event) => {
+        if (event.type === "data")
+          (
+            window as unknown as { recordTestTerminal: (data: string) => void }
+          ).recordTestTerminal(event.data);
+      });
+    });
     const errors: string[] = [];
     page.on("pageerror", (error) => {
       errors.push(error.message);
@@ -212,6 +232,17 @@ test("real desktop opens, saves safely, reviews both diffs and runs a PTY", asyn
     expect(errors).toEqual([]);
   } catch (error) {
     console.error(await page?.locator("body").innerText());
+    console.error(
+      "PTY input",
+      JSON.stringify(
+        await app.evaluate(
+          () =>
+            (globalThis as unknown as { anvilTestInput: string[] })
+              .anvilTestInput,
+        ),
+      ),
+    );
+    console.error("PTY output", JSON.stringify(terminalOutput.join("")));
     throw error;
   } finally {
     await app
