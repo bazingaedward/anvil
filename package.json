@@ -1,0 +1,19 @@
+{
+  "name": "anvil",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "anvil": "node src/cli.mjs",
+    "chatgpt:login": "node scripts/chatgpt-login.mjs",
+    "chatgpt:probe": "node scripts/chatgpt-probe.mjs",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "jose": "6.2.14"
+  }
+}

@@ -1,34 +1,58 @@
 # Anvil
 
-专注 coding、模型可替换的开源 agent harness。
+English | [简体中文](README.zh-CN.md)
 
-模型会更迭，可靠完成编程任务的执行框架应当持续积累。Anvil 的目标是把代码理解、工具执行、修改验证和失败重试连接起来，让不同模型都能在真实代码仓库中完成任务。
+An open-source, model-agnostic agent harness focused on coding.
 
-## 项目目标
+**Our long-term goal is to build a model-agnostic coding harness that surpasses Claude on real-world coding tasks.** Claude Code is our primary product benchmark. Progress toward this goal will be measured through reproducible evaluations.
 
-- **专注编程**：围绕理解代码、修复问题、实现需求和验证修改构建工作流。
-- **模型可替换**：通过统一适配层接入不同模型提供商，避免核心执行流程绑定某一个模型。
-- **验证驱动**：修改之后运行适当检查，根据结果继续修复，并给出可核验的交付说明。
-- **可衡量的进步**：以真实编程任务的成功率、成本和耗时衡量效果，长期目标是超过 Claude Code 的编程任务表现。
+Models change. Anvil focuses on the execution loop around them: understanding a repository, choosing tools, making precise edits, running checks, and repairing failures.
 
-## 当前状态
+## What works today
 
-项目处于设计阶段，尚未实现可运行的 harness。以上内容是建设目标，不代表已具备的能力或性能结论。
+- A local CLI with a provider-independent execution loop and an initial OpenAI Responses API adapter.
+- File listing, literal text search, file reading, exact text replacement, new file creation, and command execution.
+- Interactive approval for edits and model-requested commands. Non-interactive runs deny those operations.
+- A user-supplied acceptance check: failures return to the model for repair; no check means the result is **unverified**.
+- Bounded model turns, context size, file size, command output, and execution time.
+- File-tool path checks and stale-read detection to reduce accidental overwrites.
 
-首个版本计划打通单任务执行闭环：
+This is an early prototype. Local tests use scripted model responses while exercising real files and test processes. Live model execution and comparisons against Claude have not been validated. Only one real provider adapter exists so far.
 
-1. 接收任务与目标仓库。
-2. 搜索、读取必要的代码上下文。
-3. 由模型选择工具并生成修改。
-4. 执行相关测试或检查，根据失败结果进行有界重试。
-5. 输出修改摘要、验证结果和未完成事项。
+## Run locally
 
-初期以本地 coding 工作流为范围；具体运行入口、实现语言和首个模型接入方式在开发前确定。
+Requirements: Node.js 22+, ripgrep (`rg`), and an OpenAI API key stored in keygrant under `OPENAI_API_KEY`. API-key requests use separately billed API access; they do not consume ChatGPT subscription allowance.
 
-## 设计文档
+```sh
+npm ci
+npm test
+npm run anvil -- --help
+```
 
-参见 [初始设计](docs/design.md)，了解问题定义、模块边界、首版范围与验收方式。
+Run from an interactive terminal, replacing the repository path and model ID with your own:
 
-## 许可证
+```sh
+keygrant exec --redact OPENAI_API_KEY -- npm run anvil -- \
+  --repo /path/to/repository \
+  --model MODEL_ID \
+  --check 'npm test' \
+  'Fix the failing test with the smallest relevant change.'
+```
 
-本项目采用 [MIT License](LICENSE)。
+Anvil shows each proposed edit or command and asks for approval. The command supplied through `--check` is already authorized and may run repeatedly. A passing check produces `completed`; no check produces `unverified` (exit code 2). A denied operation stops the run. Other failures, cancellation, or limits produce exit code 1. Review the resulting diff before committing.
+
+This is a local executor, **not a sandbox**. Approved commands run with your user permissions. File tools reject traversal, symlinks, and selected sensitive paths, but those checks do not constrain shell commands. Commands receive a reduced environment without the model API key. No conversation transcript is saved by default.
+
+## Design and evaluation
+
+See the [design document](docs/design.md) (in Chinese) for module boundaries, implementation decisions, and acceptance criteria.
+
+Future Claude comparisons should use the same tasks, starting repositories, environments, permissions, and budgets, with model and product versions recorded. Measure success rate, elapsed time, cost, and human intervention across repeated runs.
+
+## ChatGPT subscription experiment
+
+The separate OAuth smoke test is paused after account/workspace permission failures. It has not completed a real inference request and is not the CLI's authentication path. See the [test guide and findings](docs/chatgpt-smoke-test.md) (in Chinese).
+
+## License
+
+[MIT License](LICENSE).

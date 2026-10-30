@@ -1,0 +1,4 @@
+node_modules/
+.anvil/
+.env
+.env.*
