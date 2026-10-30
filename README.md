@@ -10,15 +10,16 @@ Models change. Anvil focuses on the execution loop around them: understanding a 
 
 ## Desktop preview
 
-The first desktop milestone provides a local workspace for reviewing and editing code:
+The desktop preview puts coding conversations at the center, with code review alongside them:
 
-- Open a Git repository and browse its files.
+- Open a Git repository and prepare local conversation drafts, restored after restart.
+- Keep the conversation and composer visible while opening files or reviewing changes in a side panel.
 - Edit UTF-8 text with Monaco; reject stale saves and protect unsaved edits.
 - Review working-tree and staged diffs separately, including new, deleted, and renamed files.
-- Run an interactive terminal in the repository using xterm.js and node-pty.
-- Resize the sidebar and terminal; restore the last repository on launch.
+- Open an interactive terminal on demand using xterm.js and node-pty; collapsing it keeps the process running.
+- Resize the review panel and terminal; restore the last repository on launch.
 
-The desktop **does not run the agent yet**. Agent integration is next; the core investment is the harness, not a full Git client. Stage, commit, and push through the terminal for now. There is no Git Graph, plugin marketplace, or separate browser product.
+The desktop **does not run the agent yet**: sending is disabled and conversations are drafts only. Agent integration is next; the core investment is the harness, not a full Git client. Stage, commit, and push through the terminal for now. There is no Git Graph, plugin marketplace, or separate browser product.
 
 Development requires Node.js 22.12+ and Git. End users of packaged builds do not need Node.js or npm; Git and the project's development tools must be installed separately.
 

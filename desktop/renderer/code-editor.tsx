@@ -70,7 +70,7 @@ export function CodeDiff({
       ...options,
       readOnly: true,
       originalEditable: false,
-      renderSideBySide: true,
+      renderSideBySide: false,
     });
     instance.setModel({ original: before, modified: after });
     return () => {

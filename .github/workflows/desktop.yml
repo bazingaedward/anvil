@@ -21,6 +21,9 @@ jobs:
         with:
           node-version: 22
           cache: npm
+      - name: Install ripgrep for harness tests
+        if: runner.os == 'macOS'
+        run: command -v rg || brew install ripgrep
       - run: npm ci
       - run: npm run typecheck
       - run: npm run test:desktop

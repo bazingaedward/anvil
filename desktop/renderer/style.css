@@ -575,3 +575,299 @@ kbd {
   min-height: 0;
   overflow: hidden;
 }
+/* Conversation is the primary surface; repository tools live in a secondary panel. */
+.conversation-sidebar {
+  width: 224px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  background: #1c222c;
+  border-right: 1px solid #303a49;
+  padding: 16px 10px 12px;
+  min-height: 0;
+}
+.new-conversation {
+  justify-content: flex-start;
+  padding: 9px 12px;
+  background: #293344;
+  margin-bottom: 24px;
+  font-size: 12px;
+  color: #d1def0;
+}
+.project-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #a6b6cc;
+  padding: 0 10px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  min-width: 0;
+}
+.project-heading span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.draft-list {
+  flex: 1;
+  overflow: auto;
+  min-height: 0;
+}
+.draft-list > p {
+  font-size: 12px;
+  line-height: 1.7;
+  color: #8d9bb0;
+  padding: 0 12px;
+}
+.draft-item {
+  display: flex;
+  justify-content: flex-start;
+  text-align: left;
+  width: 100%;
+  padding: 10px;
+  gap: 8px;
+  min-height: 38px;
+  color: #a6b4c8;
+  font-size: 12px;
+}
+.draft-item > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+.draft-item small {
+  font-size: 10px;
+  color: #8496af;
+}
+.draft-item.selected {
+  background: #2a3546;
+  color: #dfebfc;
+}
+.sidebar-footnote {
+  font-size: 11px;
+  line-height: 1.6;
+  color: #7f8fa6;
+  padding: 0 10px;
+  margin: 16px 0 0;
+}
+.conversation-main {
+  flex: 1;
+  min-width: 300px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.conversation-toolbar {
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #29313e;
+  padding: 0 20px;
+  gap: 12px;
+  flex-shrink: 0;
+}
+.conversation-title {
+  font-size: 12px;
+  color: #b8c6d9;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.workspace-tools {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+}
+.workspace-tools button {
+  font-size: 11px;
+  padding: 4px 8px;
+  color: #97aac3;
+}
+.workspace-tools button[aria-pressed="true"] {
+  background: #29394e;
+  color: #d7e6fc;
+}
+.conversation-body {
+  flex: 1;
+  min-height: 100px;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 30px 32px;
+  gap: 26px;
+}
+.conversation-intro {
+  width: 100%;
+  max-width: 620px;
+  text-align: left;
+}
+.conversation-mark {
+  color: #9cb5d7;
+  margin-bottom: 18px;
+}
+.conversation-intro h1 {
+  font-size: clamp(24px, 2.5vw, 32px);
+  font-weight: 500;
+  letter-spacing: -0.8px;
+  margin: 0 0 14px;
+}
+.conversation-intro p {
+  color: #8f9fb6;
+  font-size: 13px;
+  line-height: 1.8;
+  max-width: 460px;
+  margin: 0;
+}
+.conversation-intro .primary-button {
+  margin-top: 24px;
+}
+.task-suggestions {
+  width: 100%;
+  max-width: 620px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.task-suggestions button {
+  font-size: 11px;
+  border: 1px solid #354255;
+  color: #adbed6;
+  padding: 7px 10px;
+  border-radius: 6px;
+}
+.composer-wrap {
+  width: calc(100% - 64px);
+  max-width: 760px;
+  margin: 0 auto 26px;
+  flex-shrink: 0;
+}
+.composer {
+  border: 1px solid #46566c;
+  border-radius: 12px;
+  background: #202733;
+  overflow: hidden;
+}
+.composer:focus-within {
+  border-color: #87b7f5;
+}
+.composer textarea {
+  display: block;
+  resize: vertical;
+  width: 100%;
+  min-height: 85px;
+  max-height: 220px;
+  padding: 17px 18px 10px;
+  font: inherit;
+  line-height: 1.7;
+  color: #e0e9f6;
+  background: transparent;
+  border: 0;
+  outline: none;
+}
+.composer textarea:disabled {
+  opacity: 0.5;
+}
+.composer textarea::placeholder {
+  color: #7e90a8;
+}
+.composer-footer {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px 11px;
+  font-size: 10px;
+  color: #95a8c3;
+}
+.composer-context {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.connection-status {
+  margin-left: auto;
+  color: #8e9bb0;
+}
+.send-button {
+  width: 28px;
+  height: 28px;
+  min-height: 28px;
+  background: #475c79;
+  color: #d7e6fa;
+  flex-shrink: 0;
+}
+.draft-notice {
+  font-size: 10px;
+  line-height: 1.6;
+  color: #7e8da3;
+  margin: 10px 7px 0;
+}
+.storage-error {
+  color: #e6b3bb;
+}
+.review-panel {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  min-width: 300px;
+  max-width: calc(100vw - 510px);
+  min-height: 0;
+  background: #1c222c;
+}
+.review-panel .sidebar-tabs {
+  height: 48px;
+}
+.review-panel .close-review {
+  margin-left: auto;
+}
+.review-browser {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+.review-panel .editor-area {
+  background: #171b22;
+}
+.review-panel .editor-toolbar {
+  padding: 0 8px;
+}
+.review-panel .editor-toolbar > button {
+  flex-shrink: 0;
+}
+.review-panel .file-tab {
+  flex: 1;
+}
+.review-panel .diff-label {
+  display: block;
+  flex-shrink: 0;
+  margin-left: 0;
+}
+@media (max-width: 1100px) {
+  .conversation-sidebar {
+    width: 180px;
+  }
+  .conversation-toolbar {
+    padding: 0 12px;
+  }
+  .workspace-tools button > span:not(.count) {
+    display: none;
+  }
+  .composer-wrap {
+    width: calc(100% - 32px);
+  }
+  .conversation-body {
+    padding: 24px 20px;
+  }
+  .connection-status {
+    font-size: 9px;
+  }
+}

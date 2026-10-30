@@ -21,8 +21,7 @@ import {
   Hammer,
   ArrowUpRight,
   Circle,
-  PanelBottomClose,
-  PanelBottomOpen,
+  ArrowLeft,
   Search,
 } from "lucide-react";
 import type {
@@ -35,6 +34,7 @@ import type {
 } from "../shared/api";
 import "@xterm/xterm/css/xterm.css";
 import "./style.css";
+import { ConversationWorkspace } from "./conversation";
 import { CodeEditor, CodeDiff } from "./code-editor";
 
 declare global {
@@ -318,8 +318,11 @@ function App() {
   const [busy, setBusy] = useState(false);
   const [query, setQuery] = useState("");
   const [revision, setRevision] = useState(0);
-  const [terminalHidden, setTerminalHidden] = useState(false);
-  const [sidebarWidth, setSidebarWidth] = useState(268);
+  const [terminalHidden, setTerminalHidden] = useState(true);
+  const [terminalStarted, setTerminalStarted] = useState(false);
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const [reviewDetail, setReviewDetail] = useState(false);
+  const [sidebarWidth, setSidebarWidth] = useState(480);
   const [terminalHeight, setTerminalHeight] = useState(230);
   const dirty = !!document && text !== document.content;
   const report = useCallback((value: unknown) => setError(message(value)), []);
@@ -375,7 +378,10 @@ function App() {
     if (busy) return;
     setBusy(true);
     try {
-      if (dirty && !(await api.confirmDiscard())) return;
+      if (dirty && !(await api.confirmDiscard())) {
+        setReviewDetail(true);
+        return;
+      }
       setError("");
       await action();
     } catch (error) {
@@ -391,7 +397,13 @@ function App() {
     try {
       const next = await api.openRepository();
       if (next) {
+        if (next.root !== repo?.root) {
+          setTerminalStarted(false);
+          setTerminalHidden(true);
+        }
         setRepo(next);
+        setReviewOpen(false);
+        setReviewDetail(false);
         setDocument(null);
         setDiff(null);
         setText("");
@@ -410,6 +422,7 @@ function App() {
       setDocument(value);
       setText(value.content);
       setDiff(null);
+      setReviewDetail(true);
     });
   }
   function openDiff(path: string, side: DiffSide) {
@@ -418,6 +431,7 @@ function App() {
       setDiff({ ...value, side });
       setDocument(null);
       setText("");
+      setReviewDetail(true);
     });
   }
   function resize(event: React.PointerEvent, kind: "sidebar" | "terminal") {
@@ -428,7 +442,10 @@ function App() {
     const move = (next: PointerEvent) => {
       if (kind === "sidebar")
         setSidebarWidth(
-          Math.max(210, Math.min(440, initial + next.clientX - start)),
+          Math.max(
+            320,
+            Math.min(window.innerWidth * 0.55, initial + start - next.clientX),
+          ),
         );
       else
         setTerminalHeight(
@@ -446,6 +463,286 @@ function App() {
     window.addEventListener("pointerup", stop);
   }
   const changes = repo?.changes || [];
+  function toggleReview(next: "files" | "changes") {
+    if (next !== view) setReviewDetail(false);
+    setView(next);
+    setReviewOpen(true);
+  }
+  function toggleTerminal() {
+    setTerminalStarted(true);
+    setTerminalHidden((value) => !value);
+  }
+  const browser = repo ? (
+    <div className="review-browser">
+      <div className="sidebar-heading">
+        <span title={repo.root}>{repo.name}</span>
+        <button
+          aria-label="Refresh repository"
+          title="Refresh repository"
+          onClick={() => {
+            void refresh();
+            setRevision((value) => value + 1);
+          }}
+        >
+          <RefreshCw size={13} />
+        </button>
+      </div>
+      {view === "files" ? (
+        <>
+          <div className="file-filter">
+            <Search size={13} />
+            <input
+              aria-label="Filter visible files"
+              placeholder="Filter visible files…"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+            />
+          </div>
+          <div className="sidebar-scroll">
+            <Tree
+              key={repo.root}
+              root={repo.root}
+              onOpen={openFile}
+              active={document?.path}
+              query={query}
+              revision={revision}
+              report={report}
+            />
+          </div>
+        </>
+      ) : (
+        <div className="sidebar-scroll changes-list">
+          {(["worktree", "index"] as const).map((side) => {
+            const items = changes.filter((item) =>
+              side === "index"
+                ? item.index !== " " && item.index !== "?"
+                : item.worktree !== " ",
+            );
+            return (
+              <section key={side}>
+                <h2>
+                  {side === "index" ? "Staged changes" : "Working changes"}
+                  <span>{items.length}</span>
+                </h2>
+                {items.map((item) => (
+                  <button
+                    className={`change-row ${diff?.path === item.path && diff.side === side ? "selected" : ""}`}
+                    key={item.path}
+                    title={
+                      item.originalPath
+                        ? `${item.originalPath} → ${item.path}`
+                        : item.path
+                    }
+                    onClick={() => openDiff(item.path, side)}
+                  >
+                    <FileCode2 size={14} />
+                    <span>{item.path}</span>
+                    <b
+                      className={`change-code code-${side === "index" ? item.index : item.worktree}`}
+                    >
+                      {side === "index"
+                        ? item.index
+                        : item.worktree === "?"
+                          ? "U"
+                          : item.worktree}
+                    </b>
+                  </button>
+                ))}
+              </section>
+            );
+          })}
+          {changes.length === 0 && (
+            <div className="clean-state">
+              <GitCompareArrows size={24} />
+              <strong>Working tree clean</strong>
+              <p>File changes will appear here.</p>
+            </div>
+          )}
+          <p className="git-note">
+            Review changes here. Use the terminal to stage, commit, and push.
+          </p>
+        </div>
+      )}
+    </div>
+  ) : null;
+  const editor = repo ? (
+    <div className="editor-area">
+      <div className="editor-toolbar">
+        <button
+          aria-label="Back to file list"
+          title="Back to file list"
+          onClick={() => setReviewDetail(false)}
+        >
+          <ArrowLeft size={15} />
+        </button>
+        <div className="file-tab">
+          {document || diff ? (
+            <>
+              <FileCode2 size={14} />
+              <span title={document?.path || diff?.path}>
+                {document?.path || diff?.path}
+              </span>
+              {dirty && (
+                <Circle
+                  size={8}
+                  fill="currentColor"
+                  aria-label="Unsaved changes"
+                />
+              )}
+              {diff && (
+                <span className="diff-label">
+                  {diff.side === "index"
+                    ? "HEAD ↔ Index"
+                    : "Index ↔ Working tree"}
+                </span>
+              )}
+            </>
+          ) : (
+            <span className="muted">Workspace</span>
+          )}
+        </div>
+        <div className="editor-actions">
+          {document && (
+            <>
+              <button
+                title="Reload file from disk"
+                aria-label="Reload file"
+                disabled={busy}
+                onClick={() => openFile(document.path)}
+              >
+                <RefreshCw size={14} />
+              </button>
+              <button
+                aria-label="Save file"
+                className="save-button"
+                disabled={!dirty || busy}
+                onClick={() => void save()}
+              >
+                <Save size={14} />
+                Save
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+      {document ? (
+        <CodeEditor
+          key={`${repo.root}:${document.path}`}
+          language={language(document.path)}
+          value={text}
+          onChange={setText}
+        />
+      ) : diff ? (
+        <CodeDiff
+          original={diff.original}
+          modified={diff.modified}
+          language={language(diff.path)}
+        />
+      ) : (
+        <div className="editor-empty">
+          <FileCode2 size={30} strokeWidth={1.2} />
+          <h1>{repo.name}</h1>
+          <p>Select a file to edit or a change to review.</p>
+          <div className="shortcut">
+            <kbd>{navigator.platform.includes("Mac") ? "⌘" : "Ctrl"} S</kbd>
+            <span>Save the current file</span>
+          </div>
+        </div>
+      )}
+    </div>
+  ) : null;
+  const review =
+    repo && reviewOpen ? (
+      <>
+        <div
+          className="resize-column"
+          role="separator"
+          aria-label="Review panel width"
+          aria-orientation="vertical"
+          tabIndex={0}
+          onPointerDown={(event) => resize(event, "sidebar")}
+          onKeyDown={(event) => {
+            if (event.key === "ArrowLeft")
+              setSidebarWidth((value) =>
+                Math.min(window.innerWidth * 0.55, value + 20),
+              );
+            if (event.key === "ArrowRight")
+              setSidebarWidth((value) => Math.max(320, value - 20));
+          }}
+        />
+        <aside
+          className="review-panel"
+          aria-label="Repository review"
+          style={{ width: sidebarWidth }}
+        >
+          <div className="sidebar-tabs">
+            <button
+              className={view === "files" ? "active" : ""}
+              onClick={() => {
+                setView("files");
+                setReviewDetail(false);
+              }}
+            >
+              <Folder size={14} />
+              Files
+            </button>
+            <button
+              className={view === "changes" ? "active" : ""}
+              onClick={() => {
+                setView("changes");
+                setReviewDetail(false);
+              }}
+            >
+              <GitCompareArrows size={14} />
+              Changes<span className="count">{changes.length}</span>
+            </button>
+            <button
+              className="close-review"
+              aria-label="Close review panel"
+              onClick={() => setReviewOpen(false)}
+            >
+              <X size={15} />
+            </button>
+          </div>
+          {reviewDetail ? editor : browser}
+        </aside>
+      </>
+    ) : null;
+  const terminalView = repo ? (
+    <>
+      {!terminalHidden && (
+        <div
+          className="resize-row"
+          role="separator"
+          aria-label="Terminal height"
+          aria-orientation="horizontal"
+          tabIndex={0}
+          onPointerDown={(event) => resize(event, "terminal")}
+          onKeyDown={(event) => {
+            if (event.key === "ArrowUp")
+              setTerminalHeight((value) =>
+                Math.min(window.innerHeight - 300, value + 20),
+              );
+            if (event.key === "ArrowDown")
+              setTerminalHeight((value) => Math.max(130, value - 20));
+          }}
+        />
+      )}
+      {terminalStarted && (
+        <div
+          className="terminal-container"
+          style={{ height: terminalHidden ? 0 : terminalHeight }}
+        >
+          <TerminalPanel
+            key={repo.root}
+            root={repo.root}
+            hidden={terminalHidden}
+            onError={report}
+          />
+        </div>
+      )}
+    </>
+  ) : null;
   return (
     <div className="application">
       <header className="app-header">
@@ -480,289 +777,40 @@ function App() {
           </button>
         </div>
       )}
-      {!repo ? (
-        <main className="welcome">
-          <div className="welcome-symbol">
-            <Hammer size={38} strokeWidth={1.3} />
-          </div>
-          <h1>A workspace for the work.</h1>
-          <p>
-            Open a Git repository to explore your code,
-            <br />
-            review changes, and run your tools.
-          </p>
-          <button
-            className="primary-button"
-            onClick={() => void openRepository()}
-            disabled={busy}
-          >
-            <FolderOpen size={16} />
-            Open repository
-          </button>
-          <div className="welcome-capabilities">
-            <span>
-              <FileCode2 size={16} />
-              Code
-            </span>
-            <span>
-              <GitCompareArrows size={16} />
-              Changes
-            </span>
-            <span>
-              <TerminalSquare size={16} />
-              Terminal
-            </span>
-          </div>
-        </main>
-      ) : (
-        <div className="workspace">
-          <aside className="sidebar" style={{ width: sidebarWidth }}>
-            <div className="sidebar-tabs">
-              <button
-                className={view === "files" ? "active" : ""}
-                onClick={() => setView("files")}
-              >
-                <Folder size={14} />
-                Explorer
-              </button>
-              <button
-                className={view === "changes" ? "active" : ""}
-                onClick={() => setView("changes")}
-              >
-                <GitCompareArrows size={14} />
-                Changes<span className="count">{changes.length}</span>
-              </button>
-            </div>
-            <div className="sidebar-heading">
-              <span title={repo.root}>{repo.name}</span>
-              <button
-                aria-label="Refresh repository"
-                title="Refresh repository"
-                onClick={() => {
-                  void refresh();
-                  setRevision((value) => value + 1);
-                }}
-              >
-                <RefreshCw size={13} />
-              </button>
-            </div>
-            {view === "files" ? (
-              <>
-                <div className="file-filter">
-                  <Search size={13} />
-                  <input
-                    aria-label="Filter visible files"
-                    placeholder="Filter visible files…"
-                    value={query}
-                    onChange={(event) => setQuery(event.target.value)}
-                  />
-                </div>
-                <div className="sidebar-scroll">
-                  <Tree
-                    key={repo.root}
-                    root={repo.root}
-                    onOpen={openFile}
-                    active={document?.path}
-                    query={query}
-                    revision={revision}
-                    report={report}
-                  />
-                </div>
-              </>
-            ) : (
-              <div className="sidebar-scroll changes-list">
-                {(["worktree", "index"] as const).map((side) => {
-                  const items = changes.filter((item) =>
-                    side === "index"
-                      ? item.index !== " " && item.index !== "?"
-                      : item.worktree !== " ",
-                  );
-                  return (
-                    <section key={side}>
-                      <h2>
-                        {side === "index"
-                          ? "Staged changes"
-                          : "Working changes"}
-                        <span>{items.length}</span>
-                      </h2>
-                      {items.map((item) => (
-                        <button
-                          className={`change-row ${diff?.path === item.path && diff.side === side ? "selected" : ""}`}
-                          key={item.path}
-                          title={
-                            item.originalPath
-                              ? `${item.originalPath} → ${item.path}`
-                              : item.path
-                          }
-                          onClick={() => openDiff(item.path, side)}
-                        >
-                          <FileCode2 size={14} />
-                          <span>{item.path}</span>
-                          <b
-                            className={`change-code code-${side === "index" ? item.index : item.worktree}`}
-                          >
-                            {side === "index"
-                              ? item.index
-                              : item.worktree === "?"
-                                ? "U"
-                                : item.worktree}
-                          </b>
-                        </button>
-                      ))}
-                    </section>
-                  );
-                })}
-                {changes.length === 0 && (
-                  <div className="clean-state">
-                    <GitCompareArrows size={24} />
-                    <strong>Working tree clean</strong>
-                    <p>File changes will appear here.</p>
-                  </div>
-                )}
-                <p className="git-note">
-                  Review changes here. Use the terminal to stage, commit, and
-                  push.
-                </p>
-              </div>
-            )}
-          </aside>
-          <div
-            className="resize-column"
-            role="separator"
-            aria-label="Sidebar width"
-            aria-orientation="vertical"
-            tabIndex={0}
-            onPointerDown={(event) => resize(event, "sidebar")}
-            onKeyDown={(event) => {
-              if (event.key === "ArrowLeft")
-                setSidebarWidth((value) => Math.max(210, value - 20));
-              if (event.key === "ArrowRight")
-                setSidebarWidth((value) => Math.min(440, value + 20));
-            }}
-          />
-          <main className="main-workspace">
-            <div className="editor-area">
-              <div className="editor-toolbar">
-                <div className="file-tab">
-                  {document || diff ? (
-                    <>
-                      <FileCode2 size={14} />
-                      <span title={document?.path || diff?.path}>
-                        {document?.path || diff?.path}
-                      </span>
-                      {dirty && (
-                        <Circle
-                          size={8}
-                          fill="currentColor"
-                          aria-label="Unsaved changes"
-                        />
-                      )}
-                      {diff && (
-                        <span className="diff-label">
-                          {diff.side === "index"
-                            ? "HEAD ↔ Index"
-                            : "Index ↔ Working tree"}
-                        </span>
-                      )}
-                    </>
-                  ) : (
-                    <span className="muted">Workspace</span>
-                  )}
-                </div>
-                <div className="editor-actions">
-                  {document && (
-                    <>
-                      <button
-                        title="Reload file from disk"
-                        aria-label="Reload file"
-                        disabled={busy}
-                        onClick={() => openFile(document.path)}
-                      >
-                        <RefreshCw size={14} />
-                      </button>
-                      <button
-                        aria-label="Save file"
-                        className="save-button"
-                        disabled={!dirty || busy}
-                        onClick={() => void save()}
-                      >
-                        <Save size={14} />
-                        Save
-                      </button>
-                    </>
-                  )}
-                  <button
-                    title="Toggle terminal"
-                    aria-label="Toggle terminal"
-                    onClick={() => setTerminalHidden((value) => !value)}
-                  >
-                    {terminalHidden ? (
-                      <PanelBottomOpen size={15} />
-                    ) : (
-                      <PanelBottomClose size={15} />
-                    )}
-                  </button>
-                </div>
-              </div>
-              {document ? (
-                <CodeEditor
-                  key={`${repo.root}:${document.path}`}
-                  language={language(document.path)}
-                  value={text}
-                  onChange={setText}
-                />
-              ) : diff ? (
-                <CodeDiff
-                  original={diff.original}
-                  modified={diff.modified}
-                  language={language(diff.path)}
-                />
-              ) : (
-                <div className="editor-empty">
-                  <FileCode2 size={30} strokeWidth={1.2} />
-                  <h1>{repo.name}</h1>
-                  <p>Select a file to edit or a change to review.</p>
-                  <div className="shortcut">
-                    <kbd>
-                      {navigator.platform.includes("Mac") ? "⌘" : "Ctrl"} S
-                    </kbd>
-                    <span>Save the current file</span>
-                  </div>
-                </div>
-              )}
-            </div>
-            {!terminalHidden && (
-              <div
-                className="resize-row"
-                role="separator"
-                aria-label="Terminal height"
-                aria-orientation="horizontal"
-                tabIndex={0}
-                onPointerDown={(event) => resize(event, "terminal")}
-                onKeyDown={(event) => {
-                  if (event.key === "ArrowUp")
-                    setTerminalHeight((value) =>
-                      Math.min(window.innerHeight - 300, value + 20),
-                    );
-                  if (event.key === "ArrowDown")
-                    setTerminalHeight((value) => Math.max(130, value - 20));
-                }}
-              />
-            )}
-            <div
-              className="terminal-container"
-              style={{ height: terminalHidden ? 0 : terminalHeight }}
+      <ConversationWorkspace
+        key={repo?.root || "welcome"}
+        repo={repo}
+        onOpen={() => void openRepository()}
+        terminalOpen={!terminalHidden}
+        onTerminal={toggleTerminal}
+        terminal={terminalView}
+        review={review}
+        tools={
+          <>
+            <button
+              onClick={() => toggleReview("files")}
+              disabled={!repo}
+              aria-label="Open files"
+              aria-pressed={reviewOpen && view === "files"}
             >
-              <TerminalPanel
-                key={repo.root}
-                root={repo.root}
-                hidden={terminalHidden}
-                onError={report}
-              />
-            </div>
-          </main>
-        </div>
-      )}
+              <Folder size={15} />
+              <span>Files</span>
+            </button>
+            <button
+              onClick={() => toggleReview("changes")}
+              disabled={!repo}
+              aria-label="Review changes"
+              aria-pressed={reviewOpen && view === "changes"}
+            >
+              <GitCompareArrows size={15} />
+              <span>Changes</span>
+              {changes.length > 0 && (
+                <span className="count">{changes.length}</span>
+              )}
+            </button>
+          </>
+        }
+      />
       <footer className="status-bar">
         <span>
           {repo ? (

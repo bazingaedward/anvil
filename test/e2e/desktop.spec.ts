@@ -44,7 +44,7 @@ test("real desktop opens, saves safely, reviews both diffs and runs a PTY", asyn
       if (event.type() === "error") console.error(event.text());
     });
     await expect(
-      page.getByRole("heading", { name: "A workspace for the work." }),
+      page.getByRole("heading", { name: "What are we working on?" }),
     ).toBeVisible();
     await app.evaluate(({ dialog }, folder) => {
       dialog.showOpenDialog = async () => ({
@@ -57,10 +57,27 @@ test("real desktop opens, saves safely, reviews both diffs and runs a PTY", asyn
       .first()
       .click();
     await expect(
+      page.getByRole("main", { name: "Conversation", exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Send message" }),
+    ).toBeDisabled();
+    await expect(
+      page.getByRole("region", { name: "Terminal", exact: true }),
+    ).toHaveCount(0);
+    await page
+      .getByRole("textbox", { name: "Message Anvil" })
+      .fill("Fix the failing tests without changing the public API.");
+    await page.screenshot({ path: "test-results/conversation-workspace.png" });
+    await page.getByRole("button", { name: "Open files", exact: true }).click();
+    await expect(
       page.getByRole("button", { name: "hello.ts", exact: true }),
     ).toBeVisible();
     await page.getByRole("button", { name: "hello.ts", exact: true }).click();
     await expect(page.locator(".monaco-editor").first()).toBeVisible();
+    await expect(
+      page.getByRole("textbox", { name: "Message Anvil" }),
+    ).toHaveValue("Fix the failing tests without changing the public API.");
     const input = page.locator(".monaco-editor textarea").first();
     await page.locator(".monaco-editor .view-lines").first().click();
     await input.focus();
@@ -82,6 +99,15 @@ test("real desktop opens, saves safely, reviews both diffs and runs a PTY", asyn
       process.platform === "darwin" ? "Meta+A" : "Control+A",
     );
     await page.keyboard.insertText("export const hello = 5;\n");
+    await page.getByRole("button", { name: "Close review panel" }).click();
+    await expect(
+      page.getByRole("textbox", { name: "Message Anvil" }),
+    ).toBeVisible();
+    await page.getByRole("button", { name: "Open files", exact: true }).click();
+    await expect(page.getByRole("button", { name: "Save file" })).toBeEnabled();
+    await expect(
+      page.locator(".monaco-editor .view-lines").first(),
+    ).toContainText("hello = 5");
     await writeFile(path.join(root, "hello.ts"), "external edit\n");
     await page.getByRole("button", { name: "Save file" }).click();
     await expect(page.locator(".error-banner")).toContainText(
@@ -111,11 +137,13 @@ test("real desktop opens, saves safely, reviews both diffs and runs a PTY", asyn
       });
     });
     await page.getByRole("button", { name: "Dismiss error" }).click();
+    await page.getByRole("button", { name: "Back to file list" }).click();
     await page.locator(".change-row").first().click();
     await expect(page.locator(".monaco-diff-editor")).toBeVisible();
     await expect(page.locator(".diff-label")).toHaveText(
       "Index ↔ Working tree",
     );
+    await page.getByRole("button", { name: "Back to file list" }).click();
     await page.locator(".change-row").nth(1).click();
     await expect(page.locator(".diff-label")).toHaveText("HEAD ↔ Index");
     await expect(page.locator(".error-banner")).toHaveCount(0);
@@ -125,12 +153,19 @@ test("real desktop opens, saves safely, reviews both diffs and runs a PTY", asyn
       process.platform === "win32"
         ? "Set-Content -NoNewline terminal-proof.txt ANVIL_PTY_OK\r"
         : "printf ANVIL_PTY_OK > terminal-proof.txt\r";
-    await page.evaluate(
-      (command) => window.anvil.terminalInput(command),
-      command,
+    await page.getByRole("button", { name: "Toggle terminal" }).click();
+    const terminalInput = page.locator(".xterm-helper-textarea");
+    await expect(page.locator(".terminal-body")).toContainText(
+      process.platform === "win32" ? "PS " : /[$%➜❯]/,
+      { timeout: 30_000 },
     );
+    await terminalInput.focus();
+    await page.keyboard.insertText(command.trimEnd());
+    await page.keyboard.press("Enter");
     await expect
-      .poll(async () => readFile(output, "utf8").catch(() => ""))
+      .poll(async () => readFile(output, "utf8").catch(() => ""), {
+        timeout: 15_000,
+      })
       .toBe("ANVIL_PTY_OK");
     await page.screenshot({ path: "test-results/desktop-workspace.png" });
     // Reopening the same repository must not silently kill its terminal.
@@ -139,13 +174,41 @@ test("real desktop opens, saves safely, reviews both diffs and runs a PTY", asyn
       .first()
       .click();
     await rm(output);
-    await page.evaluate(
-      (command) => window.anvil.terminalInput(command),
-      command,
-    );
+    await terminalInput.focus();
+    await page.keyboard.insertText(command.trimEnd());
+    await page.keyboard.press("Enter");
     await expect
-      .poll(async () => readFile(output, "utf8").catch(() => ""))
+      .poll(async () => readFile(output, "utf8").catch(() => ""), {
+        timeout: 15_000,
+      })
       .toBe("ANVIL_PTY_OK");
+    await expect(
+      page.getByRole("textbox", { name: "Message Anvil" }),
+    ).toHaveValue("Fix the failing tests without changing the public API.");
+    await page
+      .getByRole("button", { name: "New conversation", exact: true })
+      .click();
+    await expect(
+      page.getByRole("textbox", { name: "Message Anvil" }),
+    ).toHaveValue("");
+    await page
+      .locator(".draft-item")
+      .filter({ hasText: "Fix the failing tests" })
+      .click();
+    await expect(
+      page.getByRole("textbox", { name: "Message Anvil" }),
+    ).toHaveValue("Fix the failing tests without changing the public API.");
+    await page.reload();
+    await expect(
+      page.locator(".draft-item").filter({ hasText: "Fix the failing tests" }),
+    ).toBeVisible();
+    await page
+      .locator(".draft-item")
+      .filter({ hasText: "Fix the failing tests" })
+      .click();
+    await expect(
+      page.getByRole("textbox", { name: "Message Anvil" }),
+    ).toHaveValue("Fix the failing tests without changing the public API.");
     expect(errors).toEqual([]);
   } catch (error) {
     console.error(await page?.locator("body").innerText());
