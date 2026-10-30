@@ -171,13 +171,13 @@ test("real desktop opens, saves safely, reviews both diffs and runs a PTY", asyn
     const output = path.join(root, "terminal-proof.txt");
     const command =
       process.platform === "win32"
-        ? "Set-Content -NoNewline terminal-proof.txt ANVIL_PTY_OK\r"
+        ? "Set-Content -LiteralPath terminal-proof.txt -Value ANVIL_PTY_OK -NoNewline\r"
         : "printf ANVIL_PTY_OK > terminal-proof.txt\r";
     await page.getByRole("button", { name: "Toggle terminal" }).click();
     const terminalInput = page.locator(".xterm-helper-textarea");
     const terminalBody = page.locator(".terminal-body");
     await expect(terminalBody).toContainText(
-      process.platform === "win32" ? "PS " : /[$%➜❯]/,
+      process.platform === "win32" ? />\s*$/ : /[$%➜❯]/,
       { timeout: 30_000 },
     );
     await terminalInput.focus();
@@ -250,6 +250,7 @@ test("real desktop opens, saves safely, reviews both diffs and runs a PTY", asyn
       ),
     );
     console.error("PTY output", JSON.stringify(terminalOutput.join("")));
+    console.error("Proof bytes", await readFile(path.join(root, "terminal-proof.txt")).catch(String));
     throw error;
   } finally {
     await app

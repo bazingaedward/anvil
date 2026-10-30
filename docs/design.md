@@ -69,7 +69,9 @@ Git 状态以 porcelain 输出为准。工作区 Diff 比较 index 与文件；�
 
 同日对话布局调整：本地类型检查、23 项测试、源码与 macOS ARM64 打包应用的 Electron 集成测试通过；增加草稿创建/切换/重载、对话与代码并存、关闭审阅面板后保留未保存编辑、终端延迟启动等验证。工作流补充安装 ripgrep 后，macOS CI 的测试、构建和打包后测试全部通过。
 
-Windows 已知问题：前一版桌面与本次调整的 CI 均在真实 PTY 写文件用例失败。Windows 类型检查、仓库测试和构建通过，桌面用例已完成编辑、冲突保护和 Diff 检查，但 PowerShell 命令没有生成预期文件。等待提示符、完整命令回显后再按回车仍未解决；失败记录确认 PTY 已收到命令与 `\r`，根因尚未定位。测试保持失败断言，没有跳过终端验收。最近一次证据见 [CI 41040758955](https://github.com/bazingaedward/anvil/actions/runs/41040758955)。Windows 打包应用的完整链路尚未验证，不作为已完成的发布目标。
+Windows PTY 排查更新（2026-10-30）：此前 CI 的真实 PTY 写文件用例失败，见 [CI 41040758955](https://github.com/bazingaedward/anvil/actions/runs/41040758955)。在本地 Windows x64 复现后确认，原测试命令 `Set-Content -NoNewline terminal-proof.txt ANVIL_PTY_OK` 会把文件名与内容绑定反，实际创建 `ANVIL_PTY_OK`、内容为 `terminal-proof.txt`；无 profile 的 Windows PowerShell 同样复现。改用显式 `-LiteralPath`、`-Value` 后通过，未改动 PTY 产品实现。另将测试的 Windows 提示符匹配从固定 `PS ` 改为行末 `>`，兼容本机 profile 的自定义提示符。
+
+本轮 Windows 验证：标准 `npm run test:desktop` 的 7 项测试、类型检查、生产构建、源码 Electron 集成测试及打包后同一集成测试均通过，覆盖真实键盘输入、PTY 文件内容、重开同一仓库后的终端连续性、编辑保存、冲突保护、两种 Diff 和草稿恢复。当前机器缺少 Visual Studio C++ 构建工具，默认 `npm run package:dir` 在 node-pty 源码重建阶段失败。本轮本地包使用已下载的 Electron 45.1.0 和 node-pty 1.1.0 自带预编译模块，通过 `npm exec -- electron-builder --dir --config.npmRebuild=false --config.electronDist=node_modules/electron/dist` 生成 `release/win-unpacked/Anvil.exe`，再运行 `npm run test:packaged` 通过。未验证 NSIS 安装流程、签名、其他 Windows 架构或修改后的远端 CI；仓库默认打包配置保持原样。
 
 ## 命令行原型设计（历史与现有实现）
 
