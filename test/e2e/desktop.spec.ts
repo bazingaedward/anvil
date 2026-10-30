@@ -175,12 +175,19 @@ test("real desktop opens, saves safely, reviews both diffs and runs a PTY", asyn
         : "printf ANVIL_PTY_OK > terminal-proof.txt\r";
     await page.getByRole("button", { name: "Toggle terminal" }).click();
     const terminalInput = page.locator(".xterm-helper-textarea");
-    await expect(page.locator(".terminal-body")).toContainText(
+    const terminalBody = page.locator(".terminal-body");
+    await expect(terminalBody).toContainText(
       process.platform === "win32" ? "PS " : /[$%➜❯]/,
       { timeout: 30_000 },
     );
     await terminalInput.focus();
     await page.keyboard.insertText(command.trimEnd());
+    // The renderer dispatches input before the native shell finishes processing it.
+    await expect
+      .poll(async () =>
+        (await terminalBody.innerText()).replace(/\s/g, ""),
+      )
+      .toContain(command.replace(/\s/g, ""));
     await page.keyboard.press("Enter");
     await expect
       .poll(async () => readFile(output, "utf8").catch(() => ""), {
