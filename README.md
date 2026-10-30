@@ -2,13 +2,43 @@
 
 English | [简体中文](README.zh-CN.md)
 
-An open-source, model-agnostic agent harness focused on coding.
+An open-source, model-agnostic coding harness with a desktop workspace for macOS and Windows.
 
 **Our long-term goal is to build a model-agnostic coding harness that surpasses Claude on real-world coding tasks.** Claude Code is our primary product benchmark. Progress toward this goal will be measured through reproducible evaluations.
 
 Models change. Anvil focuses on the execution loop around them: understanding a repository, choosing tools, making precise edits, running checks, and repairing failures.
 
-## What works today
+## Desktop preview
+
+The first desktop milestone provides a local workspace for reviewing and editing code:
+
+- Open a Git repository and browse its files.
+- Edit UTF-8 text with Monaco; reject stale saves and protect unsaved edits.
+- Review working-tree and staged diffs separately, including new, deleted, and renamed files.
+- Run an interactive terminal in the repository using xterm.js and node-pty.
+- Resize the sidebar and terminal; restore the last repository on launch.
+
+The desktop **does not run the agent yet**. Agent integration is next; the core investment is the harness, not a full Git client. Stage, commit, and push through the terminal for now. There is no Git Graph, plugin marketplace, or separate browser product.
+
+Development requires Node.js 22.12+ and Git. End users of packaged builds do not need Node.js or npm; Git and the project's development tools must be installed separately.
+
+```sh
+npm ci
+npm run dev
+```
+
+```sh
+npm run typecheck
+npm test
+npm run build
+npm run test:e2e
+npm run package:mac   # on macOS
+npm run package:win   # on Windows
+```
+
+Native terminal dependencies are rebuilt for Electron during installation; source builds may need Xcode Command Line Tools on macOS or Visual Studio C++ build tools on Windows. The preview reads text files up to 2 MiB and does not open symlink targets or binary files. The terminal runs with your user permissions, not in a sandbox. Installer signing and automatic updates are not configured yet.
+
+## Internal harness prototype
 
 - A local CLI with a provider-independent execution loop and an initial OpenAI Responses API adapter.
 - File listing, literal text search, file reading, exact text replacement, new file creation, and command execution.
@@ -19,7 +49,7 @@ Models change. Anvil focuses on the execution loop around them: understanding a 
 
 This is an early prototype. Local tests use scripted model responses while exercising real files and test processes. Live model execution and comparisons against Claude have not been validated. Only one real provider adapter exists so far.
 
-## Run locally
+## Run the internal harness
 
 Requirements: Node.js 22+, ripgrep (`rg`), and an OpenAI API key stored in keygrant under `OPENAI_API_KEY`. API-key requests use separately billed API access; they do not consume ChatGPT subscription allowance.
 

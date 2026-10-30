@@ -2,3 +2,7 @@ node_modules/
 .anvil/
 .env
 .env.*
+out/
+release/
+test-results/
+playwright-report/

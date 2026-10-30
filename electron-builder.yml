@@ -1,0 +1,17 @@
+appId: dev.anvil.desktop
+productName: Anvil
+asar: true
+npmRebuild: true
+directories:
+  output: release
+files:
+  - out/**
+  - package.json
+mac:
+  category: public.app-category.developer-tools
+  target: dmg
+win:
+  target: nsis
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true

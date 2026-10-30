@@ -1,0 +1,167 @@
+import { test, expect, _electron as electron } from "@playwright/test";
+import { mkdtemp, writeFile, readFile, rm } from "node:fs/promises";
+import path from "node:path";
+import os from "node:os";
+import { git } from "../../desktop/main/workspace";
+
+test("real desktop opens, saves safely, reviews both diffs and runs a PTY", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "anvil-ui-"));
+  const profile = await mkdtemp(path.join(os.tmpdir(), "anvil-profile-"));
+  await git(root, ["init", "-b", "main"]);
+  await git(root, ["config", "user.name", "Anvil Test"]);
+  await git(root, ["config", "user.email", "test@example.invalid"]);
+  await writeFile(path.join(root, "hello.ts"), "export const hello = 1;\n");
+  await git(root, ["add", "."]);
+  await git(root, ["commit", "-m", "fixture"]);
+  await writeFile(path.join(root, "hello.ts"), "export const hello = 2;\n");
+  await git(root, ["add", "hello.ts"]);
+  await writeFile(path.join(root, "hello.ts"), "export const hello = 3;\n");
+  const env: Record<string, string> = {
+    ...Object.fromEntries(
+      Object.entries(process.env).filter(
+        (pair): pair is [string, string] => pair[1] !== undefined,
+      ),
+    ),
+    ANVIL_TEST_USER_DATA: profile,
+    ELECTRON_DISABLE_SECURITY_WARNINGS: "true",
+  };
+  delete env.ELECTRON_RUN_AS_NODE;
+  const app = await electron.launch({
+    ...(process.env.ANVIL_ELECTRON_PATH
+      ? { executablePath: process.env.ANVIL_ELECTRON_PATH, args: [] }
+      : { args: ["."] }),
+    env,
+  });
+  let page;
+  try {
+    page = await app.firstWindow();
+    const errors: string[] = [];
+    page.on("pageerror", (error) => {
+      errors.push(error.message);
+      console.error(error.message);
+    });
+    page.on("console", (event) => {
+      if (event.type() === "error") console.error(event.text());
+    });
+    await expect(
+      page.getByRole("heading", { name: "A workspace for the work." }),
+    ).toBeVisible();
+    await app.evaluate(({ dialog }, folder) => {
+      dialog.showOpenDialog = async () => ({
+        canceled: false,
+        filePaths: [folder],
+      });
+    }, root);
+    await page
+      .getByRole("button", { name: "Open repository", exact: true })
+      .first()
+      .click();
+    await expect(
+      page.getByRole("button", { name: "hello.ts", exact: true }),
+    ).toBeVisible();
+    await page.getByRole("button", { name: "hello.ts", exact: true }).click();
+    await expect(page.locator(".monaco-editor").first()).toBeVisible();
+    const input = page.locator(".monaco-editor textarea").first();
+    await page.locator(".monaco-editor .view-lines").first().click();
+    await input.focus();
+    await page.keyboard.press(
+      process.platform === "darwin" ? "Meta+A" : "Control+A",
+    );
+    await page.keyboard.insertText("export const hello = 4;\n");
+    await expect(page.getByRole("button", { name: "Save file" })).toBeEnabled();
+    await page.getByRole("button", { name: "Save file" }).click();
+    await expect
+      .poll(() => readFile(path.join(root, "hello.ts"), "utf8"))
+      .toBe("export const hello = 4;\n");
+    expect((await git(root, ["show", ":hello.ts"])).toString()).toBe(
+      "export const hello = 2;\n",
+    );
+    // A concurrent disk edit must remain untouched; the unsaved buffer stays visible.
+    await input.focus();
+    await page.keyboard.press(
+      process.platform === "darwin" ? "Meta+A" : "Control+A",
+    );
+    await page.keyboard.insertText("export const hello = 5;\n");
+    await writeFile(path.join(root, "hello.ts"), "external edit\n");
+    await page.getByRole("button", { name: "Save file" }).click();
+    await expect(page.locator(".error-banner")).toContainText(
+      "changed on disk",
+    );
+    expect(await readFile(path.join(root, "hello.ts"), "utf8")).toBe(
+      "external edit\n",
+    );
+    // Keep editing is the default response; attempts to navigate must preserve the buffer.
+    await app.evaluate(({ dialog }) => {
+      dialog.showMessageBox = async () => ({
+        response: 0,
+        checkboxChecked: false,
+      });
+    });
+    await page
+      .getByRole("button", { name: /Changes/ })
+      .first()
+      .click();
+    await page.locator(".change-row").first().click();
+    await expect(page.getByRole("button", { name: "Save file" })).toBeEnabled();
+    // Explicit discard permits inspecting the index and worktree separately.
+    await app.evaluate(({ dialog }) => {
+      dialog.showMessageBox = async () => ({
+        response: 1,
+        checkboxChecked: false,
+      });
+    });
+    await page.getByRole("button", { name: "Dismiss error" }).click();
+    await page.locator(".change-row").first().click();
+    await expect(page.locator(".monaco-diff-editor")).toBeVisible();
+    await expect(page.locator(".diff-label")).toHaveText(
+      "Index ↔ Working tree",
+    );
+    await page.locator(".change-row").nth(1).click();
+    await expect(page.locator(".diff-label")).toHaveText("HEAD ↔ Index");
+    await expect(page.locator(".error-banner")).toHaveCount(0);
+    // Exercise the actual native PTY and its cwd, rather than a mocked terminal API.
+    const output = path.join(root, "terminal-proof.txt");
+    const command =
+      process.platform === "win32"
+        ? "Set-Content -NoNewline terminal-proof.txt ANVIL_PTY_OK\r"
+        : "printf ANVIL_PTY_OK > terminal-proof.txt\r";
+    await page.evaluate(
+      (command) => window.anvil.terminalInput(command),
+      command,
+    );
+    await expect
+      .poll(async () => readFile(output, "utf8").catch(() => ""))
+      .toBe("ANVIL_PTY_OK");
+    await page.screenshot({ path: "test-results/desktop-workspace.png" });
+    // Reopening the same repository must not silently kill its terminal.
+    await page
+      .getByRole("button", { name: "Open repository", exact: true })
+      .first()
+      .click();
+    await rm(output);
+    await page.evaluate(
+      (command) => window.anvil.terminalInput(command),
+      command,
+    );
+    await expect
+      .poll(async () => readFile(output, "utf8").catch(() => ""))
+      .toBe("ANVIL_PTY_OK");
+    expect(errors).toEqual([]);
+  } catch (error) {
+    console.error(await page?.locator("body").innerText());
+    throw error;
+  } finally {
+    await app
+      .evaluate(({ dialog, BrowserWindow }) => {
+        dialog.showMessageBox = async () => ({
+          response: 1,
+          checkboxChecked: false,
+        });
+        for (const window of BrowserWindow.getAllWindows()) window.destroy();
+      })
+      .catch(() => {});
+    await app.close();
+    await rm(root, { recursive: true, force: true });
+    await rm(profile, { recursive: true, force: true });
+  }
+});
