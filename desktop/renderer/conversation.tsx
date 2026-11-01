@@ -1,3 +1,4 @@
+import { ConversationRow } from "./conversation-row";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   ArrowUp,
@@ -8,7 +9,6 @@ import {
   PanelLeftOpen,
   Ellipsis,
   Search,
-  ChevronDown,
 } from "lucide-react";
 import type {
   RepoState,
@@ -46,8 +46,6 @@ export function ConversationWorkspace({
   const [selected, setSelected] = useState("");
   const [loaded, setLoaded] = useState(false);
   const [archived, setArchived] = useState(false);
-  const [rename, setRename] = useState<string | null>(null);
-  const [renamingID, setRenamingID] = useState("");
   const [managing, setManaging] = useState(false);
   const pending = useRef(Promise.resolve());
   const deleted = useRef(new Set<string>());
@@ -255,7 +253,6 @@ export function ConversationWorkspace({
   async function choose(id: string) {
     await window.anvil.selectConversation(id);
     setSelected(id);
-    setRename(null);
   }
   async function create() {
     setManaging(true);
@@ -266,17 +263,16 @@ export function ConversationWorkspace({
       setSelected(next.id);
       setArchived(false);
       setSearch("");
-      setRename(null);
       input.current?.focus();
     });
     setManaging(false);
   }
-  async function archive() {
+  async function archive(target = draft) {
     setManaging(true);
     await action(async () => {
       await pending.current;
-      const result = await window.anvil.updateConversation(selected, {
-        archived: !draft.archived,
+      const result = await window.anvil.updateConversation(target.id, {
+        archived: !target.archived,
       });
       setDrafts((items) =>
         items.map((item) =>
@@ -285,12 +281,11 @@ export function ConversationWorkspace({
             : item,
         ),
       );
-      setArchived(!draft.archived);
+      if (target.id === selected) setArchived(!target.archived);
     });
     setManaging(false);
   }
-  async function remove() {
-    const id = selected;
+  async function remove(id = selected) {
     setManaging(true);
     await action(async () => {
       await pending.current;
@@ -304,12 +299,13 @@ export function ConversationWorkspace({
         state.selected = next.id;
       }
       setDrafts(state.conversations);
-      setSelected(state.selected);
-      setArchived(
-        !!state.conversations.find((item) => item.id === state.selected)
-          ?.archived,
-      );
-      setRename(null);
+      if (id === selected) {
+        setSelected(state.selected);
+        setArchived(
+          !!state.conversations.find((item) => item.id === state.selected)
+            ?.archived,
+        );
+      }
     });
     setManaging(false);
   }
@@ -363,19 +359,22 @@ export function ConversationWorkspace({
           </div>
           <div className="draft-list">
             {visible.map((item) => (
-              <button
+              <ConversationRow
                 key={item.id}
-                className={`draft-item ${item.id === selected ? "selected" : ""}`}
-                onClick={() => void action(() => choose(item.id))}
-                disabled={managing || sending}
-              >
-                <span>{conversationTitle(item)}</span>
-                {tasks.some(
+                title={conversationTitle(item)}
+                selected={item.id === selected}
+                archived={item.archived}
+                running={tasks.some(
                   (task) =>
                     task.conversationID === item.id &&
                     task.status === "running",
-                ) && <span className="activity-dot" aria-label="Running" />}
-              </button>
+                )}
+                disabled={managing || sending}
+                onSelect={() => void action(() => choose(item.id))}
+                onRename={(title) => patchDraft(item.id, { title })}
+                onArchive={() => void archive(item)}
+                onDelete={() => void remove(item.id)}
+              />
             ))}
             {loaded && !visible.length && (
               <p>
@@ -432,56 +431,6 @@ export function ConversationWorkspace({
             </button>
           )}
           <span className="conversation-title">{conversationTitle(draft)}</span>
-          <details className="conversation-actions tools-menu" key={selected}>
-            <summary
-              aria-label="Conversation actions"
-              title="Rename, archive or delete conversation"
-            >
-              <ChevronDown size={18} />
-            </summary>
-            <div
-              className="workspace-tools"
-              onClick={(event) => {
-                const button = (event.target as HTMLElement).closest(
-                  "button:not(:disabled)",
-                );
-                if (button)
-                  (
-                    event.currentTarget.parentElement as HTMLDetailsElement
-                  ).open = false;
-              }}
-            >
-              <button
-                disabled={!loaded || !draft.id || managing || sending}
-                onClick={() => {
-                  setRename(conversationTitle(draft));
-                  setRenamingID(selected);
-                }}
-              >
-                Rename
-              </button>
-              <button
-                disabled={
-                  !draft.id ||
-                  managing ||
-                  sending ||
-                  running?.conversationID === selected
-                }
-                onClick={() => void archive()}
-              >
-                {draft.archived
-                  ? "Restore conversation"
-                  : "Archive conversation"}
-              </button>
-              <button
-                className="delete-conversation"
-                disabled={!draft.id || managing || sending}
-                onClick={() => void remove()}
-              >
-                Delete conversation
-              </button>
-            </div>
-          </details>
           <details className="tools-menu" ref={toolsMenu}>
             <summary
               aria-label="Workspace tools"
@@ -515,35 +464,6 @@ export function ConversationWorkspace({
             </div>
           </details>
         </header>
-        {rename !== null && (
-          <form
-            className="conversation-rename"
-            onSubmit={(event) => {
-              event.preventDefault();
-              void action(async () => {
-                await patchDraft(renamingID, { title: rename });
-                setRename(null);
-              });
-            }}
-          >
-            <input
-              aria-label="Conversation title"
-              autoFocus
-              maxLength={120}
-              value={rename}
-              onChange={(event) => setRename(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Escape") setRename(null);
-              }}
-            />
-            <button type="submit" disabled={!rename.trim()}>
-              Save
-            </button>
-            <button type="button" onClick={() => setRename(null)}>
-              Cancel
-            </button>
-          </form>
-        )}
         <section
           className={`conversation-body ${conversationTasks.length ? "has-tasks" : ""}`}
         >

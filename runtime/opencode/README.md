@@ -74,7 +74,7 @@ acceptance settings, the selected conversation, and ordered task records (user
 prompts, assistant messages, verification results and private SDK session links).
 Only public task fields cross IPC. SDK runtime databases remain separate.
 
-The title-bar conversation menu supports rename, archive/restore and delete.
+Each sidebar conversation has a trailing actions menu for inline rename, archive/restore and delete. Actions target that row without switching the open conversation.
 Search matches titles, drafts and message bodies within the active or archived
 list. History can be browsed and drafts written without selecting a folder.
 Sending still requires an added working folder and provider credentials.
