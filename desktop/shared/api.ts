@@ -39,15 +39,42 @@ export type AgentTask = {
   conversationID: string;
   prompt: string;
   text: string;
-  status: "running" | "completed" | "cancelled" | "failed";
+  status:
+    "running" | "completed" | "unverified" | "cancelled" | "failed" | "limit";
+  phase?: "working" | "checking" | "repairing" | "stopping";
+  round?: number;
+  acceptance?: AcceptanceOptions;
+  checks?: AcceptanceRun[];
   permissions: AgentPermission[];
   error?: string;
   updated: number;
 };
+export type AcceptanceOptions = {
+  command: string;
+  directory: string;
+  maxRepairs: number;
+  timeoutMs: number;
+};
+export type AcceptanceRun = {
+  round: number;
+  exitCode: number | null;
+  output: string;
+  timedOut: boolean;
+  cancelled: boolean;
+  truncated: boolean;
+  durationMs: number;
+  error?: string;
+};
 export interface DesktopAPI {
+  readonly platform: string;
+  showApplicationMenu(): Promise<void>;
   selectDirectory(root: string): Promise<RepoState | null>;
   tasks(): Promise<AgentTask[]>;
-  startTask(conversationID: string, text: string): Promise<AgentTask>;
+  startTask(
+    conversationID: string,
+    text: string,
+    acceptance?: AcceptanceOptions,
+  ): Promise<AgentTask>;
   cancelTask(id: string): Promise<void>;
   replyPermission(
     taskID: string,

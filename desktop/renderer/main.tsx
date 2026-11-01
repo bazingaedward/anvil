@@ -10,7 +10,6 @@ import {
   ChevronRight,
   ChevronDown,
   Folder,
-  FolderOpen,
   FileCode2,
   GitBranch,
   GitCompareArrows,
@@ -18,11 +17,11 @@ import {
   Save,
   TerminalSquare,
   X,
-  Hammer,
   ArrowUpRight,
   Circle,
   ArrowLeft,
   Search,
+  Menu as MenuIcon,
 } from "lucide-react";
 import type {
   DesktopAPI,
@@ -748,26 +747,19 @@ function App() {
   ) : null;
   return (
     <div className="application">
-      <header className="app-header">
-        <div className="brand">
-          <Hammer size={19} strokeWidth={1.7} />
-          <strong>Anvil</strong>
-        </div>
-        {repo && (
-          <div className="repo-title">
-            <Folder size={14} />
-            <span>{repo.name}</span>
-          </div>
-        )}
+      <div
+        className={`window-titlebar ${api.platform === "darwin" ? "mac-titlebar" : ""}`}
+      >
         <button
-          className="open-button"
-          onClick={() => void openRepository()}
-          disabled={busy}
+          className="application-menu-button"
+          aria-label="Application menu"
+          aria-haspopup="menu"
+          title="File, Edit and View"
+          onClick={() => void api.showApplicationMenu().catch(report)}
         >
-          <FolderOpen size={15} />
-          Add folders
+          <MenuIcon size={20} />
         </button>
-      </header>
+      </div>
       {error && (
         <div className="error-banner" role="alert">
           <span>{error}</span>
@@ -815,29 +807,32 @@ function App() {
           </>
         }
       />
-      <footer className="status-bar">
-        <span>
-          {repo ? (
-            <>
-              {repo.git !== false && <GitBranch size={12} />}
-              {repo.branch || "Folder"}
-              <span className="status-separator" />
-              {changes.length} changed {changes.length === 1 ? "file" : "files"}
-            </>
-          ) : (
-            "Local coding workspace"
-          )}
-        </span>
-        <span>
-          {busy
-            ? "Working…"
-            : dirty
-              ? "Unsaved changes"
-              : document
-                ? `${language(document.path)} · UTF-8`
-                : ""}
-        </span>
-      </footer>
+      {(reviewOpen || !terminalHidden || dirty || busy) && (
+        <footer className="status-bar">
+          <span>
+            {repo ? (
+              <>
+                {repo.git !== false && <GitBranch size={12} />}
+                {repo.branch || "Folder"}
+                <span className="status-separator" />
+                {changes.length} changed{" "}
+                {changes.length === 1 ? "file" : "files"}
+              </>
+            ) : (
+              "Local coding workspace"
+            )}
+          </span>
+          <span>
+            {busy
+              ? "Working…"
+              : dirty
+                ? "Unsaved changes"
+                : document
+                  ? `${language(document.path)} · UTF-8`
+                  : ""}
+          </span>
+        </footer>
+      )}
     </div>
   );
 }

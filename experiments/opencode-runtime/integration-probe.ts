@@ -83,7 +83,7 @@ try {
         error: result.error,
       }),
     );
-    assert.equal(result.status, "completed");
+    assert.equal(result.status, "unverified");
     if (prompt.startsWith("Read")) {
       assert.ok(result.text.includes("ANVIL_TOOL_OK"));
       assert.ok(result.text.includes("ANVIL_CONTEXT_OK"));

@@ -5,7 +5,12 @@ import { fileURLToPath } from "node:url";
 import * as pty from "node-pty";
 import { Workspace } from "./workspace";
 import { Agent } from "./agent";
-import type { FileDocument, DiffSide, TerminalEvent } from "../shared/api";
+import type {
+  FileDocument,
+  DiffSide,
+  TerminalEvent,
+  AcceptanceOptions,
+} from "../shared/api";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 let window: BrowserWindow;
@@ -108,6 +113,9 @@ function registerIPC() {
       return null;
     }
   });
+  handle("window:menu", () => {
+    Menu.getApplicationMenu()?.popup({ window, x: 8, y: 36 });
+  });
   handle("workspace:open", async () => {
     if (!(await discardChanges())) return null;
     const result = await dialog.showOpenDialog(window, {
@@ -134,8 +142,10 @@ function registerIPC() {
     directories: [...directories],
   }));
   handle("agent:tasks", () => currentAgent().list());
-  handle("agent:start", (id: string, text: string) =>
-    currentAgent().start(id, text, directories, current().root),
+  handle(
+    "agent:start",
+    (id: string, text: string, acceptance?: AcceptanceOptions) =>
+      currentAgent().start(id, text, directories, current().root, acceptance),
   );
   handle("agent:cancel", (id: string) => currentAgent().cancel(id));
   handle("agent:permission", (task: string, id: string, allow: boolean) =>
@@ -240,6 +250,8 @@ app.whenReady().then(() => {
     minHeight: 620,
     backgroundColor: "#1b1b1b",
     title: "Anvil",
+    titleBarStyle: "hidden",
+    titleBarOverlay: { color: "#1b1b1b", symbolColor: "#d4d4d4", height: 36 },
     webPreferences: {
       preload: path.join(here, "../preload/index.cjs"),
       sandbox: true,
@@ -305,6 +317,7 @@ app.whenReady().then(() => {
       },
     ]),
   );
+  if (process.platform !== "darwin") window.setMenuBarVisibility(false);
   if (!app.isPackaged && process.env.ELECTRON_RENDERER_URL)
     void window.loadURL(process.env.ELECTRON_RENDERER_URL);
   else void window.loadFile(path.join(here, "../renderer/index.html"));

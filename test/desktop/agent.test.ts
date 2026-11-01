@@ -42,7 +42,7 @@ test("agent owns task state, validates permission replies, and persists only pub
       /no longer pending/,
     );
     agent.reply(task.id, "p1", true);
-    await until(() => events.some((t) => t.status === "completed"));
+    await until(() => events.some((t) => t.status === "unverified"));
     assert.equal(agent.list()[0].text, "hello");
     assert.equal("sessionID" in agent.list()[0], false);
     assert.equal(agent.list()[0].permissions.length, 0);
@@ -54,7 +54,7 @@ test("agent owns task state, validates permission replies, and persists only pub
       credentials,
       [script],
     );
-    assert.equal(restored.list()[0].status, "completed");
+    assert.equal(restored.list()[0].status, "unverified");
     assert.ok(!JSON.stringify(restored.list()).includes("test-secret"));
     restored.stop();
   } finally {

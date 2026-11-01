@@ -29,10 +29,24 @@ and reuses the SDK session to retain context across turns and restarts.
 All SDK tool actions request approval; the UI offers Deny and Allow once.
 Cancellation interrupts the session, with a five-second process-kill fallback.
 Closing the desktop stops the active task. Switching the file browser between working folders keeps conversations and active tasks running. A task
-marked completed means the model execution ended, not that a separate acceptance
-check passed. This executor is not an OS sandbox; approved tools run with the
-user's filesystem permissions. Automatic acceptance checks, configurable model
-selection, and cross-platform runtime packaging remain follow-up work.
+marked completed means its configured acceptance command passed. Without an
+acceptance command, a model finish is recorded as unverified. This executor is
+not an OS sandbox; approved tools run with the user's filesystem permissions.
+Configurable model selection and cross-platform runtime packaging remain follow-up work.
+
+Expand **Add acceptance check** above the composer to specify a command and one
+of the added working folders. Sending the message authorizes that command to run
+after each model round. Failure output is returned to the same SDK session for
+repair; the command and directory remain fixed for the task. The default allows
+two repairs, 120 seconds per check, and 15 minutes for the whole task. Exhausting
+the repair or time budget records a limit, not a successful completion. Denying a
+tool request stops the task without another repair attempt.
+
+Check output is capped at 64 KiB per run. Checks receive a minimal OS environment
+without provider credentials; cancellation and check timeouts terminate their
+process tree. Check results are stored with task history. The agent may edit
+project files with approval, so passing a command is evidence of that command's
+result, not a guarantee that project test files remained unchanged.
 
 Validation (real tests incur provider usage):
 
@@ -42,6 +56,7 @@ npm run test:desktop
 npm run build
 # Execute through keygrant MCP with both secrets:
 # node --import tsx experiments/opencode-runtime/integration-probe.ts
+# node --import tsx experiments/opencode-runtime/acceptance-probe.ts
 # set ANVIL_REAL_AGENT=1&& node node_modules/@playwright/test/cli.js test test/e2e/agent.spec.ts
 ```
 

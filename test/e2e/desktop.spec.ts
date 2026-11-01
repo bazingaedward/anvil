@@ -89,6 +89,7 @@ test("real desktop opens, saves safely, reviews both diffs and runs a PTY", asyn
       .getByRole("textbox", { name: "Message Anvil" })
       .fill("Fix the failing tests without changing the public API.");
     await page.screenshot({ path: "test-results/conversation-workspace.png" });
+    await page.getByLabel("Workspace tools", { exact: true }).click();
     await page.getByRole("button", { name: "Open files", exact: true }).click();
     await expect(
       page.getByRole("button", { name: "hello.ts", exact: true }),
@@ -123,6 +124,7 @@ test("real desktop opens, saves safely, reviews both diffs and runs a PTY", asyn
     await expect(
       page.getByRole("textbox", { name: "Message Anvil" }),
     ).toBeVisible();
+    await page.getByLabel("Workspace tools", { exact: true }).click();
     await page.getByRole("button", { name: "Open files", exact: true }).click();
     await expect(page.getByRole("button", { name: "Save file" })).toBeEnabled();
     await expect(
@@ -173,6 +175,7 @@ test("real desktop opens, saves safely, reviews both diffs and runs a PTY", asyn
       process.platform === "win32"
         ? "Set-Content -LiteralPath terminal-proof.txt -Value ANVIL_PTY_OK -NoNewline\r"
         : "printf ANVIL_PTY_OK > terminal-proof.txt\r";
+    await page.getByLabel("Workspace tools", { exact: true }).click();
     await page.getByRole("button", { name: "Toggle terminal" }).click();
     const terminalInput = page.locator(".xterm-helper-textarea");
     const terminalBody = page.locator(".terminal-body");
