@@ -56,20 +56,21 @@ test("agent owns task state, validates permission replies, and persists only pub
     );
     assert.equal(restored.list()[0].status, "unverified");
     assert.ok(!JSON.stringify(restored.list()).includes("test-secret"));
-    restored.stop();
+    await restored.close();
   } finally {
-    agent.stop();
+    await agent.close();
     await new Promise((resolve) => setTimeout(resolve, 100));
     rmSync(root, { recursive: true, force: true });
   }
 });
 
-test("missing credentials do not create a misleading running task", () => {
+test("missing credentials do not create a misleading running task", async () => {
   const root = mkdtempSync(path.join(os.tmpdir(), "anvil-agent-"));
   try {
     const agent = new Agent(root, root, process.execPath, () => {}, {});
     assert.throws(() => agent.start("chat", "hello"), /keygrant/);
     assert.deepEqual(agent.list(), []);
+    await agent.close();
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -97,7 +98,7 @@ test("an unresponsive runtime is cancelled and cannot overwrite the final state 
     assert.equal(agent.list()[0].status, "cancelled");
     assert.equal(agent.list()[0].permissions.length, 0);
   } finally {
-    agent.stop();
+    await agent.close();
     await new Promise((resolve) => setTimeout(resolve, 100));
     rmSync(root, { recursive: true, force: true });
   }

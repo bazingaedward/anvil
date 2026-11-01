@@ -47,7 +47,7 @@ test("real agent streams, requests permission, resumes context, cancels and rest
       { timeout: 45000 },
     );
     await expect(page.locator(".agent-task [role=status]")).toHaveText(
-      "completed",
+      "Finished · not verified",
     );
     await input.fill(
       "Use the read tool to read proof.txt and report its contents and the marker I asked you to remember.",
@@ -65,7 +65,7 @@ test("real agent streams, requests permission, resumes context, cancels and rest
       "ANVIL_CONTEXT_OK",
     );
     await expect(page.locator(".agent-task [role=status]").last()).toHaveText(
-      "completed",
+      "Finished · not verified",
     );
     await page.getByRole("button", { name: "New conversation" }).click();
     await input.fill("Read proof.txt using the read tool.");

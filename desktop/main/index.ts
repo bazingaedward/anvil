@@ -10,6 +10,8 @@ import type {
   DiffSide,
   TerminalEvent,
   AcceptanceOptions,
+  ConversationPatch,
+  LegacyDraft,
 } from "../shared/api";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -142,6 +144,42 @@ function registerIPC() {
     directories: [...directories],
   }));
   handle("agent:tasks", () => currentAgent().list());
+  handle("conversations:list", (drafts?: LegacyDraft[]) =>
+    currentAgent().conversations(drafts),
+  );
+  handle("conversations:create", () => currentAgent().createConversation());
+  handle("conversations:update", (id: string, patch: ConversationPatch) =>
+    currentAgent().updateConversation(id, patch),
+  );
+  handle("conversations:select", (id: string) =>
+    currentAgent().selectConversation(id),
+  );
+  handle("conversations:delete", async (id: string) => {
+    const executor = currentAgent();
+    const conversation = executor
+      .conversations()
+      .conversations.find((item) => item.id === id);
+    if (!conversation) throw new Error("Conversation no longer exists.");
+    const tasks = executor.list().filter((task) => task.conversationID === id);
+    const running = tasks.some((task) => task.status === "running");
+    const result = await dialog.showMessageBox(window, {
+      type: "warning",
+      title: "Delete conversation",
+      message: `Delete “${conversation.title || tasks[0]?.prompt.slice(0, 48) || "New conversation"}”?`,
+      detail: running
+        ? "The running task will be stopped, then this conversation and its messages will be removed. Project files will be kept."
+        : "This conversation and its messages will be removed. Project files will be kept.",
+      buttons: [
+        "Keep conversation",
+        running ? "Stop and delete" : "Delete conversation",
+      ],
+      defaultId: 0,
+      cancelId: 0,
+    });
+    if (result.response !== 1) return false;
+    await executor.deleteConversation(id);
+    return true;
+  });
   handle(
     "agent:start",
     (id: string, text: string, acceptance?: AcceptanceOptions) =>

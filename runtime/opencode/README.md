@@ -65,3 +65,32 @@ Add one or more working folders through the directory picker. Ordinary folders a
 The ordinary E2E suite skips the live-model test. It is opt-in and uses a temporary
 repository and desktop profile. The integration probe leaves its isolated state
 in the ignored `.anvil/integration-probes` directory for debugging.
+
+## Local conversation management
+
+The main process owns `userData/tasks/conversations.sqlite`, using Electron's
+built-in `node:sqlite`. The database contains conversation metadata, drafts,
+acceptance settings, the selected conversation, and ordered task records (user
+prompts, assistant messages, verification results and private SDK session links).
+Only public task fields cross IPC. SDK runtime databases remain separate.
+
+The title-bar conversation menu supports rename, archive/restore and delete.
+Search matches titles, drafts and message bodies within the active or archived
+list. History can be browsed and drafts written without selecting a folder.
+Sending still requires an added working folder and provider credentials.
+Archived conversations must be restored before sending. Running conversations
+cannot be archived; deletion asks for confirmation and waits for cancellation
+of the model or acceptance command before removing the conversation and tasks.
+Project files are never deleted by conversation management.
+
+On first use, the global task JSON is imported transactionally. Legacy per-folder
+task JSON is imported when that folder is selected; its original SDK session path
+is retained. Renderer drafts are imported once through IPC. Migration markers
+and deleted-ID tombstones prevent old files from restoring deleted conversations.
+Malformed imports roll back and keep the source available for recovery.
+
+Original JSON/localStorage backups and SDK databases are retained. Delete removes
+Anvil's current history and session links, not these recovery copies or provider
+records; it is not a secure-erasure operation. New versions write only SQLite
+conversation data. Do not run an older preview against the same profile after
+migration: changes it writes to legacy storage are not imported again.

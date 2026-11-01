@@ -65,7 +65,37 @@ export type AcceptanceRun = {
   durationMs: number;
   error?: string;
 };
+export type Conversation = {
+  id: string;
+  title: string;
+  text: string;
+  acceptance?: AcceptanceOptions;
+  archived: boolean;
+  created: number;
+  updated: number;
+};
+export type ConversationPatch = Partial<
+  Pick<Conversation, "title" | "text" | "acceptance" | "archived">
+>;
+export type LegacyDraft = {
+  id: string;
+  text: string;
+  acceptance?: AcceptanceOptions;
+};
+export type ConversationState = {
+  conversations: Conversation[];
+  selected: string;
+  legacyDraftsImported: boolean;
+};
 export interface DesktopAPI {
+  conversations(drafts?: LegacyDraft[]): Promise<ConversationState>;
+  createConversation(): Promise<Conversation>;
+  updateConversation(
+    id: string,
+    patch: ConversationPatch,
+  ): Promise<Conversation>;
+  selectConversation(id: string): Promise<void>;
+  deleteConversation(id: string): Promise<boolean>;
   readonly platform: string;
   showApplicationMenu(): Promise<void>;
   selectDirectory(root: string): Promise<RepoState | null>;

@@ -1,6 +1,12 @@
 import { contextBridge, ipcRenderer } from "electron";
 import type { DesktopAPI, TerminalEvent, AgentTask } from "../shared/api";
 const api: DesktopAPI = {
+  conversations: (drafts) => ipcRenderer.invoke("conversations:list", drafts),
+  createConversation: () => ipcRenderer.invoke("conversations:create"),
+  updateConversation: (id, patch) =>
+    ipcRenderer.invoke("conversations:update", id, patch),
+  selectConversation: (id) => ipcRenderer.invoke("conversations:select", id),
+  deleteConversation: (id) => ipcRenderer.invoke("conversations:delete", id),
   platform: process.platform,
   showApplicationMenu: () => ipcRenderer.invoke("window:menu"),
   selectDirectory: (root) => ipcRenderer.invoke("workspace:select", root),

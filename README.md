@@ -12,7 +12,8 @@ Models change. Anvil focuses on the execution loop around them: understanding a 
 
 The desktop preview puts coding conversations at the center, with code review alongside them:
 
-- Open a Git repository and prepare local conversation drafts, restored after restart.
+- Add one or more working folders, with or without Git, and restore conversation drafts after restart.
+- Rename, archive, restore, delete and search conversations, including message content. History and drafts are stored in local SQLite; no server is required.
 - Keep the conversation and composer visible while opening files or reviewing changes in a side panel.
 - Edit UTF-8 text with Monaco; reject stale saves and protect unsaved edits.
 - Review working-tree and staged diffs separately, including new, deleted, and renamed files.
@@ -21,7 +22,7 @@ The desktop preview puts coding conversations at the center, with code review al
 
 The Windows x64 desktop now has an initial OpenCode-backed agent integration: streaming replies, persistent conversations, tool approval and cancellation. The first validated provider is BytePlus Ark Responses with DeepSeek. See the [runtime setup](runtime/opencode/README.md) for building the runtime and launching through keygrant. macOS agent packaging is still pending. Stage, commit, and push through the terminal for now.
 
-Development requires Node.js 22.12+ and Git. End users of packaged builds do not need Node.js or npm; Git and the project's development tools must be installed separately.
+Development requires Node.js 22.13+ and Git (the minimum includes unflagged `node:sqlite`). End users of packaged builds do not need Node.js or npm; Git and the project's development tools must be installed separately.
 
 ```sh
 npm ci

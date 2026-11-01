@@ -1,15 +1,15 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { createInterface } from "node:readline";
 import { createHash, randomUUID } from "node:crypto";
-import {
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  writeFileSync,
-  renameSync,
-} from "node:fs";
+import { existsSync, mkdirSync } from "node:fs";
 import path from "node:path";
-import type { AgentTask, AcceptanceOptions } from "../shared/api";
+import type {
+  AgentTask,
+  AcceptanceOptions,
+  ConversationPatch,
+  LegacyDraft,
+} from "../shared/api";
+import { ConversationStore, type StoredTask } from "./conversations";
 import {
   executionEnvironment,
   killProcessTree,
@@ -17,17 +17,14 @@ import {
   validateAcceptance,
 } from "./acceptance";
 
-type RecordTask = AgentTask & {
-  sessionID?: string;
-  directory?: string;
-  runtimeState?: string;
-};
+type RecordTask = StoredTask;
 type Active = {
   task: RecordTask;
   abort: AbortController;
   child?: ChildProcessWithoutNullStreams;
   limit: boolean;
   denied: boolean;
+  done?: Promise<void>;
 };
 type RoundResult = {
   status: "completed" | "cancelled" | "failed";
@@ -37,7 +34,8 @@ const TASK_TIMEOUT = 15 * 60 * 1000;
 export class Agent {
   private tasks: RecordTask[] = [];
   private active?: Active;
-  private file: string;
+  private store: ConversationStore;
+  private deleting = new Set<string>();
   private state: string;
   constructor(
     private repo: string,
@@ -50,14 +48,15 @@ export class Agent {
   ) {
     this.state = path.join(storage, "conversations");
     mkdirSync(this.state, { recursive: true });
-    this.file = path.join(this.state, "tasks.json");
-    if (existsSync(this.file)) {
-      const data = JSON.parse(readFileSync(this.file, "utf8"));
-      if (!Array.isArray(data)) throw new Error("Invalid task history.");
-      this.tasks = data.map((task) => this.recover(task));
-      this.save();
+    this.store = new ConversationStore(storage);
+    try {
+      this.tasks = this.store.tasks().map((task) => this.recover(task));
+      for (const task of this.tasks) this.store.saveTask(task);
+      this.includeDirectory(repo);
+    } catch (error) {
+      this.store.close();
+      throw error;
     }
-    this.includeDirectory(repo);
   }
   private recover(task: RecordTask): RecordTask {
     if (task.status === "running") {
@@ -85,26 +84,55 @@ export class Agent {
       this.storage,
       createHash("sha256").update(directory).digest("hex"),
     );
-    if (!existsSync(path.join(legacy, "tasks.json"))) return;
-    const records = JSON.parse(
-      readFileSync(path.join(legacy, "tasks.json"), "utf8"),
-    );
-    if (!Array.isArray(records)) return;
-    for (const record of records)
-      if (!this.tasks.some((task) => task.id === record.id))
-        this.tasks.push(
-          this.recover({
-            ...record,
-            directory,
-            runtimeState: path.join(legacy, "runtime"),
-            permissions: [],
-          }),
-        );
-    this.save();
+    this.store.importTasks(path.join(legacy, "tasks.json"), directory);
+    for (const record of this.store.tasks())
+      if (!this.tasks.some((task) => task.id === record.id)) {
+        const task = this.recover(record);
+        this.tasks.push(task);
+        this.store.saveTask(task);
+      }
   }
-  private save() {
-    writeFileSync(this.file + ".tmp", JSON.stringify(this.tasks));
-    renameSync(this.file + ".tmp", this.file);
+  conversations(drafts?: LegacyDraft[]) {
+    if (drafts !== undefined) this.store.importDrafts(drafts);
+    return this.store.state();
+  }
+  createConversation() {
+    return this.store.create();
+  }
+  selectConversation(id: string) {
+    this.store.select(id);
+  }
+  updateConversation(id: string, patch: ConversationPatch) {
+    if (this.deleting.has(id))
+      throw new Error("Conversation is being deleted.");
+    if (patch?.archived && this.active?.task.conversationID === id)
+      throw new Error(
+        "Stop the running task before archiving this conversation.",
+      );
+    return this.store.update(id, patch);
+  }
+  async deleteConversation(id: string) {
+    this.store.get(id);
+    if (this.deleting.has(id))
+      throw new Error("Conversation is being deleted.");
+    this.deleting.add(id);
+    try {
+      const active = this.active;
+      if (active?.task.conversationID === id) {
+        this.cancel(active.task.id);
+        await active.done;
+      }
+      this.store.remove(id);
+      this.tasks = this.tasks.filter((task) => task.conversationID !== id);
+    } finally {
+      this.deleting.delete(id);
+    }
+  }
+  async close() {
+    const active = this.active;
+    this.stop();
+    await active?.done;
+    this.store.close();
   }
   private view(task: RecordTask): AgentTask {
     const { sessionID, directory, runtimeState, ...visible } = task;
@@ -115,7 +143,7 @@ export class Agent {
   }
   private publish(task: RecordTask) {
     task.updated = Math.max(Date.now(), task.updated + 1);
-    this.save();
+    this.store.saveTask(task);
     this.notify(this.view(task));
   }
   private redact(text: string) {
@@ -155,6 +183,13 @@ export class Agent {
     if (!directories.length || !directories.includes(activeDirectory))
       throw new Error("Add a working directory first.");
     const check = validateAcceptance(acceptance, directories);
+    if (this.deleting.has(conversationID))
+      throw new Error("Conversation is being deleted.");
+    const conversation = this.store.ensure(conversationID);
+    if (conversation.archived)
+      throw new Error(
+        "Restore the archived conversation before sending a message.",
+      );
     const previous = [...this.tasks]
       .reverse()
       .find((task) => task.conversationID === conversationID && task.sessionID);
@@ -188,7 +223,7 @@ export class Agent {
     this.tasks.push(task);
     this.active = active;
     this.publish(task);
-    void this.execute(active, [...directories]);
+    active.done = this.execute(active, [...directories]);
     return this.view(task);
   }
   private finish(active: Active, status: AgentTask["status"], error?: string) {

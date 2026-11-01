@@ -8,13 +8,20 @@ import {
   PanelLeftOpen,
   Ellipsis,
   Search,
+  ChevronDown,
 } from "lucide-react";
-import type { RepoState, AgentTask, AcceptanceOptions } from "../shared/api";
-
-type Draft = { id: string; text: string; acceptance?: AcceptanceOptions };
-const fresh = (): Draft => ({ id: crypto.randomUUID(), text: "" });
-const title = (draft: Draft) =>
-  draft.text.trim().split("\n")[0].slice(0, 48) || "New conversation";
+import type {
+  RepoState,
+  AgentTask,
+  AcceptanceOptions,
+  Conversation,
+  ConversationPatch,
+} from "../shared/api";
+import {
+  readLegacyDrafts,
+  conversationTitle as getTitle,
+  filterConversations,
+} from "./conversation-data";
 
 export function ConversationWorkspace({
   repo,
@@ -35,40 +42,16 @@ export function ConversationWorkspace({
   onOpen: () => void;
   onSelectDirectory: (root: string) => void;
 }) {
-  const key = "anvil:conversations:v2";
-  const [drafts, setDrafts] = useState<Draft[]>(() => {
-    try {
-      const saved = localStorage.getItem(key);
-      const data: unknown = saved
-        ? JSON.parse(saved)
-        : Object.keys(localStorage)
-            .filter((name) => name.startsWith("anvil:drafts:"))
-            .flatMap((name) => {
-              try {
-                const items = JSON.parse(localStorage.getItem(name) || "[]");
-                return Array.isArray(items) ? items : [];
-              } catch {
-                return [];
-              }
-            });
-      if (
-        Array.isArray(data) &&
-        data.length &&
-        data.every(
-          (value) =>
-            typeof value?.id === "string" && typeof value?.text === "string",
-        )
-      )
-        return data.filter(
-          (item, index) =>
-            data.findIndex((other) => other.id === item.id) === index,
-        );
-    } catch {
-      /* A malformed local draft must not prevent the workspace opening. */
-    }
-    return [fresh()];
-  });
-  const [selected, setSelected] = useState(drafts[0].id);
+  const [drafts, setDrafts] = useState<Conversation[]>([]);
+  const [selected, setSelected] = useState("");
+  const [loaded, setLoaded] = useState(false);
+  const [archived, setArchived] = useState(false);
+  const [rename, setRename] = useState<string | null>(null);
+  const [renamingID, setRenamingID] = useState("");
+  const [managing, setManaging] = useState(false);
+  const pending = useRef(Promise.resolve());
+  const deleted = useRef(new Set<string>());
+  const [initialization, setInitialization] = useState(0);
   const [storageError, setStorageError] = useState(false);
   const [tasks, setTasks] = useState<AgentTask[]>([]);
   const [agentError, setAgentError] = useState("");
@@ -91,14 +74,20 @@ export function ConversationWorkspace({
   }, [sidebarOpen]);
   useEffect(() => {
     const close = (event: PointerEvent) => {
-      if (!toolsMenu.current?.contains(event.target as Node))
-        toolsMenu.current?.removeAttribute("open");
+      document
+        .querySelectorAll<HTMLDetailsElement>(".tools-menu[open]")
+        .forEach((menu) => {
+          if (!menu.contains(event.target as Node)) menu.open = false;
+        });
     };
     const escape = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && toolsMenu.current?.open) {
-        toolsMenu.current.open = false;
-        toolsMenu.current.querySelector("summary")?.focus();
-      }
+      if (event.key === "Escape")
+        document
+          .querySelectorAll<HTMLDetailsElement>(".tools-menu[open]")
+          .forEach((menu) => {
+            menu.open = false;
+            menu.querySelector("summary")?.focus();
+          });
     };
     document.addEventListener("pointerdown", close);
     document.addEventListener("keydown", escape);
@@ -112,9 +101,40 @@ export function ConversationWorkspace({
   );
   const running = tasks.find((task) => task.status === "running");
   useEffect(() => {
-    if (!repo) return;
     let live = true;
-    const merge = (incoming: AgentTask) =>
+    async function load() {
+      let state = await window.anvil.conversations();
+      if (!state.legacyDraftsImported)
+        state = await window.anvil.conversations(
+          readLegacyDrafts(localStorage),
+        );
+      if (!live) return;
+      if (!state.conversations.length) {
+        const first = await window.anvil.createConversation();
+        state.conversations = [first];
+        state.selected = first.id;
+      }
+      if (!live) return;
+      setDrafts(state.conversations);
+      setSelected(state.selected);
+      setArchived(
+        !!state.conversations.find((item) => item.id === state.selected)
+          ?.archived,
+      );
+      setLoaded(true);
+      setAgentError("");
+    }
+    void load().catch((error) => {
+      if (live) setAgentError(String(error));
+    });
+    return () => {
+      live = false;
+    };
+  }, [initialization]);
+  useEffect(() => {
+    let live = true;
+    const merge = (incoming: AgentTask) => {
+      if (!live || deleted.current.has(incoming.conversationID)) return;
       setTasks((items) => {
         const existing = items.find((item) => item.id === incoming.id);
         if (existing && existing.updated > incoming.updated) return items;
@@ -122,37 +142,54 @@ export function ConversationWorkspace({
           ? items.map((item) => (item.id === incoming.id ? incoming : item))
           : [...items, incoming];
       });
+    };
     const unsubscribe = window.anvil.onTask(merge);
     void window.anvil
       .tasks()
       .then((items) => {
-        if (!live) return;
-        items.forEach(merge);
-        setDrafts((drafts) => {
-          const missing = [
-            ...new Set(items.map((item) => item.conversationID)),
-          ].filter((id) => !drafts.some((d) => d.id === id));
-          return [...drafts, ...missing.map((id) => ({ id, text: "" }))];
-        });
+        if (live) items.forEach(merge);
       })
       .catch((error) => {
         if (live) setAgentError(String(error));
       });
+    // A newly selected folder may import history from an older, per-folder profile.
+    if (loaded)
+      void window.anvil
+        .conversations()
+        .then((state) => {
+          if (live)
+            setDrafts((items) => [
+              ...items,
+              ...state.conversations.filter(
+                (c) =>
+                  !items.some((item) => item.id === c.id) &&
+                  !deleted.current.has(c.id),
+              ),
+            ]);
+        })
+        .catch((error) => {
+          if (live) setAgentError(String(error));
+        });
     return () => {
       live = false;
       unsubscribe();
     };
-  }, [repo?.root]);
+  }, [repo?.root, loaded]);
   async function send() {
     setSending(true);
     setAgentError("");
     try {
+      await pending.current;
+      await window.anvil.updateConversation(selected, {
+        text: draft.text,
+        acceptance: draft.acceptance,
+      });
       await window.anvil.startTask(
         selected,
         draft.text,
         draft.acceptance?.command.trim() ? draft.acceptance : undefined,
       );
-      update("");
+      await patchDraft(selected, { text: "" });
     } catch (error) {
       setAgentError(String(error));
     } finally {
@@ -167,58 +204,114 @@ export function ConversationWorkspace({
       setAgentError(String(error));
     }
   }
-  const conversationTitle = (item: Draft) =>
-    tasks
-      .find((task) => task.conversationID === item.id)
-      ?.prompt.slice(0, 48) || title(item);
+  const conversationTitle = (item: Conversation) => getTitle(item, tasks);
   const input = useRef<HTMLTextAreaElement>(null);
-  const draft = drafts.find((item) => item.id === selected)!;
-  useEffect(() => {
-    if (!repo) return;
-    try {
-      localStorage.setItem(key, JSON.stringify(drafts));
-      setStorageError(false);
-    } catch {
-      setStorageError(true);
-    }
-  }, [drafts, key, repo?.root]);
-  function update(text: string) {
-    setDrafts((items) =>
-      items.map((item) => (item.id === selected ? { ...item, text } : item)),
-    );
-  }
-  function updateAcceptance(value: Partial<AcceptanceOptions>) {
+  const draft =
+    drafts.find((item) => item.id === selected) ||
+    ({
+      id: "",
+      title: "",
+      text: "",
+      archived: false,
+      created: 0,
+      updated: 0,
+    } as Conversation);
+  const visible = filterConversations(drafts, tasks, search, archived);
+  const readOnly = !loaded || !draft.id || draft.archived;
+  function patchDraft(id: string, patch: ConversationPatch) {
     setDrafts((items) =>
       items.map((item) =>
-        item.id === selected
-          ? {
-              ...item,
-              acceptance: {
-                command: "",
-                directory: repo?.root || "",
-                maxRepairs: 2,
-                timeoutMs: 120000,
-                ...item.acceptance,
-                ...value,
-              },
-            }
-          : item,
+        item.id === id ? { ...item, ...patch, updated: Date.now() } : item,
       ),
     );
-  }
-  function create() {
-    const empty = drafts.find(
-      (item) =>
-        !item.text.trim() &&
-        !tasks.some((task) => task.conversationID === item.id),
+    // Send immediately: updates are applied synchronously in IPC arrival order.
+    // Do not leave recent keystrokes waiting in a renderer-only save queue.
+    const operation = window.anvil.updateConversation(id, patch);
+    pending.current = Promise.all([pending.current, operation]).then(
+      () => {
+        setStorageError(false);
+      },
+      () => {
+        setStorageError(true);
+      },
     );
-    if (empty) setSelected(empty.id);
-    else {
-      const next = fresh();
+    return operation;
+  }
+  function update(text: string) {
+    void patchDraft(selected, { text }).catch(() => {});
+  }
+  function updateAcceptance(value: Partial<AcceptanceOptions>) {
+    void patchDraft(selected, {
+      acceptance: {
+        command: "",
+        directory: repo?.root || "",
+        maxRepairs: 2,
+        timeoutMs: 120000,
+        ...draft.acceptance,
+        ...value,
+      },
+    }).catch(() => {});
+  }
+  async function choose(id: string) {
+    await window.anvil.selectConversation(id);
+    setSelected(id);
+    setRename(null);
+  }
+  async function create() {
+    setManaging(true);
+    await action(async () => {
+      await pending.current;
+      const next = await window.anvil.createConversation();
       setDrafts((items) => [next, ...items]);
       setSelected(next.id);
-    }
-    input.current?.focus();
+      setArchived(false);
+      setSearch("");
+      setRename(null);
+      input.current?.focus();
+    });
+    setManaging(false);
+  }
+  async function archive() {
+    setManaging(true);
+    await action(async () => {
+      await pending.current;
+      const result = await window.anvil.updateConversation(selected, {
+        archived: !draft.archived,
+      });
+      setDrafts((items) =>
+        items.map((item) =>
+          item.id === result.id
+            ? { ...item, archived: result.archived, updated: result.updated }
+            : item,
+        ),
+      );
+      setArchived(!draft.archived);
+    });
+    setManaging(false);
+  }
+  async function remove() {
+    const id = selected;
+    setManaging(true);
+    await action(async () => {
+      await pending.current;
+      if (!(await window.anvil.deleteConversation(id))) return;
+      deleted.current.add(id);
+      setTasks((items) => items.filter((item) => item.conversationID !== id));
+      const state = await window.anvil.conversations();
+      if (!state.conversations.length) {
+        const next = await window.anvil.createConversation();
+        state.conversations = [next];
+        state.selected = next.id;
+      }
+      setDrafts(state.conversations);
+      setSelected(state.selected);
+      setArchived(
+        !!state.conversations.find((item) => item.id === state.selected)
+          ?.archived,
+      );
+      setRename(null);
+    });
+    setManaging(false);
   }
   return (
     <div className="workspace conversation-workspace">
@@ -242,8 +335,8 @@ export function ConversationWorkspace({
           </div>
           <button
             className="new-conversation"
-            onClick={create}
-            disabled={!repo}
+            onClick={() => void create()}
+            disabled={!loaded || managing || sending}
           >
             <Plus size={16} />
             New conversation
@@ -257,32 +350,43 @@ export function ConversationWorkspace({
               onChange={(event) => setSearch(event.target.value)}
             />
           </label>
-          <div className="project-heading">Conversations</div>
+          <div
+            className="conversation-filters"
+            aria-label="Conversation filter"
+          >
+            <button aria-pressed={!archived} onClick={() => setArchived(false)}>
+              Conversations
+            </button>
+            <button aria-pressed={archived} onClick={() => setArchived(true)}>
+              Archived
+            </button>
+          </div>
           <div className="draft-list">
-            {repo ? (
-              drafts
-                .filter((item) =>
-                  conversationTitle(item)
-                    .toLowerCase()
-                    .includes(search.toLowerCase()),
-                )
-                .map((item) => (
-                  <button
-                    key={item.id}
-                    className={`draft-item ${item.id === selected ? "selected" : ""}`}
-                    onClick={() => setSelected(item.id)}
-                  >
-                    <span>{conversationTitle(item)}</span>
-                    {tasks.some(
-                      (task) =>
-                        task.conversationID === item.id &&
-                        task.status === "running",
-                    ) && <span className="activity-dot" aria-label="Running" />}
-                  </button>
-                ))
-            ) : (
-              <p>Add working folders to get started.</p>
+            {visible.map((item) => (
+              <button
+                key={item.id}
+                className={`draft-item ${item.id === selected ? "selected" : ""}`}
+                onClick={() => void action(() => choose(item.id))}
+                disabled={managing || sending}
+              >
+                <span>{conversationTitle(item)}</span>
+                {tasks.some(
+                  (task) =>
+                    task.conversationID === item.id &&
+                    task.status === "running",
+                ) && <span className="activity-dot" aria-label="Running" />}
+              </button>
+            ))}
+            {loaded && !visible.length && (
+              <p>
+                {search.trim()
+                  ? "No matching conversations"
+                  : archived
+                    ? "No archived conversations"
+                    : "No conversations"}
+              </p>
             )}
+            {!loaded && <p>Loading conversations…</p>}
           </div>
           <section className="working-folders" aria-label="Working folders">
             <div className="folders-heading">
@@ -328,6 +432,56 @@ export function ConversationWorkspace({
             </button>
           )}
           <span className="conversation-title">{conversationTitle(draft)}</span>
+          <details className="conversation-actions tools-menu" key={selected}>
+            <summary
+              aria-label="Conversation actions"
+              title="Rename, archive or delete conversation"
+            >
+              <ChevronDown size={18} />
+            </summary>
+            <div
+              className="workspace-tools"
+              onClick={(event) => {
+                const button = (event.target as HTMLElement).closest(
+                  "button:not(:disabled)",
+                );
+                if (button)
+                  (
+                    event.currentTarget.parentElement as HTMLDetailsElement
+                  ).open = false;
+              }}
+            >
+              <button
+                disabled={!loaded || !draft.id || managing || sending}
+                onClick={() => {
+                  setRename(conversationTitle(draft));
+                  setRenamingID(selected);
+                }}
+              >
+                Rename
+              </button>
+              <button
+                disabled={
+                  !draft.id ||
+                  managing ||
+                  sending ||
+                  running?.conversationID === selected
+                }
+                onClick={() => void archive()}
+              >
+                {draft.archived
+                  ? "Restore conversation"
+                  : "Archive conversation"}
+              </button>
+              <button
+                className="delete-conversation"
+                disabled={!draft.id || managing || sending}
+                onClick={() => void remove()}
+              >
+                Delete conversation
+              </button>
+            </div>
+          </details>
           <details className="tools-menu" ref={toolsMenu}>
             <summary
               aria-label="Workspace tools"
@@ -361,6 +515,35 @@ export function ConversationWorkspace({
             </div>
           </details>
         </header>
+        {rename !== null && (
+          <form
+            className="conversation-rename"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void action(async () => {
+                await patchDraft(renamingID, { title: rename });
+                setRename(null);
+              });
+            }}
+          >
+            <input
+              aria-label="Conversation title"
+              autoFocus
+              maxLength={120}
+              value={rename}
+              onChange={(event) => setRename(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Escape") setRename(null);
+              }}
+            />
+            <button type="submit" disabled={!rename.trim()}>
+              Save
+            </button>
+            <button type="button" onClick={() => setRename(null)}>
+              Cancel
+            </button>
+          </form>
+        )}
         <section
           className={`conversation-body ${conversationTasks.length ? "has-tasks" : ""}`}
         >
@@ -477,6 +660,19 @@ export function ConversationWorkspace({
           ))}
         </section>
         <div className="composer-wrap">
+          {draft.archived && (
+            <p className="archived-notice">
+              This conversation is archived.{" "}
+              <button onClick={() => void archive()} disabled={managing}>
+                Restore to continue
+              </button>
+            </p>
+          )}
+          {!loaded && agentError && (
+            <button onClick={() => setInitialization((value) => value + 1)}>
+              Retry loading history
+            </button>
+          )}
           <details className="acceptance-settings">
             <summary>
               {draft.acceptance?.command.trim()
@@ -490,7 +686,7 @@ export function ConversationWorkspace({
                   aria-label="Acceptance command"
                   placeholder="npm test"
                   value={draft.acceptance?.command || ""}
-                  disabled={!!running || sending}
+                  disabled={readOnly || !!running || sending}
                   onChange={(event) =>
                     updateAcceptance({ command: event.target.value })
                   }
@@ -501,7 +697,7 @@ export function ConversationWorkspace({
                 <select
                   aria-label="Acceptance directory"
                   value={draft.acceptance?.directory || repo?.root || ""}
-                  disabled={!!running || sending || !repo}
+                  disabled={readOnly || !!running || sending || !repo}
                   onChange={(event) =>
                     updateAcceptance({ directory: event.target.value })
                   }
@@ -521,7 +717,7 @@ export function ConversationWorkspace({
                   <select
                     aria-label="Repair attempts"
                     value={draft.acceptance?.maxRepairs ?? 2}
-                    disabled={!!running || sending}
+                    disabled={readOnly || !!running || sending}
                     onChange={(event) =>
                       updateAcceptance({
                         maxRepairs: Number(event.target.value),
@@ -540,7 +736,7 @@ export function ConversationWorkspace({
                   <select
                     aria-label="Check timeout"
                     value={draft.acceptance?.timeoutMs ?? 120000}
-                    disabled={!!running || sending}
+                    disabled={readOnly || !!running || sending}
                     onChange={(event) =>
                       updateAcceptance({
                         timeoutMs: Number(event.target.value),
@@ -578,6 +774,7 @@ export function ConversationWorkspace({
                   event.key === "Enter" &&
                   (event.ctrlKey || event.metaKey) &&
                   !event.nativeEvent.isComposing &&
+                  !readOnly &&
                   repo &&
                   draft.text.trim() &&
                   !running &&
@@ -587,7 +784,7 @@ export function ConversationWorkspace({
                   void send();
                 }
               }}
-              disabled={!repo}
+              disabled={readOnly || sending}
               rows={2}
             />
             <div className="composer-footer">
@@ -619,7 +816,14 @@ export function ConversationWorkspace({
                 aria-label="Send message"
                 title="Send task"
                 onClick={() => void send()}
-                disabled={!repo || !draft.text.trim() || !!running || sending}
+                disabled={
+                  readOnly ||
+                  !repo ||
+                  !draft.text.trim() ||
+                  !!running ||
+                  sending ||
+                  managing
+                }
               >
                 <ArrowUp size={17} />
               </button>
