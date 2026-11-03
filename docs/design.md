@@ -199,3 +199,19 @@ CI 补充：提交 `5bb5f41` 的 [运行 41106437444](https://github.com/bazinga
 ### 后续研究方向（2026-11-01）
 
 用户将优先级转向理解 agent loop 和 harness，而非继续补齐界面功能。已整理 [harness 架构分析](harness.md)，区分源码确认的机制、产品公开行为和待验证建议。执行观测、固定任务评测、按失败类型优化是建议的后续方向，尚未作为新功能实现，也未据此替换 OpenCode 内核。
+
+
+### 对话级目录授权（2026-11-03）
+
+添加本地目录后通过原生对话框确认该会话的读取和修改授权，保存到 SQLite v2 的 folder_grants 表。旧版本的全局目录选择不会自动授予权限。输入区显示已授权目录及撤销按钮；不同对话的授权独立，重启后保留。发送任务使用该对话的授权目录，不再把全局浏览目录全部传给 agent。若原 SDK 会话的执行目录已移除，需要重新添加该目录后才能续接。
+
+SDK 仍以 ask 规则运行。主进程在每次权限请求时检查已授权目录，仅为明确的 read/edit 文件路径自动回复 once。检查目录边界、实际目录路径及符号链接；通配符、未知动作、命令和范围外资源保留人工审批。撤销授权先取消本对话活动任务并等待结束。此机制是工具审批策略，不是 OS 沙箱，不能约束获准 shell 命令的全部副作用，也不能消除路径检查与执行之间的文件系统竞态。
+
+验收命令移入默认折叠的 Advanced task settings，并说明其用途是执行测试及失败修复，与文件夹授权无关。默认普通对话不需要填写验收命令。
+
+
+### 2026-11-03 — Conversation permission modes and compact composer
+
+Three modes are persisted per conversation (SQLite schema v3), defaulting to Ask. Ask automatically approves explicit reads inside attached folders, but confirms edits and commands. Auto uses conservative deterministic rules to also approve explicit in-scope edits; commands, patterns, symlink escapes, outside access and unknown actions still ask. This is not a model-based risk classifier or an OS sandbox. Full access approves all SDK permission requests; entering this mode requires native confirmation and can reach outside attached folders with the current OS account's permissions. Mode changes are rejected during a running task. Generic conversation patches cannot elevate permissions.
+
+The composer has a plus menu, collapsed folder list and mode selector. Folder removal stops that conversation's running task. The advanced acceptance form was removed; ordinary composer sends no longer submit saved acceptance commands. Existing historical check results and the internal acceptance API remain available. Testing should be requested naturally in the task, and follows the same tool permission policy.

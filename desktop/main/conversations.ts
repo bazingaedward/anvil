@@ -4,6 +4,7 @@ import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import type {
   AgentTask,
+  PermissionMode,
   Conversation,
   ConversationPatch,
   LegacyDraft,
@@ -82,7 +83,7 @@ export class ConversationStore {
       const version = Number(
         this.db.prepare("PRAGMA user_version").get()!.user_version,
       );
-      if (version > 1)
+      if (version > 3)
         throw new Error(
           "Conversation database belongs to a newer Anvil version.",
         );
@@ -101,7 +102,9 @@ export class ConversationStore {
           CREATE INDEX IF NOT EXISTS tasks_conversation ON tasks(conversation_id);
           CREATE TABLE IF NOT EXISTS metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL);
           CREATE TABLE IF NOT EXISTS deleted_conversations (id TEXT PRIMARY KEY);
-          PRAGMA user_version=1;
+          CREATE TABLE IF NOT EXISTS folder_grants (conversation_id TEXT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE, root TEXT NOT NULL, PRIMARY KEY(conversation_id,root));
+          CREATE TABLE IF NOT EXISTS permission_modes (conversation_id TEXT PRIMARY KEY REFERENCES conversations(id) ON DELETE CASCADE, mode TEXT NOT NULL);
+          PRAGMA user_version=3;
         `);
       });
       this.importTasks(path.join(storage, "conversations", "tasks.json"));
@@ -139,6 +142,16 @@ export class ConversationStore {
   }
   private decode(row: Row): Conversation {
     return {
+      permissionMode:
+        (this.db
+          .prepare("SELECT mode FROM permission_modes WHERE conversation_id=?")
+          .get(row.id)?.mode as PermissionMode) || "ask",
+      folders: this.db
+        .prepare(
+          "SELECT root FROM folder_grants WHERE conversation_id=? ORDER BY rowid",
+        )
+        .all(row.id)
+        .map((item) => String(item.root)),
       id: row.id,
       title: row.title,
       text: row.draft,
@@ -312,6 +325,34 @@ export class ConversationStore {
       }
       this.setMeta("drafts:v2", "1");
     });
+  }
+  setPermissionMode(id: string, mode: PermissionMode) {
+    this.get(id);
+    if (!["ask", "auto", "full"].includes(mode))
+      throw new Error("Invalid permission mode.");
+    this.db
+      .prepare(
+        "INSERT INTO permission_modes VALUES (?,?) ON CONFLICT(conversation_id) DO UPDATE SET mode=excluded.mode",
+      )
+      .run(id, mode);
+    return this.get(id);
+  }
+  grantFolders(id: string, roots: string[]) {
+    this.get(id);
+    this.transaction(() => {
+      for (const root of roots)
+        this.db
+          .prepare("INSERT OR IGNORE INTO folder_grants VALUES (?,?)")
+          .run(id, root);
+    });
+    return this.get(id);
+  }
+  revokeFolder(id: string, root: string) {
+    this.get(id);
+    this.db
+      .prepare("DELETE FROM folder_grants WHERE conversation_id=? AND root=?")
+      .run(id, root);
+    return this.get(id);
   }
   close() {
     this.db.close();

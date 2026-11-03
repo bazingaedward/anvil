@@ -1,6 +1,12 @@
 import { contextBridge, ipcRenderer } from "electron";
 import type { DesktopAPI, TerminalEvent, AgentTask } from "../shared/api";
 const api: DesktopAPI = {
+  setPermissionMode: (id, mode) =>
+    ipcRenderer.invoke("conversations:permission-mode", id, mode),
+  addConversationFolders: (id) =>
+    ipcRenderer.invoke("conversations:add-folders", id),
+  revokeConversationFolder: (id, root) =>
+    ipcRenderer.invoke("conversations:revoke-folder", id, root),
   conversations: (drafts) => ipcRenderer.invoke("conversations:list", drafts),
   createConversation: () => ipcRenderer.invoke("conversations:create"),
   updateConversation: (id, patch) =>

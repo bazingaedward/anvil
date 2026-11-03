@@ -918,7 +918,7 @@ kbd {
   border: 1px solid #383838;
   border-radius: 12px;
   background: #2b2b2b;
-  overflow: hidden;
+  overflow: visible;
 }
 .composer:focus-within {
   border-color: #626262;
@@ -1338,4 +1338,106 @@ kbd {
   .conversation-row-more {
     opacity: 1;
   }
+}
+
+.authorized-folders {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.authorized-folder {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  background: #292929;
+  border-radius: 6px;
+  font-size: 12px;
+  color: #bbb;
+  max-width: 100%;
+}
+.authorized-folder > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.authorized-folder button {
+  padding: 0 3px;
+  color: #aaa;
+}
+.advanced-task-settings {
+  margin-bottom: 8px;
+  color: #888;
+  font-size: 11px;
+}
+.advanced-task-settings > summary {
+  cursor: pointer;
+}
+.advanced-task-settings .acceptance-settings {
+  margin-top: 10px;
+}
+
+.composer-menu > summary {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.composer-menu .context-popover {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  left: 0;
+  z-index: 30;
+  min-width: 210px;
+  padding: 8px;
+  border: 1px solid #414141;
+  border-radius: 12px;
+  background: #292929;
+  box-shadow: 0 8px 28px #0005;
+}
+.context-popover button {
+  text-align: left;
+  background: transparent;
+  border: 0;
+  padding: 8px;
+}
+.context-popover button:hover {
+  background: #ffffff0d;
+}
+.context-popover p {
+  margin: 6px 8px;
+  color: #999;
+  font-size: 12px;
+}
+.composer-menu .folder-popover {
+  width: min(360px, 65vw);
+  max-height: 260px;
+  overflow: auto;
+}
+.context-folder {
+  display: flex;
+  align-items: center;
+}
+.context-folder > button:first-child {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.permission-mode {
+  min-width: 0;
+  background: transparent;
+  color: #aaa;
+  border: 0;
+  padding: 6px 2px;
+  font: inherit;
+  font-size: 12px;
+}
+.permission-mode option {
+  background: #292929;
+  color: #eee;
+}
+.composer-footer {
+  flex-wrap: wrap;
 }

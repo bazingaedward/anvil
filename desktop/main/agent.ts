@@ -1,3 +1,4 @@
+import { allowsOperation } from "./folder-access";
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { createInterface } from "node:readline";
 import { createHash, randomUUID } from "node:crypto";
@@ -5,6 +6,7 @@ import { existsSync, mkdirSync } from "node:fs";
 import path from "node:path";
 import type {
   AgentTask,
+  PermissionMode,
   AcceptanceOptions,
   ConversationPatch,
   LegacyDraft,
@@ -95,6 +97,22 @@ export class Agent {
   conversations(drafts?: LegacyDraft[]) {
     if (drafts !== undefined) this.store.importDrafts(drafts);
     return this.store.state();
+  }
+  setPermissionMode(id: string, mode: PermissionMode) {
+    if (this.active?.task.conversationID === id)
+      throw new Error("Stop the running task before changing permissions.");
+    return this.store.setPermissionMode(id, mode);
+  }
+  grantFolders(id: string, roots: string[]) {
+    return this.store.grantFolders(id, roots);
+  }
+  async revokeFolder(id: string, root: string) {
+    const active = this.active;
+    if (active?.task.conversationID === id) {
+      this.cancel(active.task.id);
+      await active.done;
+    }
+    return this.store.revokeFolder(id, root);
   }
   createConversation() {
     return this.store.create();
@@ -406,6 +424,24 @@ export class Agent {
             typeof message.permission.action === "string" &&
             Array.isArray(message.permission.resources)
           ) {
+            if (
+              allowsOperation(
+                this.store.get(task.conversationID).permissionMode,
+                message.permission.action,
+                message.permission.resources,
+                task.directory!,
+                this.store.get(task.conversationID).folders || [],
+              )
+            ) {
+              child.stdin.write(
+                JSON.stringify({
+                  type: "permission",
+                  id: message.permission.id,
+                  allow: true,
+                }) + "\n",
+              );
+              return;
+            }
             task.permissions.push({
               id: message.permission.id,
               action: this.redact(message.permission.action),

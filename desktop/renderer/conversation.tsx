@@ -13,7 +13,7 @@ import {
 import type {
   RepoState,
   AgentTask,
-  AcceptanceOptions,
+  PermissionMode,
   Conversation,
   ConversationPatch,
 } from "../shared/api";
@@ -30,7 +30,6 @@ export function ConversationWorkspace({
   terminal,
   terminalOpen,
   onTerminal,
-  onOpen,
   onSelectDirectory,
 }: {
   repo: RepoState | null;
@@ -180,13 +179,8 @@ export function ConversationWorkspace({
       await pending.current;
       await window.anvil.updateConversation(selected, {
         text: draft.text,
-        acceptance: draft.acceptance,
       });
-      await window.anvil.startTask(
-        selected,
-        draft.text,
-        draft.acceptance?.command.trim() ? draft.acceptance : undefined,
-      );
+      await window.anvil.startTask(selected, draft.text);
       await patchDraft(selected, { text: "" });
     } catch (error) {
       setAgentError(String(error));
@@ -238,17 +232,43 @@ export function ConversationWorkspace({
   function update(text: string) {
     void patchDraft(selected, { text }).catch(() => {});
   }
-  function updateAcceptance(value: Partial<AcceptanceOptions>) {
-    void patchDraft(selected, {
-      acceptance: {
-        command: "",
-        directory: repo?.root || "",
-        maxRepairs: 2,
-        timeoutMs: 120000,
-        ...draft.acceptance,
-        ...value,
-      },
-    }).catch(() => {});
+  async function changePermissionMode(mode: PermissionMode) {
+    await action(async () => {
+      const result = await window.anvil.setPermissionMode(selected, mode);
+      if (result)
+        setDrafts((items) =>
+          items.map((item) =>
+            item.id === result.id
+              ? { ...item, permissionMode: result.permissionMode }
+              : item,
+          ),
+        );
+    });
+  }
+  async function addFolders() {
+    await action(async () => {
+      const result = await window.anvil.addConversationFolders(selected);
+      if (!result) return;
+      setDrafts((items) =>
+        items.map((item) =>
+          item.id === result.id ? { ...item, folders: result.folders } : item,
+        ),
+      );
+      if (result.folders?.length) onSelectDirectory(result.folders[0]);
+    });
+  }
+  async function revokeFolder(root: string) {
+    await action(async () => {
+      const result = await window.anvil.revokeConversationFolder(
+        selected,
+        root,
+      );
+      setDrafts((items) =>
+        items.map((item) =>
+          item.id === result.id ? { ...item, folders: result.folders } : item,
+        ),
+      );
+    });
   }
   async function choose(id: string) {
     await window.anvil.selectConversation(id);
@@ -389,16 +409,16 @@ export function ConversationWorkspace({
           </div>
           <section className="working-folders" aria-label="Working folders">
             <div className="folders-heading">
-              <span>Working folders</span>
+              <span>Authorized folders</span>
               <button
                 aria-label="Add working folders"
-                title="Add working folders"
-                onClick={onOpen}
+                title="Add and authorize a local folder"
+                onClick={() => void addFolders()}
               >
                 <Plus size={14} />
               </button>
             </div>
-            {(repo?.directories || []).map((root) => (
+            {(draft.folders || []).map((root) => (
               <button
                 key={root}
                 className={`folder-item ${repo?.root === root ? "selected" : ""}`}
@@ -410,7 +430,9 @@ export function ConversationWorkspace({
                 <span>{root.split(/[\\/]/).filter(Boolean).pop()}</span>
               </button>
             ))}
-            {!repo && <p>No folders added</p>}
+            {!draft.folders?.length && (
+              <p>Add a folder to authorize this conversation.</p>
+            )}
           </section>
         </aside>
       )}
@@ -475,8 +497,12 @@ export function ConversationWorkspace({
                   ? "Ask about your code, plan a change, or start building."
                   : "Add working folders to start a conversation."}
               </p>
-              {!repo && (
-                <button className="primary-button" onClick={onOpen}>
+              {!draft.folders?.length && (
+                <button
+                  className="primary-button"
+                  disabled={!loaded}
+                  onClick={() => void addFolders()}
+                >
                   Add folders
                 </button>
               )}
@@ -593,91 +619,6 @@ export function ConversationWorkspace({
               Retry loading history
             </button>
           )}
-          <details className="acceptance-settings">
-            <summary>
-              {draft.acceptance?.command.trim()
-                ? "Acceptance check configured"
-                : "Add acceptance check"}
-            </summary>
-            <div className="acceptance-fields">
-              <label>
-                Command
-                <input
-                  aria-label="Acceptance command"
-                  placeholder="npm test"
-                  value={draft.acceptance?.command || ""}
-                  disabled={readOnly || !!running || sending}
-                  onChange={(event) =>
-                    updateAcceptance({ command: event.target.value })
-                  }
-                />
-              </label>
-              <label>
-                Run in
-                <select
-                  aria-label="Acceptance directory"
-                  value={draft.acceptance?.directory || repo?.root || ""}
-                  disabled={readOnly || !!running || sending || !repo}
-                  onChange={(event) =>
-                    updateAcceptance({ directory: event.target.value })
-                  }
-                >
-                  {(repo?.directories || [repo?.root].filter(Boolean)).map(
-                    (root) => (
-                      <option key={root} value={root}>
-                        {root}
-                      </option>
-                    ),
-                  )}
-                </select>
-              </label>
-              <div className="acceptance-limits">
-                <label>
-                  Repair attempts
-                  <select
-                    aria-label="Repair attempts"
-                    value={draft.acceptance?.maxRepairs ?? 2}
-                    disabled={readOnly || !!running || sending}
-                    onChange={(event) =>
-                      updateAcceptance({
-                        maxRepairs: Number(event.target.value),
-                      })
-                    }
-                  >
-                    {[0, 1, 2, 3, 4, 5].map((value) => (
-                      <option key={value} value={value}>
-                        {value}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  Check timeout
-                  <select
-                    aria-label="Check timeout"
-                    value={draft.acceptance?.timeoutMs ?? 120000}
-                    disabled={readOnly || !!running || sending}
-                    onChange={(event) =>
-                      updateAcceptance({
-                        timeoutMs: Number(event.target.value),
-                      })
-                    }
-                  >
-                    {[30000, 60000, 120000, 300000, 600000].map((value) => (
-                      <option key={value} value={value}>
-                        {value / 1000}s
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-              <p>
-                Sending authorizes this command to run after each attempt in the
-                selected folder. Task limit: 15 minutes. Leave the command blank
-                to skip verification.
-              </p>
-            </div>
-          </details>
           <div className="composer">
             <textarea
               ref={input}
@@ -695,7 +636,7 @@ export function ConversationWorkspace({
                   (event.ctrlKey || event.metaKey) &&
                   !event.nativeEvent.isComposing &&
                   !readOnly &&
-                  repo &&
+                  !!draft.folders?.length &&
                   draft.text.trim() &&
                   !running &&
                   !sending
@@ -708,17 +649,72 @@ export function ConversationWorkspace({
               rows={2}
             />
             <div className="composer-footer">
-              <button
-                className="composer-context"
-                onClick={onOpen}
-                aria-label="Add folders"
-                title="Add working folders"
+              <details
+                className="tools-menu composer-menu"
+                key={`add-${selected}`}
               >
-                <Plus size={17} />
-                {repo
-                  ? `${repo.directories?.length || 1} working folder${(repo.directories?.length || 1) > 1 ? "s" : ""}`
-                  : "No folders"}
-              </button>
+                <summary aria-label="Add context">
+                  <Plus size={17} />
+                </summary>
+                <div className="context-popover">
+                  <button
+                    onClick={(event) => {
+                      event.currentTarget
+                        .closest("details")
+                        ?.removeAttribute("open");
+                      void addFolders();
+                    }}
+                    disabled={readOnly || sending || managing}
+                  >
+                    Add local folder…
+                  </button>
+                </div>
+              </details>
+              <details
+                className="tools-menu composer-menu"
+                key={`folders-${selected}`}
+              >
+                <summary aria-label="Attached folders">
+                  <Folder size={14} /> {draft.folders?.length || 0}
+                </summary>
+                <div className="context-popover folder-popover">
+                  <p>Folders for this conversation</p>
+                  {!draft.folders?.length && <p>No folders attached.</p>}
+                  {(draft.folders || []).map((root) => (
+                    <div className="context-folder" key={root}>
+                      <button
+                        title={root}
+                        onClick={() => onSelectDirectory(root)}
+                      >
+                        {root}
+                      </button>
+                      <button
+                        aria-label={`Revoke access to ${root}`}
+                        title="Remove folder and stop its running task"
+                        onClick={() => void revokeFolder(root)}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </details>
+              <select
+                className="permission-mode"
+                aria-label="Permission mode"
+                title="Ask: confirm edits and commands. Auto: allow scoped file edits, ask for commands and unknown operations. Full access: approve all tools."
+                value={draft.permissionMode || "ask"}
+                disabled={readOnly || sending || !!running || managing}
+                onChange={(event) =>
+                  void changePermissionMode(
+                    event.target.value as PermissionMode,
+                  )
+                }
+              >
+                <option value="ask">Ask each time</option>
+                <option value="auto">Auto</option>
+                <option value="full">Full access</option>
+              </select>
               <span className="connection-status">
                 {running ? "Working" : "DeepSeek"}
               </span>
@@ -738,7 +734,7 @@ export function ConversationWorkspace({
                 onClick={() => void send()}
                 disabled={
                   readOnly ||
-                  !repo ||
+                  !draft.folders?.length ||
                   !draft.text.trim() ||
                   !!running ||
                   sending ||

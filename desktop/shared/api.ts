@@ -65,7 +65,10 @@ export type AcceptanceRun = {
   durationMs: number;
   error?: string;
 };
+export type PermissionMode = "ask" | "auto" | "full";
 export type Conversation = {
+  permissionMode?: PermissionMode;
+  folders?: string[];
   id: string;
   title: string;
   text: string;
@@ -88,6 +91,12 @@ export type ConversationState = {
   legacyDraftsImported: boolean;
 };
 export interface DesktopAPI {
+  setPermissionMode(
+    id: string,
+    mode: PermissionMode,
+  ): Promise<Conversation | null>;
+  addConversationFolders(id: string): Promise<Conversation | null>;
+  revokeConversationFolder(id: string, root: string): Promise<Conversation>;
   conversations(drafts?: LegacyDraft[]): Promise<ConversationState>;
   createConversation(): Promise<Conversation>;
   updateConversation(

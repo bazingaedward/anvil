@@ -37,6 +37,20 @@ test("real agent streams, requests permission, resumes context, cancels and rest
   let app = await launch();
   try {
     let page = await app.firstWindow();
+    await app.evaluate(({ dialog }, folder) => {
+      dialog.showOpenDialog = async () => ({
+        canceled: false,
+        filePaths: [folder],
+      });
+      dialog.showMessageBox = async () => ({
+        response: 1,
+        checkboxChecked: false,
+      });
+    }, root);
+    await page.getByLabel("Add context", { exact: true }).click();
+    await page
+      .getByRole("button", { name: "Add local folder…", exact: true })
+      .click();
     const input = page.getByRole("textbox", { name: "Message Anvil" });
     await input.fill(
       "Remember ANVIL_CONTEXT_OK. Reply exactly ANVIL_DESKTOP_OK. Do not use any tools.",
@@ -53,10 +67,6 @@ test("real agent streams, requests permission, resumes context, cancels and rest
       "Use the read tool to read proof.txt and report its contents and the marker I asked you to remember.",
     );
     await page.getByRole("button", { name: "Send message" }).click();
-    await expect(
-      page.getByRole("region", { name: "Tool approval" }),
-    ).toContainText("proof.txt", { timeout: 45000 });
-    await page.getByRole("button", { name: "Allow once" }).click();
     await expect(page.locator(".agent-response").last()).toContainText(
       "ANVIL_DESKTOP_TOOL_OK",
       { timeout: 45000 },
@@ -68,7 +78,13 @@ test("real agent streams, requests permission, resumes context, cancels and rest
       "Finished · not verified",
     );
     await page.getByRole("button", { name: "New conversation" }).click();
-    await input.fill("Read proof.txt using the read tool.");
+    await page.getByLabel("Add context", { exact: true }).click();
+    await page
+      .getByRole("button", { name: "Add local folder…", exact: true })
+      .click();
+    await input.fill(
+      "Use the shell tool to print the current directory. Do not use any other tools.",
+    );
     await page.getByRole("button", { name: "Send message" }).click();
     await expect(
       page.getByRole("region", { name: "Tool approval" }),

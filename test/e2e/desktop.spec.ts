@@ -67,14 +67,18 @@ test("real desktop opens, saves safely, reviews both diffs and runs a PTY", asyn
       page.getByRole("heading", { name: "What are we working on?" }),
     ).toBeVisible();
     await app.evaluate(({ dialog }, folder) => {
+      dialog.showMessageBox = async () => ({
+        response: 1,
+        checkboxChecked: false,
+      });
       dialog.showOpenDialog = async () => ({
         canceled: false,
         filePaths: [folder],
       });
     }, root);
+    await page.getByLabel("Add context", { exact: true }).click();
     await page
-      .getByRole("button", { name: "Add folders", exact: true })
-      .first()
+      .getByRole("button", { name: "Add local folder…", exact: true })
       .click();
     await expect(
       page.getByRole("main", { name: "Conversation", exact: true }),
@@ -197,9 +201,9 @@ test("real desktop opens, saves safely, reviews both diffs and runs a PTY", asyn
       .toBe("ANVIL_PTY_OK");
     await page.screenshot({ path: "test-results/desktop-workspace.png" });
     // Reopening the same repository must not silently kill its terminal.
+    await page.getByLabel("Add context", { exact: true }).click();
     await page
-      .getByRole("button", { name: "Add folders", exact: true })
-      .first()
+      .getByRole("button", { name: "Add local folder…", exact: true })
       .click();
     await rm(output);
     await terminalInput.focus();

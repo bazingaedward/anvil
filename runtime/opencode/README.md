@@ -26,7 +26,7 @@ OpenCode configuration is disabled. SDK state is isolated under the desktop's
 user-data directory. Conversations are independent of working folders; Anvil stores task history there
 and reuses the SDK session to retain context across turns and restarts.
 
-All SDK tool actions request approval; the UI offers Deny and Allow once.
+SDK tool actions request approval. The main process automatically approves explicit read/edit paths within folders authorized for that conversation; other requests reach the UI with Deny and Allow once.
 Cancellation interrupts the session, with a five-second process-kill fallback.
 Closing the desktop stops the active task. Switching the file browser between working folders keeps conversations and active tasks running. A task
 marked completed means its configured acceptance command passed. Without an
@@ -34,7 +34,7 @@ acceptance command, a model finish is recorded as unverified. This executor is
 not an OS sandbox; approved tools run with the user's filesystem permissions.
 Configurable model selection and cross-platform runtime packaging remain follow-up work.
 
-Expand **Add acceptance check** above the composer to specify a command and one
+Expand **Advanced task settings**, then **Automatic verification (optional)** above the composer to specify a command and one
 of the added working folders. Sending the message authorizes that command to run
 after each model round. Failure output is returned to the same SDK session for
 repair; the command and directory remain fixed for the task. The default allows
@@ -94,3 +94,15 @@ Anvil's current history and session links, not these recovery copies or provider
 records; it is not a secure-erasure operation. New versions write only SQLite
 conversation data. Do not run an older preview against the same profile after
 migration: changes it writes to legacy storage are not imported again.
+
+
+Folder access is granted per conversation through the local directory picker and a
+native confirmation. Selected editor folders from older versions are not grants.
+The composer shows authorized folders with revoke buttons; revoking a folder stops
+that conversation's running task before removing access. Shell commands, unknown
+actions, wildcard paths and paths through symlinks still require approval. This is
+a tool approval policy, not OS sandboxing; approved shell commands may access other
+resources. SQLite schema v2 stores grants separately from editable draft metadata.
+
+
+Permission modes (2026-11-03): Ask allows scoped reads only; Auto additionally allows scoped explicit edits and asks for commands/unknown operations; Full access allows all runtime permission requests after native confirmation. Modes are per conversation and cannot change during a running task. This policy is not an OS sandbox. The composer no longer submits legacy acceptance commands; request testing as part of the task.

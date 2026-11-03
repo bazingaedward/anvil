@@ -1,3 +1,4 @@
+import { realpath } from "node:fs/promises";
 import { app, BrowserWindow, dialog, ipcMain, Menu } from "electron";
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -7,6 +8,7 @@ import { Workspace } from "./workspace";
 import { Agent } from "./agent";
 import type {
   FileDocument,
+  PermissionMode,
   DiffSide,
   TerminalEvent,
   AcceptanceOptions,
@@ -143,6 +145,70 @@ function registerIPC() {
     ...(await current().status()),
     directories: [...directories],
   }));
+  handle(
+    "conversations:permission-mode",
+    async (id: string, mode: PermissionMode) => {
+      const executor = currentAgent();
+      const conversation = executor
+        .conversations()
+        .conversations.find((item) => item.id === id);
+      if (!conversation) throw new Error("Conversation no longer exists.");
+      if (!["ask", "auto", "full"].includes(mode))
+        throw new Error("Invalid permission mode.");
+      if (mode === "full" && conversation.permissionMode !== "full") {
+        const approval = await dialog.showMessageBox(window, {
+          type: "warning",
+          title: "Full access",
+          message: "Allow unrestricted tool execution in this conversation?",
+          detail:
+            "Anvil will approve file operations and commands without asking, including outside attached folders. Tools run with your operating system account’s access. This is not a sandbox. The mode is saved for this conversation.",
+          buttons: ["Cancel", "Allow full access"],
+          defaultId: 0,
+          cancelId: 0,
+        });
+        if (approval.response !== 1) return null;
+      }
+      return executor.setPermissionMode(id, mode);
+    },
+  );
+  handle("conversations:add-folders", async (id: string) => {
+    const executor = currentAgent();
+    if (!executor.conversations().conversations.some((item) => item.id === id))
+      throw new Error("Conversation no longer exists.");
+    if (!(await discardChanges())) return null;
+    const picked = await dialog.showOpenDialog(window, {
+      title: "Add local folders to this conversation",
+      properties: ["openDirectory", "multiSelections"],
+    });
+    if (picked.canceled || !picked.filePaths.length) return null;
+    const roots = await Promise.all(
+      picked.filePaths.map((root) => realpath(root)),
+    );
+    const approval = await dialog.showMessageBox(window, {
+      type: "question",
+      title: "Authorize folder access",
+      message: "Allow this conversation to read and modify these folders?",
+      detail:
+        roots.join("\n") +
+        "\n\nReads inside these folders do not require repeated approval. Ask mode confirms edits; Auto also approves scoped edits. Commands and outside access require approval unless Full access is enabled. Access is saved for this conversation and can be revoked.",
+      buttons: ["Cancel", "Allow access"],
+      defaultId: 0,
+      cancelId: 0,
+    });
+    if (approval.response !== 1) return null;
+    await selectRepository(roots[0]);
+    for (const root of roots)
+      if (!directories.includes(root)) directories.push(root);
+    await writeFile(
+      settingsFile(),
+      JSON.stringify({ root: roots[0], directories }),
+      "utf8",
+    );
+    return executor.grantFolders(id, roots);
+  });
+  handle("conversations:revoke-folder", (id: string, root: string) =>
+    currentAgent().revokeFolder(id, root),
+  );
   handle("agent:tasks", () => currentAgent().list());
   handle("conversations:list", (drafts?: LegacyDraft[]) =>
     currentAgent().conversations(drafts),
@@ -182,8 +248,23 @@ function registerIPC() {
   });
   handle(
     "agent:start",
-    (id: string, text: string, acceptance?: AcceptanceOptions) =>
-      currentAgent().start(id, text, directories, current().root, acceptance),
+    (id: string, text: string, acceptance?: AcceptanceOptions) => {
+      const executor = currentAgent();
+      const folders =
+        executor.conversations().conversations.find((item) => item.id === id)
+          ?.folders || [];
+      if (!folders.length)
+        throw new Error(
+          "Add and authorize a local folder for this conversation first.",
+        );
+      return executor.start(
+        id,
+        text,
+        folders,
+        folders.includes(workspace?.root || "") ? workspace!.root : folders[0],
+        acceptance,
+      );
+    },
   );
   handle("agent:cancel", (id: string) => currentAgent().cancel(id));
   handle("agent:permission", (task: string, id: string, allow: boolean) =>
