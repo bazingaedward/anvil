@@ -114,6 +114,15 @@ export class Agent {
     }
     return this.store.revokeFolder(id, root);
   }
+  createGroup(name: string, conversationID?: string) {
+    return this.store.createGroup(name, conversationID);
+  }
+  updateGroup(id: string, patch: { name?: string; collapsed?: boolean }) {
+    return this.store.updateGroup(id, patch);
+  }
+  deleteGroup(id: string) {
+    this.store.deleteGroup(id);
+  }
   createConversation() {
     return this.store.create();
   }
@@ -211,11 +220,9 @@ export class Agent {
     const previous = [...this.tasks]
       .reverse()
       .find((task) => task.conversationID === conversationID && task.sessionID);
-    const directory = previous?.directory || activeDirectory;
-    if (!directories.includes(directory))
-      throw new Error(
-        "Add this conversation’s original working directory before continuing.",
-      );
+    // The selected authorized folder determines cwd; the SDK session retains history
+    // and is moved by the worker when the user changes working directories.
+    const directory = activeDirectory;
     const task: RecordTask = {
       id: randomUUID(),
       conversationID,

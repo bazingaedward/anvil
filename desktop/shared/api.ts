@@ -66,7 +66,15 @@ export type AcceptanceRun = {
   error?: string;
 };
 export type PermissionMode = "ask" | "auto" | "full";
+export type ConversationGroup = {
+  id: string;
+  name: string;
+  collapsed: boolean;
+  created: number;
+};
 export type Conversation = {
+  groupID?: string | null;
+  pinned?: boolean;
   permissionMode?: PermissionMode;
   folders?: string[];
   id: string;
@@ -78,7 +86,10 @@ export type Conversation = {
   updated: number;
 };
 export type ConversationPatch = Partial<
-  Pick<Conversation, "title" | "text" | "acceptance" | "archived">
+  Pick<
+    Conversation,
+    "title" | "text" | "acceptance" | "archived" | "groupID" | "pinned"
+  >
 >;
 export type LegacyDraft = {
   id: string;
@@ -86,11 +97,21 @@ export type LegacyDraft = {
   acceptance?: AcceptanceOptions;
 };
 export type ConversationState = {
+  groups: ConversationGroup[];
   conversations: Conversation[];
   selected: string;
   legacyDraftsImported: boolean;
 };
 export interface DesktopAPI {
+  createGroup(
+    name: string,
+    conversationID?: string,
+  ): Promise<ConversationGroup>;
+  updateGroup(
+    id: string,
+    patch: { name?: string; collapsed?: boolean },
+  ): Promise<ConversationGroup>;
+  deleteGroup(id: string): Promise<boolean>;
   setPermissionMode(
     id: string,
     mode: PermissionMode,

@@ -215,3 +215,18 @@ SDK 仍以 ask 规则运行。主进程在每次权限请求时检查已授权�
 Three modes are persisted per conversation (SQLite schema v3), defaulting to Ask. Ask automatically approves explicit reads inside attached folders, but confirms edits and commands. Auto uses conservative deterministic rules to also approve explicit in-scope edits; commands, patterns, symlink escapes, outside access and unknown actions still ask. This is not a model-based risk classifier or an OS sandbox. Full access approves all SDK permission requests; entering this mode requires native confirmation and can reach outside attached folders with the current OS account's permissions. Mode changes are rejected during a running task. Generic conversation patches cannot elevate permissions.
 
 The composer has a plus menu, collapsed folder list and mode selector. Folder removal stops that conversation's running task. The advanced acceptance form was removed; ordinary composer sends no longer submit saved acceptance commands. Existing historical check results and the internal acceptance API remain available. Testing should be requested naturally in the task, and follows the same tool permission policy.
+
+
+### 2026-11-03 — Resume conversations after changing folders
+
+The active authorized folder now sets each task's working directory. When it differs from an existing SDK session location, the adapter calls `sessions.move` before prompting, preserving the session ID and its message history. Removing the original folder no longer blocks sending. The main process still validates the selected directory against current conversation grants; moving does not grant access to the old folder.
+
+
+### 2026-11-03 — Local conversation groups
+
+SQLite schema v4 adds conversation groups (stable UUID, name, collapsed state) and conversation organization (one optional group and pin state per conversation). Groups organize chats only: they do not bind repositories or grant folder access. Deleting a group uses `ON DELETE SET NULL`, preserving its conversations, tasks, drafts, pins and folder permissions. Conversation deletion cascades its organization record but retains the group. Group membership is validated before an atomic metadata update. Nested legacy draft imports use savepoints to retain all-or-nothing migration semantics.
+
+The sidebar supports all/pinned/archived views, activity sorting, new groups, collapse, rename and confirmed group deletion. Conversation menus include pin/unpin, rename, move to group/ungrouped, archive and delete. Pinned conversations appear once at the top while keeping their group membership. Search reveals matching conversations inside collapsed groups without changing saved collapse state. All data stays local; no cloud service or project concept is introduced.
+
+
+The conversation's Move to group action now opens a separate flyout beside the parent menu on hover or click. It lists existing groups, offers Ungrouped when applicable, and ends with New group. Creating a group from this flyout moves the targeted conversation in the same SQLite transaction. Keyboard right/left arrows enter/leave the flyout; outside click and Escape dismiss it. Flyouts clamp to the viewport and flip left when the right edge has insufficient space.

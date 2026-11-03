@@ -268,7 +268,7 @@ test("a restarted agent resumes the stored SDK session after conversation metada
     script = path.join(root, "worker.cjs");
   writeFileSync(
     script,
-    `const fs=require('node:fs'); const path=require('node:path'); const send=x=>console.log(JSON.stringify(x));require('node:readline').createInterface({input:process.stdin}).on('line',line=>{const m=JSON.parse(line);if(m.type!=='start')return;fs.appendFileSync(path.join(m.repo,'sessions.jsonl'),JSON.stringify({id:m.sessionID||null})+'\\n');send({type:'session',id:m.sessionID||'persisted-session'});send({type:'text',text:'Done'});send({type:'done',status:'completed'});process.exit(0);});`,
+    `const fs=require('node:fs'); const path=require('node:path'); const send=x=>console.log(JSON.stringify(x));require('node:readline').createInterface({input:process.stdin}).on('line',line=>{const m=JSON.parse(line);if(m.type!=='start')return;fs.appendFileSync(path.join(m.repo,'sessions.jsonl'),JSON.stringify({id:m.sessionID||null,repo:m.repo})+'\\n');send({type:'session',id:m.sessionID||'persisted-session'});send({type:'text',text:'Done'});send({type:'done',status:'completed'});process.exit(0);});`,
   );
   const credentials = {
     BYTEPLUS_ARK_API_KEY: "fixture",
@@ -313,6 +313,29 @@ test("a restarted agent resumes the stored SDK session after conversation metada
         .split("\n")
         .map((line) => JSON.parse(line).id),
       [null, "persisted-session"],
+    );
+    // Replace the originally authorized directory entirely, retaining SDK history.
+    const nextDirectory = path.join(root, "next");
+    mkdirSync(nextDirectory);
+    agent.grantFolders(chat.id, [root]);
+    await agent.revokeFolder(chat.id, root);
+    agent.grantFolders(chat.id, [nextDirectory]);
+    agent.start(
+      chat.id,
+      "Continue in the new folder",
+      [nextDirectory],
+      nextDirectory,
+    );
+    await finish();
+    const moved = JSON.parse(
+      readFileSync(path.join(nextDirectory, "sessions.jsonl"), "utf8").trim(),
+    );
+    assert.equal(moved.id, "persisted-session");
+    assert.equal(moved.repo, nextDirectory);
+    assert.equal(agent.list().length, 3);
+    assert.throws(
+      () => agent.start(chat.id, "Outside", [nextDirectory], root),
+      /working directory/,
     );
     assert.equal(agent.conversations().conversations[0].title, "Renamed");
     assert.ok(agent.list().every((t) => !("sessionID" in t)));

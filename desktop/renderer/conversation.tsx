@@ -16,6 +16,7 @@ import type {
   PermissionMode,
   Conversation,
   ConversationPatch,
+  ConversationGroup,
 } from "../shared/api";
 import {
   readLegacyDrafts,
@@ -41,6 +42,13 @@ export function ConversationWorkspace({
   onOpen: () => void;
   onSelectDirectory: (root: string) => void;
 }) {
+  const [groups, setGroups] = useState<ConversationGroup[]>([]);
+  const [creatingGroup, setCreatingGroup] = useState(false);
+  const [groupName, setGroupName] = useState("");
+  const [groupError, setGroupError] = useState("");
+  const [groupBusy, setGroupBusy] = useState(false);
+  const [onlyPinned, setOnlyPinned] = useState(false);
+  const [oldestFirst, setOldestFirst] = useState(false);
   const [drafts, setDrafts] = useState<Conversation[]>([]);
   const [selected, setSelected] = useState("");
   const [loaded, setLoaded] = useState(false);
@@ -112,6 +120,7 @@ export function ConversationWorkspace({
         state.selected = first.id;
       }
       if (!live) return;
+      setGroups(state.groups);
       setDrafts(state.conversations);
       setSelected(state.selected);
       setArchived(
@@ -208,7 +217,104 @@ export function ConversationWorkspace({
       created: 0,
       updated: 0,
     } as Conversation);
-  const visible = filterConversations(drafts, tasks, search, archived);
+  const visible = filterConversations(drafts, tasks, search, archived).filter(
+    (item) => !onlyPinned || item.pinned,
+  );
+  if (oldestFirst) visible.reverse();
+  const pinned = visible.filter((item) => item.pinned);
+  const unpinned = visible.filter((item) => !item.pinned);
+  async function saveGroup(
+    id: string,
+    patch: { name?: string; collapsed?: boolean },
+  ) {
+    const result = await window.anvil.updateGroup(id, patch);
+    setGroups((items) =>
+      items.map((item) => (item.id === result.id ? result : item)),
+    );
+  }
+  async function removeGroup(id: string) {
+    await action(async () => {
+      if (!(await window.anvil.deleteGroup(id))) return;
+      setGroups((items) => items.filter((item) => item.id !== id));
+      setDrafts((items) =>
+        items.map((item) =>
+          item.groupID === id ? { ...item, groupID: null } : item,
+        ),
+      );
+    });
+  }
+  async function addGroup() {
+    setGroupBusy(true);
+    setGroupError("");
+    try {
+      const result = await window.anvil.createGroup(groupName);
+      setGroups((items) => [...items, result]);
+      setOnlyPinned(false);
+      setArchived(false);
+      setSearch("");
+      setCreatingGroup(false);
+      setGroupName("");
+    } catch (error) {
+      setGroupError(String(error));
+    } finally {
+      setGroupBusy(false);
+    }
+  }
+  async function organizeConversation(
+    id: string,
+    patch: Pick<ConversationPatch, "pinned" | "groupID">,
+  ) {
+    await action(async () => {
+      const result = await window.anvil.updateConversation(id, patch);
+      setDrafts((items) =>
+        items.map((item) =>
+          item.id === id
+            ? {
+                ...item,
+                pinned: result.pinned,
+                groupID: result.groupID,
+                updated: result.updated,
+              }
+            : item,
+        ),
+      );
+    });
+  }
+  function renderConversation(item: Conversation) {
+    return (
+      <ConversationRow
+        key={item.id}
+        title={conversationTitle(item)}
+        selected={item.id === selected}
+        archived={item.archived}
+        running={tasks.some(
+          (task) =>
+            task.conversationID === item.id && task.status === "running",
+        )}
+        disabled={managing || sending}
+        onCreateGroup={async (name) => {
+          const group = await window.anvil.createGroup(name, item.id);
+          setGroups((items) => [...items, group]);
+          setDrafts((items) =>
+            items.map((chat) =>
+              chat.id === item.id ? { ...chat, groupID: group.id } : chat,
+            ),
+          );
+        }}
+        groups={groups}
+        groupID={item.groupID}
+        pinned={item.pinned}
+        onPin={() =>
+          void organizeConversation(item.id, { pinned: !item.pinned })
+        }
+        onMove={(groupID) => void organizeConversation(item.id, { groupID })}
+        onSelect={() => void action(() => choose(item.id))}
+        onRename={(title) => patchDraft(item.id, { title })}
+        onArchive={() => void archive(item)}
+        onDelete={() => void remove(item.id)}
+      />
+    );
+  }
   const readOnly = !loaded || !draft.id || draft.archived;
   function patchDraft(id: string, patch: ConversationPatch) {
     setDrafts((items) =>
@@ -282,6 +388,7 @@ export function ConversationWorkspace({
       setDrafts((items) => [next, ...items]);
       setSelected(next.id);
       setArchived(false);
+      setOnlyPinned(false);
       setSearch("");
       input.current?.focus();
     });
@@ -318,6 +425,7 @@ export function ConversationWorkspace({
         state.conversations = [next];
         state.selected = next.id;
       }
+      setGroups(state.groups);
       setDrafts(state.conversations);
       if (id === selected) {
         setSelected(state.selected);
@@ -366,36 +474,141 @@ export function ConversationWorkspace({
               onChange={(event) => setSearch(event.target.value)}
             />
           </label>
-          <div
-            className="conversation-filters"
-            aria-label="Conversation filter"
-          >
-            <button aria-pressed={!archived} onClick={() => setArchived(false)}>
-              Conversations
-            </button>
-            <button aria-pressed={archived} onClick={() => setArchived(true)}>
-              Archived
-            </button>
+          <div className="sidebar-list-heading">
+            <select
+              aria-label="Conversation filter"
+              value={archived ? "archived" : onlyPinned ? "pinned" : "all"}
+              onChange={(event) => {
+                setArchived(event.target.value === "archived");
+                setOnlyPinned(event.target.value === "pinned");
+              }}
+            >
+              <option value="all">Chats and tasks</option>
+              <option value="pinned">Pinned</option>
+              <option value="archived">Archived</option>
+            </select>
+            <details className="tools-menu sidebar-list-options">
+              <summary aria-label="List options">
+                <Ellipsis size={17} />
+              </summary>
+              <div className="workspace-tools">
+                <button
+                  onClick={(event) => {
+                    event.currentTarget
+                      .closest("details")
+                      ?.removeAttribute("open");
+                    setCreatingGroup(true);
+                    setGroupError("");
+                  }}
+                >
+                  New group
+                </button>
+                <button
+                  onClick={(event) => {
+                    event.currentTarget
+                      .closest("details")
+                      ?.removeAttribute("open");
+                    setOldestFirst((value) => !value);
+                  }}
+                >
+                  {oldestFirst ? "Sort: newest first" : "Sort: oldest first"}
+                </button>
+              </div>
+            </details>
           </div>
-          <div className="draft-list">
-            {visible.map((item) => (
-              <ConversationRow
-                key={item.id}
-                title={conversationTitle(item)}
-                selected={item.id === selected}
-                archived={item.archived}
-                running={tasks.some(
-                  (task) =>
-                    task.conversationID === item.id &&
-                    task.status === "running",
-                )}
-                disabled={managing || sending}
-                onSelect={() => void action(() => choose(item.id))}
-                onRename={(title) => patchDraft(item.id, { title })}
-                onArchive={() => void archive(item)}
-                onDelete={() => void remove(item.id)}
+          {creatingGroup && (
+            <form
+              className="group-create"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void addGroup();
+              }}
+            >
+              <input
+                autoFocus
+                aria-label="Group name"
+                placeholder="Group name"
+                maxLength={80}
+                value={groupName}
+                disabled={groupBusy}
+                onChange={(event) => setGroupName(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Escape" && !groupBusy)
+                    setCreatingGroup(false);
+                }}
               />
-            ))}
+              <button disabled={!groupName.trim() || groupBusy}>Create</button>
+              <button
+                type="button"
+                disabled={groupBusy}
+                onClick={() => setCreatingGroup(false)}
+              >
+                Cancel
+              </button>
+              {groupError && <p role="alert">{groupError}</p>}
+            </form>
+          )}
+          <div className="draft-list">
+            {!!pinned.length && (
+              <>
+                <div className="group-label">Pinned</div>
+                {pinned.map(renderConversation)}
+              </>
+            )}
+            {!onlyPinned &&
+              groups
+                .filter(
+                  (group) =>
+                    !search.trim() ||
+                    unpinned.some((item) => item.groupID === group.id),
+                )
+                .map((group) => (
+                  <section
+                    className="conversation-group"
+                    key={group.id}
+                    aria-label={group.name}
+                  >
+                    <ConversationRow
+                      title={group.name}
+                      selected={false}
+                      archived={false}
+                      running={false}
+                      disabled={managing || sending}
+                      collapsed={group.collapsed && !search.trim()}
+                      onSelect={() =>
+                        void action(() =>
+                          saveGroup(group.id, { collapsed: !group.collapsed }),
+                        )
+                      }
+                      onRename={(name) => saveGroup(group.id, { name })}
+                      onDelete={() => void removeGroup(group.id)}
+                    />
+                    {(!group.collapsed || !!search.trim()) && (
+                      <div className="group-conversations">
+                        {unpinned
+                          .filter((item) => item.groupID === group.id)
+                          .map(renderConversation)}
+                        {!unpinned.some(
+                          (item) => item.groupID === group.id,
+                        ) && (
+                          <p className="group-empty">
+                            Move a conversation here from its ⋯ menu.
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </section>
+                ))}
+            {!onlyPinned && (
+              <>
+                {!!groups.length && (
+                  <div className="group-label">Ungrouped</div>
+                )}
+                {unpinned
+                  .filter((item) => !item.groupID)
+                  .map(renderConversation)}
+              </>
+            )}
             {loaded && !visible.length && (
               <p>
                 {search.trim()
@@ -407,33 +620,6 @@ export function ConversationWorkspace({
             )}
             {!loaded && <p>Loading conversations…</p>}
           </div>
-          <section className="working-folders" aria-label="Working folders">
-            <div className="folders-heading">
-              <span>Authorized folders</span>
-              <button
-                aria-label="Add working folders"
-                title="Add and authorize a local folder"
-                onClick={() => void addFolders()}
-              >
-                <Plus size={14} />
-              </button>
-            </div>
-            {(draft.folders || []).map((root) => (
-              <button
-                key={root}
-                className={`folder-item ${repo?.root === root ? "selected" : ""}`}
-                title={root}
-                aria-pressed={repo?.root === root}
-                onClick={() => onSelectDirectory(root)}
-              >
-                <Folder size={14} />
-                <span>{root.split(/[\\/]/).filter(Boolean).pop()}</span>
-              </button>
-            ))}
-            {!draft.folders?.length && (
-              <p>Add a folder to authorize this conversation.</p>
-            )}
-          </section>
         </aside>
       )}
       <main

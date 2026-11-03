@@ -112,7 +112,10 @@ async function run(input) {
   if (input.sessionID) {
     const session = await host.sessions.get({ sessionID: input.sessionID });
     if (path.resolve(session.location.directory) !== path.resolve(input.repo))
-      throw new Error("Session repository mismatch.");
+      await host.sessions.move({
+        sessionID: session.id,
+        directory: input.repo,
+      });
     sessionID = session.id;
   } else {
     const session = await host.sessions.create({

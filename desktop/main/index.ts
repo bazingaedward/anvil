@@ -213,6 +213,33 @@ function registerIPC() {
   handle("conversations:list", (drafts?: LegacyDraft[]) =>
     currentAgent().conversations(drafts),
   );
+  handle("groups:create", (name: string, conversationID?: string) =>
+    currentAgent().createGroup(name, conversationID),
+  );
+  handle(
+    "groups:update",
+    (id: string, patch: { name?: string; collapsed?: boolean }) =>
+      currentAgent().updateGroup(id, patch),
+  );
+  handle("groups:delete", async (id: string) => {
+    const executor = currentAgent();
+    const group = executor
+      .conversations()
+      .groups.find((item) => item.id === id);
+    if (!group) throw new Error("Group no longer exists.");
+    const result = await dialog.showMessageBox(window, {
+      type: "question",
+      message: `Delete group “${group.name}”?`,
+      detail:
+        "Conversations will be moved to Ungrouped. No conversations will be deleted.",
+      buttons: ["Cancel", "Delete group"],
+      defaultId: 0,
+      cancelId: 0,
+    });
+    if (result.response !== 1) return false;
+    executor.deleteGroup(id);
+    return true;
+  });
   handle("conversations:create", () => currentAgent().createConversation());
   handle("conversations:update", (id: string, patch: ConversationPatch) =>
     currentAgent().updateConversation(id, patch),

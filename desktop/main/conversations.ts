@@ -4,6 +4,7 @@ import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import type {
   AgentTask,
+  ConversationGroup,
   PermissionMode,
   Conversation,
   ConversationPatch,
@@ -34,7 +35,15 @@ function validatePatch(patch: ConversationPatch) {
     throw new Error("Invalid conversation update.");
   if (
     Object.keys(patch).some(
-      (key) => !["title", "text", "acceptance", "archived"].includes(key),
+      (key) =>
+        ![
+          "title",
+          "text",
+          "acceptance",
+          "archived",
+          "groupID",
+          "pinned",
+        ].includes(key),
     )
   )
     throw new Error("Unknown conversation field.");
@@ -52,6 +61,10 @@ function validatePatch(patch: ConversationPatch) {
     throw new Error("Draft is too long.");
   if (patch.archived !== undefined && typeof patch.archived !== "boolean")
     throw new Error("Invalid archive state.");
+  if (patch.pinned !== undefined && typeof patch.pinned !== "boolean")
+    throw new Error("Invalid pin state.");
+  if (patch.groupID !== undefined && patch.groupID !== null)
+    checkID(patch.groupID);
   const a = patch.acceptance;
   if (
     a !== undefined &&
@@ -83,7 +96,7 @@ export class ConversationStore {
       const version = Number(
         this.db.prepare("PRAGMA user_version").get()!.user_version,
       );
-      if (version > 3)
+      if (version > 4)
         throw new Error(
           "Conversation database belongs to a newer Anvil version.",
         );
@@ -104,7 +117,9 @@ export class ConversationStore {
           CREATE TABLE IF NOT EXISTS deleted_conversations (id TEXT PRIMARY KEY);
           CREATE TABLE IF NOT EXISTS folder_grants (conversation_id TEXT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE, root TEXT NOT NULL, PRIMARY KEY(conversation_id,root));
           CREATE TABLE IF NOT EXISTS permission_modes (conversation_id TEXT PRIMARY KEY REFERENCES conversations(id) ON DELETE CASCADE, mode TEXT NOT NULL);
-          PRAGMA user_version=3;
+          CREATE TABLE IF NOT EXISTS conversation_groups (id TEXT PRIMARY KEY, name TEXT NOT NULL, collapsed INTEGER NOT NULL DEFAULT 0, created INTEGER NOT NULL);
+          CREATE TABLE IF NOT EXISTS conversation_organization (conversation_id TEXT PRIMARY KEY REFERENCES conversations(id) ON DELETE CASCADE, group_id TEXT REFERENCES conversation_groups(id) ON DELETE SET NULL, pinned INTEGER NOT NULL DEFAULT 0);
+          PRAGMA user_version=4;
         `);
       });
       this.importTasks(path.join(storage, "conversations", "tasks.json"));
@@ -114,13 +129,15 @@ export class ConversationStore {
     }
   }
   private transaction<T>(run: () => T): T {
-    this.db.exec("BEGIN IMMEDIATE");
+    const savepoint = `tx_${randomUUID().replaceAll("-", "")}`;
+    this.db.exec(`SAVEPOINT ${savepoint}`);
     try {
       const result = run();
-      this.db.exec("COMMIT");
+      this.db.exec(`RELEASE ${savepoint}`);
       return result;
     } catch (error) {
-      this.db.exec("ROLLBACK");
+      this.db.exec(`ROLLBACK TO ${savepoint}`);
+      this.db.exec(`RELEASE ${savepoint}`);
       throw error;
     }
   }
@@ -141,7 +158,14 @@ export class ConversationStore {
       .get(id);
   }
   private decode(row: Row): Conversation {
+    const organization = this.db
+      .prepare(
+        "SELECT group_id,pinned FROM conversation_organization WHERE conversation_id=?",
+      )
+      .get(row.id);
     return {
+      groupID: organization?.group_id ? String(organization.group_id) : null,
+      pinned: !!organization?.pinned,
       permissionMode:
         (this.db
           .prepare("SELECT mode FROM permission_modes WHERE conversation_id=?")
@@ -198,25 +222,33 @@ export class ConversationStore {
   update(id: string, patch: ConversationPatch) {
     validatePatch(patch);
     const old = this.get(id);
+    if (patch.groupID) this.getGroup(patch.groupID);
     const next = {
       ...old,
       ...patch,
       title: patch.title?.trim() ?? old.title,
       updated: Math.max(Date.now(), old.updated + 1),
     };
-    this.db
-      .prepare(
-        "UPDATE conversations SET title=?,draft=?,acceptance=?,archived=?,updated=? WHERE id=?",
-      )
-      .run(
-        next.title,
-        next.text,
-        next.acceptance ? JSON.stringify(next.acceptance) : null,
-        Number(next.archived),
-        next.updated,
-        id,
-      );
-    return next;
+    return this.transaction(() => {
+      this.db
+        .prepare(
+          "UPDATE conversations SET title=?,draft=?,acceptance=?,archived=?,updated=? WHERE id=?",
+        )
+        .run(
+          next.title,
+          next.text,
+          next.acceptance ? JSON.stringify(next.acceptance) : null,
+          Number(next.archived),
+          next.updated,
+          id,
+        );
+      this.db
+        .prepare(
+          "INSERT INTO conversation_organization VALUES (?,?,?) ON CONFLICT(conversation_id) DO UPDATE SET group_id=excluded.group_id,pinned=excluded.pinned",
+        )
+        .run(id, next.groupID ?? null, Number(next.pinned || false));
+      return next;
+    });
   }
   select(id: string) {
     this.get(id);
@@ -227,6 +259,7 @@ export class ConversationStore {
     const selected = this.meta("selected");
     return {
       conversations,
+      groups: this.groups(),
       selected: conversations.some((c) => c.id === selected)
         ? selected!
         : conversations.find((c) => !c.archived)?.id ||
@@ -325,6 +358,71 @@ export class ConversationStore {
       }
       this.setMeta("drafts:v2", "1");
     });
+  }
+  groups(): ConversationGroup[] {
+    return this.db
+      .prepare("SELECT * FROM conversation_groups ORDER BY created,rowid")
+      .all()
+      .map((row) => ({
+        id: String(row.id),
+        name: String(row.name),
+        collapsed: !!row.collapsed,
+        created: Number(row.created),
+      }));
+  }
+  getGroup(id: string) {
+    checkID(id);
+    const group = this.groups().find((item) => item.id === id);
+    if (!group) throw new Error("Group no longer exists.");
+    return group;
+  }
+  createGroup(name: string, conversationID?: string) {
+    if (typeof name !== "string") throw new Error("Invalid group name.");
+    this.validateGroup({ name });
+    return this.transaction(() => {
+      if (conversationID !== undefined) this.get(conversationID);
+      const id = randomUUID();
+      this.db
+        .prepare("INSERT INTO conversation_groups VALUES (?,?,0,?)")
+        .run(id, name.trim(), Date.now());
+      if (conversationID !== undefined)
+        this.update(conversationID, { groupID: id });
+      return this.getGroup(id);
+    });
+  }
+  private validateGroup(patch: { name?: string; collapsed?: boolean }) {
+    if (
+      !patch ||
+      typeof patch !== "object" ||
+      Array.isArray(patch) ||
+      Object.keys(patch).some((key) => !["name", "collapsed"].includes(key))
+    )
+      throw new Error("Invalid group update.");
+    if (
+      patch.name !== undefined &&
+      (typeof patch.name !== "string" ||
+        !patch.name.trim() ||
+        patch.name.trim().length > 80)
+    )
+      throw new Error("Enter a group name of 1–80 characters.");
+    if (patch.collapsed !== undefined && typeof patch.collapsed !== "boolean")
+      throw new Error("Invalid group state.");
+  }
+  updateGroup(id: string, patch: { name?: string; collapsed?: boolean }) {
+    this.validateGroup(patch);
+    const old = this.getGroup(id);
+    this.db
+      .prepare("UPDATE conversation_groups SET name=?,collapsed=? WHERE id=?")
+      .run(
+        patch.name?.trim() ?? old.name,
+        Number(patch.collapsed ?? old.collapsed),
+        id,
+      );
+    return this.getGroup(id);
+  }
+  deleteGroup(id: string) {
+    this.getGroup(id);
+    this.db.prepare("DELETE FROM conversation_groups WHERE id=?").run(id);
   }
   setPermissionMode(id: string, mode: PermissionMode) {
     this.get(id);

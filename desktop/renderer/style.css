@@ -1167,43 +1167,6 @@ kbd {
   text-align: left;
 }
 
-.working-folders {
-  margin-top: 20px;
-  padding: 12px 2px 0;
-  border-top: 1px solid #292929;
-  max-height: 220px;
-  overflow: auto;
-}
-.folders-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 8px 8px;
-  color: #888;
-  font-size: 11px;
-}
-.folder-item {
-  width: 100%;
-  padding: 8px;
-  justify-content: flex-start;
-  font-size: 12px;
-  color: #999;
-}
-.folder-item span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.folder-item.selected {
-  background: #262626;
-  color: #ddd;
-}
-.working-folders p {
-  font-size: 11px;
-  color: #888;
-  padding: 0 8px;
-}
-
 .conversation-filters {
   display: flex;
   gap: 6px;
@@ -1440,4 +1403,111 @@ kbd {
 }
 .composer-footer {
   flex-wrap: wrap;
+}
+
+.sidebar-list-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 4px 8px;
+}
+.sidebar-list-heading select {
+  flex: 1;
+  min-width: 0;
+  color: #ccc;
+  background: transparent;
+  border: 0;
+  font: inherit;
+  padding: 6px;
+}
+.sidebar-list-heading option {
+  background: #292929;
+}
+.sidebar-list-options .workspace-tools {
+  z-index: 50;
+  min-width: 180px;
+}
+.group-create {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  padding: 8px;
+}
+.group-create input {
+  width: 100%;
+  min-width: 0;
+  background: #292929;
+  color: #eee;
+  border: 1px solid #555;
+  border-radius: 6px;
+  padding: 8px;
+}
+.group-create p {
+  color: #e9a39b;
+  font-size: 12px;
+}
+.group-label {
+  color: #888;
+  font-size: 11px;
+  padding: 14px 10px 5px;
+}
+.conversation-group {
+  margin-top: 8px;
+}
+.conversation-group > .conversation-row .draft-item {
+  color: #aaa;
+  font-size: 12px;
+}
+.group-conversations {
+  margin-left: 10px;
+}
+.group-empty {
+  font-size: 11px;
+  color: #777;
+  padding: 0 10px;
+}
+.conversation-row-menu {
+  max-height: min(480px, calc(100vh - 16px));
+  overflow: auto;
+}
+.conversation-row-menu button span {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.draft-item > svg {
+  flex-shrink: 0;
+}
+
+.conversation-row-menu .submenu-active {
+  background: #454545;
+}
+.group-submenu {
+  width: 220px;
+  z-index: 1001;
+}
+.submenu-group-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 6px;
+}
+.submenu-group-form label {
+  color: #ddd;
+  font-size: 13px;
+}
+.submenu-group-form input {
+  width: 100%;
+  box-sizing: border-box;
+  background: #222;
+  color: #eee;
+  border: 1px solid #666;
+  padding: 8px;
+  border-radius: 6px;
+}
+.submenu-group-form p {
+  color: #eea49e;
+  font-size: 12px;
+  margin: 0;
 }
