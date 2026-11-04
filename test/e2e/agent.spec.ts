@@ -37,6 +37,9 @@ test("real agent streams, requests permission, resumes context, cancels and rest
   let app = await launch();
   try {
     let page = await app.firstWindow();
+    await app.evaluate(({ BrowserWindow }) => {
+      for (const window of BrowserWindow.getAllWindows()) window.hide();
+    });
     await app.evaluate(({ dialog }, folder) => {
       dialog.showOpenDialog = async () => ({
         canceled: false,
@@ -64,6 +67,7 @@ test("real agent streams, requests permission, resumes context, cancels and rest
     await page
       .getByRole("button", { name: "Add local folder…", exact: true })
       .click();
+    await expect(page.getByLabel("Attached folders")).toHaveText("1");
     await input.fill(
       "Use the read tool to read proof.txt and report its contents and the marker I asked you to remember.",
     );
@@ -83,6 +87,7 @@ test("real agent streams, requests permission, resumes context, cancels and rest
     await page
       .getByRole("button", { name: "Add local folder…", exact: true })
       .click();
+    await expect(page.getByLabel("Attached folders")).toHaveText("1");
     await input.fill(
       "Use the shell tool to print the current directory. Do not use any other tools.",
     );
@@ -101,6 +106,9 @@ test("real agent streams, requests permission, resumes context, cancels and rest
     await app.close();
     app = await launch();
     page = await app.firstWindow();
+    await app.evaluate(({ BrowserWindow }) => {
+      for (const window of BrowserWindow.getAllWindows()) window.hide();
+    });
     await expect(page.locator(".agent-task [role=status]")).toHaveText(
       "cancelled",
     );
@@ -111,6 +119,10 @@ test("real agent streams, requests permission, resumes context, cancels and rest
     await expect(page.locator(".agent-response").last()).toContainText(
       "ANVIL_DESKTOP_TOOL_OK",
     );
+  } catch (error) {
+    const page = await app.firstWindow();
+    console.error(await page.locator(".agent-task").allTextContents());
+    throw error;
   } finally {
     await app.close();
     await rm(root, { recursive: true, force: true });

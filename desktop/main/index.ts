@@ -28,12 +28,14 @@ const providerCredentials = {
 delete process.env.BYTEPLUS_ARK_API_KEY;
 delete process.env.BYTEPLUS_ARK_RESPONSES_URL;
 function currentAgent() {
+  const runtime =
+    process.platform === "win32" ? "anvil-runtime.exe" : "anvil-runtime";
   return (agent ??= new Agent(
     workspace?.root || app.getPath("userData"),
     path.join(app.getPath("userData"), "tasks"),
     app.isPackaged
-      ? path.join(process.resourcesPath, "runtime/anvil-runtime.exe")
-      : path.resolve(here, "../../runtime/opencode/dist/anvil-runtime.exe"),
+      ? path.join(process.resourcesPath, "runtime", runtime)
+      : path.resolve(here, "../../runtime/opencode/dist", runtime),
     (task) => {
       if (!window.isDestroyed()) window.webContents.send("agent:task", task);
     },

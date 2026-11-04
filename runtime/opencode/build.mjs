@@ -1,18 +1,38 @@
 import { spawnSync } from "node:child_process";
-import { mkdirSync, copyFileSync, rmSync } from "node:fs";
+import { mkdirSync, copyFileSync, rmSync, chmodSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 const root = path.dirname(fileURLToPath(import.meta.url));
-if (process.platform !== "win32" || process.arch !== "x64")
-  throw new Error("Agent runtime build currently supports Windows x64.");
+const platform = `${process.platform}-${process.arch}`;
+const packages = {
+  "win32-x64": "bun-windows-x64",
+  "darwin-arm64": "bun-darwin-aarch64",
+  "darwin-x64": "bun-darwin-x64",
+};
+const compilerPackage = packages[platform];
+if (!compilerPackage)
+  throw new Error(`Agent runtime build does not support ${platform}.`);
+const suffix = process.platform === "win32" ? ".exe" : "";
 const dist = path.join(root, "dist");
 mkdirSync(dist, { recursive: true });
-const compiler = path.join(dist, "bun.exe");
+const compiler = path.join(dist, `bun${suffix}`);
 copyFileSync(
-  path.join(root, "node_modules/@oven/bun-windows-x64/bin/bun.exe"),
+  path.join(root, `node_modules/@oven/${compilerPackage}/bin/bun${suffix}`),
   compiler,
 );
 try {
+  if (process.platform !== "win32") chmodSync(compiler, 0o755);
+  if (process.platform === "darwin") {
+    const pty = path.join(dist, "opencode-pty");
+    copyFileSync(
+      path.join(
+        root,
+        `node_modules/@opencode-ai/pty-darwin-${process.arch}/bin/opencode-pty`,
+      ),
+      pty,
+    );
+    chmodSync(pty, 0o755);
+  }
   const result = spawnSync(
     compiler,
     [
@@ -23,7 +43,7 @@ try {
       "--no-compile-autoload-bunfig",
       path.join(root, "worker.mjs"),
       "--outfile",
-      path.join(dist, "anvil-runtime.exe"),
+      path.join(dist, `anvil-runtime${suffix}`),
     ],
     { cwd: root, stdio: "inherit", windowsHide: true },
   );

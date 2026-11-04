@@ -10,6 +10,11 @@ files:
 mac:
   category: public.app-category.developer-tools
   target: dmg
+  extraResources:
+    - from: runtime/opencode/dist/anvil-runtime
+      to: runtime/anvil-runtime
+    - from: runtime/opencode/dist/opencode-pty
+      to: runtime/opencode-pty
 win:
   target: nsis
   extraResources:

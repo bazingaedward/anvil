@@ -25,8 +25,7 @@ jobs:
         if: runner.os == 'macOS'
         run: command -v rg || brew install ripgrep
       - run: npm ci
-      - name: Build Windows agent runtime
-        if: runner.os == 'Windows'
+      - name: Build agent runtime
         run: |
           npm ci --ignore-scripts --prefix runtime/opencode
           npm run runtime:build

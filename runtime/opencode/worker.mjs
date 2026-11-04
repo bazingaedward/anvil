@@ -8,6 +8,12 @@ const endpoint = process.env.BYTEPLUS_ARK_RESPONSES_URL;
 delete process.env.BYTEPLUS_ARK_API_KEY;
 delete process.env.BYTEPLUS_ARK_RESPONSES_URL;
 const send = (message) => process.stdout.write(JSON.stringify(message) + "\n");
+const runtimeError = (error) => {
+  let message = error instanceof Error ? error.message : String(error);
+  for (const value of [key, endpoint])
+    if (value) message = message.split(value).join("[REDACTED]");
+  return `Agent runtime failed: ${message.slice(0, 1000)}`;
+};
 const lines = createInterface({ input: process.stdin });
 let host,
   sessionID,
@@ -154,12 +160,11 @@ lines.on("line", (line) => {
         reply: input.allow === true ? "once" : "reject",
       });
     }
-  })().catch(async () => {
+  })().catch(async (error) => {
     send({
       type: "done",
       status: "failed",
-      error:
-        "Agent runtime failed. Check the runtime installation and provider configuration.",
+      error: runtimeError(error),
     });
     await close();
   });

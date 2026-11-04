@@ -1,0 +1,7 @@
+{
+  "compilerOptions": {
+    "paths": {
+      "@opencode-ai/pty": ["./pty-binding.mjs"]
+    }
+  }
+}

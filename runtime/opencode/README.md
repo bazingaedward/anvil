@@ -1,9 +1,11 @@
 # Anvil agent runtime preview
 
-Windows x64 only. The desktop owns task IDs, history and IPC. This adapter alone
+Supports builds on macOS ARM64/x64 and Windows x64. The desktop owns task IDs, history and IPC. This adapter alone
 imports OpenCode 2.0.0; it compiles with Bun 1.4.2 into a standalone executable.
-The executable is included in Windows desktop packages. macOS retains the editor
-and terminal preview; agent packaging there is not implemented yet.
+The executable is included in desktop packages: `anvil-runtime` on macOS and
+`anvil-runtime.exe` on Windows. Build on the target OS and architecture.
+macOS also includes the upstream `opencode-pty` helper beside the runtime. A local
+build-time module mapping resolves that helper without changing the upstream SDK.
 
 From the repository root:
 
@@ -20,6 +22,21 @@ available when the desktop starts. Do not write them into project configuration.
 The current provider adapter uses a BytePlus Ark HTTPS `/responses` URL and
 `deepseek-v4-1-flash-261017`.
 
+For an existing vault entry named `DEEPSEEK_API_KEY` that holds a **BytePlus** key,
+use `exec_with_secrets` with that name and this macOS command (the mapping stays
+in the process environment):
+
+```sh
+BYTEPLUS_ARK_API_KEY="$DEEPSEEK_API_KEY" BYTEPLUS_ARK_RESPONSES_URL=https://ark.ap-southeast.bytepluses.com/api/v3/responses npm run dev
+```
+
+A key issued by the official DeepSeek API is not interchangeable with a BytePlus key.
+
+Verified on macOS ARM64 (2026-11-04): compiled runtime, a live folderless reply,
+context retained after attaching a folder, reading its file, permission/cancel,
+and history after restarting Electron. Intel macOS and signed installers have
+not been tested in this run.
+
 The runtime removes the credential variables before initializing OpenCode and
 launching tools. Credentials remain in memory for provider requests. Project
 OpenCode configuration is disabled. SDK state is isolated under the desktop's
@@ -32,7 +49,7 @@ Closing the desktop stops the active task. Switching the file browser between wo
 marked completed means its configured acceptance command passed. Without an
 acceptance command, a model finish is recorded as unverified. This executor is
 not an OS sandbox; approved tools run with the user's filesystem permissions.
-Configurable model selection and cross-platform runtime packaging remain follow-up work.
+Configurable model selection and signed releases remain follow-up work.
 
 Expand **Advanced task settings**, then **Automatic verification (optional)** above the composer to specify a command and one
 of the added working folders. Sending the message authorizes that command to run
@@ -77,7 +94,9 @@ Only public task fields cross IPC. SDK runtime databases remain separate.
 Each sidebar conversation has a trailing actions menu for inline rename, archive/restore and delete. Actions target that row without switching the open conversation.
 Search matches titles, drafts and message bodies within the active or archived
 list. History can be browsed and drafts written without selecting a folder.
-Sending still requires an added working folder and provider credentials.
+Sending requires an installed runtime and provider credentials. Folders are
+optional; a conversation without folders uses a private internal working
+directory and gains no folder grants. See [optional folders](../../docs/optional-conversation-folders.md).
 Archived conversations must be restored before sending. Running conversations
 cannot be archived; deletion asks for confirmation and waits for cancellation
 of the model or acceptance command before removing the conversation and tasks.

@@ -20,7 +20,7 @@ The desktop preview puts coding conversations at the center, with code review al
 - Open an interactive terminal on demand using xterm.js and node-pty; collapsing it keeps the process running.
 - Resize the review panel and terminal; restore the last repository on launch.
 
-The Windows x64 desktop now has an initial OpenCode-backed agent integration: streaming replies, persistent conversations, tool approval and cancellation. The first validated provider is BytePlus Ark Responses with DeepSeek. See the [runtime setup](runtime/opencode/README.md) for building the runtime and launching through keygrant. macOS agent packaging is still pending. Stage, commit, and push through the terminal for now.
+The macOS and Windows desktops now have an initial OpenCode-backed agent integration: streaming replies, persistent conversations, tool approval and cancellation. The first validated provider is BytePlus Ark Responses with DeepSeek. See the [runtime setup](runtime/opencode/README.md) for building the runtime and launching through keygrant. macOS ARM64 live conversation, context, tool access, cancellation and history restoration have been verified. Stage, commit, and push through the terminal for now.
 
 Development requires Node.js 22.13+ and Git (the minimum includes unflagged `node:sqlite`). End users of packaged builds do not need Node.js or npm; Git and the project's development tools must be installed separately.
 
