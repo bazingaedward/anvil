@@ -7,7 +7,9 @@ directories:
 files:
   - out/**
   - package.json
+  - assets/icon.png
 mac:
+  icon: assets/icon.icns
   category: public.app-category.developer-tools
   target: dmg
   extraResources:
@@ -16,6 +18,7 @@ mac:
     - from: runtime/opencode/dist/opencode-pty
       to: runtime/opencode-pty
 win:
+  icon: assets/icon.ico
   target: nsis
   extraResources:
     - from: runtime/opencode/dist/anvil-runtime.exe
