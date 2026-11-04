@@ -47,11 +47,8 @@ test("real agent streams, requests permission, resumes context, cancels and rest
         checkboxChecked: false,
       });
     }, root);
-    await page.getByLabel("Add context", { exact: true }).click();
-    await page
-      .getByRole("button", { name: "Add local folder…", exact: true })
-      .click();
     const input = page.getByRole("textbox", { name: "Message Anvil" });
+    await expect(page.getByLabel("Attached folders")).toHaveText("0");
     await input.fill(
       "Remember ANVIL_CONTEXT_OK. Reply exactly ANVIL_DESKTOP_OK. Do not use any tools.",
     );
@@ -63,6 +60,10 @@ test("real agent streams, requests permission, resumes context, cancels and rest
     await expect(page.locator(".agent-task [role=status]")).toHaveText(
       "Finished · not verified",
     );
+    await page.getByLabel("Add context", { exact: true }).click();
+    await page
+      .getByRole("button", { name: "Add local folder…", exact: true })
+      .click();
     await input.fill(
       "Use the read tool to read proof.txt and report its contents and the marker I asked you to remember.",
     );

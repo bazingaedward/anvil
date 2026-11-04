@@ -207,8 +207,8 @@ export class Agent {
       throw new Error(
         "Start Anvil through keygrant with the BytePlus API key and Responses URL.",
       );
-    if (!directories.length || !directories.includes(activeDirectory))
-      throw new Error("Add a working directory first.");
+    if (directories.length && !directories.includes(activeDirectory))
+      throw new Error("Choose an authorized working directory.");
     const check = validateAcceptance(acceptance, directories);
     if (this.deleting.has(conversationID))
       throw new Error("Conversation is being deleted.");
@@ -220,9 +220,16 @@ export class Agent {
     const previous = [...this.tasks]
       .reverse()
       .find((task) => task.conversationID === conversationID && task.sessionID);
-    // The selected authorized folder determines cwd; the SDK session retains history
-    // and is moved by the worker when the user changes working directories.
-    const directory = activeDirectory;
+    // A folderless conversation gets its own cwd, without granting folder access.
+    // The worker moves the existing SDK session when folders change.
+    const directory = directories.length
+      ? activeDirectory
+      : path.join(
+          this.storage,
+          "workspaces",
+          createHash("sha256").update(conversationID).digest("hex"),
+        );
+    if (!directories.length) mkdirSync(directory, { recursive: true });
     const task: RecordTask = {
       id: randomUUID(),
       conversationID,

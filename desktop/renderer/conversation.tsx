@@ -679,9 +679,9 @@ export function ConversationWorkspace({
             <div className="conversation-intro">
               <h1>What are we working on?</h1>
               <p>
-                {repo
+                {draft.folders?.length
                   ? "Ask about your code, plan a change, or start building."
-                  : "Add working folders to start a conversation."}
+                  : "Start a conversation, or add a folder to work on your code."}
               </p>
               {!draft.folders?.length && (
                 <button
@@ -689,7 +689,7 @@ export function ConversationWorkspace({
                   disabled={!loaded}
                   onClick={() => void addFolders()}
                 >
-                  Add folders
+                  Add folders (optional)
                 </button>
               )}
             </div>
@@ -809,11 +809,7 @@ export function ConversationWorkspace({
             <textarea
               ref={input}
               aria-label="Message Anvil"
-              placeholder={
-                repo
-                  ? "Describe a task, ask about your code, or plan a change…"
-                  : "Add a working folder to prepare a task…"
-              }
+              placeholder="Describe a task, ask about your code, or plan a change…"
               value={draft.text}
               onChange={(event) => update(event.target.value)}
               onKeyDown={(event) => {
@@ -822,10 +818,10 @@ export function ConversationWorkspace({
                   (event.ctrlKey || event.metaKey) &&
                   !event.nativeEvent.isComposing &&
                   !readOnly &&
-                  !!draft.folders?.length &&
                   draft.text.trim() &&
                   !running &&
-                  !sending
+                  !sending &&
+                  !managing
                 ) {
                   event.preventDefault();
                   void send();
@@ -920,7 +916,6 @@ export function ConversationWorkspace({
                 onClick={() => void send()}
                 disabled={
                   readOnly ||
-                  !draft.folders?.length ||
                   !draft.text.trim() ||
                   !!running ||
                   sending ||

@@ -131,7 +131,9 @@ async function run(input) {
     : [input.repo];
   await host.sessions.prompt({
     sessionID,
-    text: `Working directories selected by the user (JSON paths): ${JSON.stringify(folders)}\nThis conversation may span multiple directories and repositories. Use absolute paths when crossing directories. Ask before accessing other directories.\n\n${input.text}`,
+    text: folders.length
+      ? `Working directories selected by the user (JSON paths): ${JSON.stringify(folders)}\nThis conversation may span multiple directories and repositories. Use absolute paths when crossing directories. Ask before accessing other directories.\n\n${input.text}`
+      : `No project folders are attached to this conversation. Answer directly when no local files are needed. Your working directory is an internal conversation workspace, not a user-selected project. Ask the user to attach a folder when a task needs project files.\n\n${input.text}`,
   });
   await consume;
   await close();

@@ -280,10 +280,6 @@ function registerIPC() {
       const folders =
         executor.conversations().conversations.find((item) => item.id === id)
           ?.folders || [];
-      if (!folders.length)
-        throw new Error(
-          "Add and authorize a local folder for this conversation first.",
-        );
       return executor.start(
         id,
         text,
