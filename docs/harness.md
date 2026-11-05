@@ -2,6 +2,8 @@
 
 日期：2026-11-01。
 
+补充研究（2026-11-05）：[OpenCode 2.0、Claude Code 早期镜像与 DeepSeek Harness 的 agent loop 源码对比](agent-loop-comparison.md)，含固定版本、源码证据、Anvil 差距与实施顺序。
+
 本文件记录当前讨论和代码核查结果，不是已完成能力清单或性能排行榜。OpenCode 实现依据仓库实际安装的 `@opencode/sdk` / `@opencode/core` 2.0.0；其他产品依据官方公开资料。未公开的内部实现不作推断。后续版本可能改变这些行为。
 
 ## 概念与整体结构
