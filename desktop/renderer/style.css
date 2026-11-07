@@ -631,21 +631,6 @@ kbd {
   height: 30px;
   color: #aaa;
 }
-.conversation-search {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  padding: 10px;
-  margin-bottom: 28px;
-  color: #999;
-}
-.conversation-search input {
-  width: 100%;
-  font-size: 12px;
-}
-.conversation-search input::placeholder {
-  color: #999;
-}
 .project-heading {
   display: flex;
   align-items: center;
@@ -1510,4 +1495,464 @@ kbd {
   color: #eea49e;
   font-size: 12px;
   margin: 0;
+}
+
+.review-workspace {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+.review-workspace[hidden],
+.review-repository-view[hidden] {
+  display: none;
+}
+.review-sidebar {
+  width: 260px;
+  flex-shrink: 0;
+  padding: 16px 12px;
+  background: #202020;
+  border-right: 1px solid #303030;
+  overflow: auto;
+}
+.review-sidebar h2 {
+  font-size: 18px;
+  font-weight: 600;
+  padding: 16px 10px;
+  margin: 0;
+}
+.review-repository,
+.review-sidebar-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.review-sidebar-label {
+  justify-content: space-between;
+  color: #888;
+  font-size: 12px;
+  padding: 16px 10px 6px;
+}
+.review-repository {
+  width: 100%;
+  padding: 12px;
+  text-align: left;
+  border-radius: 8px;
+}
+.review-repository span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.review-repository[aria-pressed="true"] {
+  background: #353535;
+  color: #eee;
+}
+.review-main,
+.review-repository-view {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+.review-empty {
+  margin: auto;
+  text-align: center;
+  color: #999;
+}
+.repository-review {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+}
+.review-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px 12px;
+}
+.review-heading h2 {
+  font-size: 18px;
+  margin: 0 0 6px;
+  font-weight: 600;
+}
+.review-heading span {
+  color: #999;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.review-views {
+  display: flex;
+  gap: 20px;
+  padding: 0 24px;
+  border-bottom: 1px solid #333;
+}
+.review-views button {
+  border-radius: 0;
+  padding: 12px 0;
+  color: #999;
+  border-bottom: 2px solid transparent;
+}
+.review-views button[aria-pressed="true"] {
+  color: #eee;
+  border-bottom-color: #bbb;
+}
+.graph-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 18px;
+  padding: 14px 24px;
+  font-size: 12px;
+}
+.graph-controls select {
+  max-width: 260px;
+  background: #252525;
+  color: #ddd;
+  border: 1px solid #444;
+  border-radius: 6px;
+  padding: 7px 10px;
+}
+.graph-controls label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #aaa;
+}
+.graph-search {
+  margin-left: auto;
+  border: 1px solid #383838;
+  border-radius: 6px;
+  padding: 6px 10px;
+}
+.graph-search input {
+  background: transparent;
+  color: #ddd;
+  border: 0;
+  outline: none;
+  width: 200px;
+}
+.graph-scroll {
+  flex: 1;
+  min-height: 120px;
+  overflow: auto;
+}
+.graph-scroll.has-detail {
+  flex: 1 1 50%;
+}
+.commit-table {
+  border-collapse: collapse;
+  table-layout: fixed;
+  width: 100%;
+  min-width: 780px;
+  font-size: 12px;
+}
+.commit-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #202020;
+  color: #888;
+  text-align: left;
+  font-weight: 500;
+  height: 34px;
+  border-bottom: 1px solid #333;
+}
+.commit-table th:nth-child(3) {
+  width: 100px;
+}
+.commit-table th:nth-child(4) {
+  width: 120px;
+}
+.commit-table th:nth-child(5) {
+  width: 112px;
+}
+.commit-table td {
+  height: 36px;
+  padding: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #aaa;
+}
+.commit-table tr:hover,
+.commit-table tr.selected {
+  background: #2c2c2c;
+}
+.commit-table tr.muted-match td:not(.graph-cell) {
+  opacity: 0.3;
+}
+.graph-cell svg {
+  display: block;
+}
+.commit-description button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  text-align: left;
+  width: 100%;
+  height: 36px;
+  border-radius: 0;
+  overflow: hidden;
+  padding: 0 10px 0 0;
+  color: #d5d5d5;
+}
+.commit-description button > span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.commit-ref {
+  flex-shrink: 0;
+  font-size: 11px;
+  border: 1px solid #496277;
+  background: #263440;
+  color: #b6cfe4;
+  padding: 2px 5px;
+  border-radius: 4px;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.commit-hash {
+  font-family: Consolas, monospace;
+  padding: 4px;
+  font-size: 11px;
+}
+.compare-commit {
+  padding: 3px;
+  color: #aaa;
+  opacity: 0;
+}
+.commit-table tr:hover .compare-commit,
+.compare-commit:focus-visible {
+  opacity: 1;
+}
+.review-detail {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 45%;
+  min-height: 120px;
+  min-width: 0;
+  overflow: hidden;
+  border-top: 1px solid #3a3a3a;
+}
+.review-detail > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  font-size: 12px;
+  min-height: 34px;
+  color: #bbb;
+}
+.review-detail > header > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.review-patch {
+  flex: 1;
+  overflow: auto;
+  margin: 0;
+  padding: 12px 18px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.review-patch .added {
+  background: #203b2a;
+  color: #a6d5af;
+}
+.review-patch .removed {
+  background: #43282c;
+  color: #e5b0b0;
+}
+.review-changes {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+.review-changes > aside {
+  width: 270px;
+  overflow: auto;
+  flex-shrink: 0;
+  border-right: 1px solid #333;
+  padding: 12px;
+}
+.review-changes h4 {
+  color: #888;
+  font-size: 11px;
+  font-weight: 500;
+  margin: 12px 8px;
+}
+.review-changes aside section > button {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+  padding: 8px;
+}
+.review-changes aside section > button > span {
+  color: #86bc94;
+}
+.review-changes .review-detail {
+  border-top: 0;
+}
+.review-muted,
+.review-search-note {
+  color: #888;
+  font-size: 12px;
+  padding: 8px 24px;
+}
+.review-search-note {
+  margin: 0;
+}
+.review-error {
+  color: #e5a19d;
+  padding: 8px 24px;
+  font-size: 12px;
+}
+.review-comparison {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: #b8cfe2;
+  background: #24303a;
+  padding: 4px 24px;
+  font-size: 12px;
+}
+.graph-more {
+  margin: 12px 24px;
+}
+.review-spinning {
+  animation: review-spin 1s linear infinite;
+}
+@keyframes review-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .review-spinning {
+    animation: none;
+  }
+}
+@media (max-width: 900px) {
+  .review-sidebar {
+    width: 190px;
+  }
+  .review-changes > aside {
+    width: 200px;
+  }
+}
+
+.commit-patch-layout {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+}
+.commit-patch-layout > aside {
+  width: 230px;
+  flex-shrink: 0;
+  overflow: auto;
+  border-right: 1px solid #333;
+  padding: 8px;
+}
+.commit-patch-layout > aside button {
+  width: 100%;
+  justify-content: flex-start;
+  padding: 7px 10px;
+  font-size: 12px;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.commit-patch-layout > aside button[aria-pressed="true"] {
+  background: #303030;
+}
+.commit-description button,
+.review-repository,
+.review-changes aside button {
+  justify-content: flex-start;
+}
+
+.agent-progress {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 24px;
+  margin: 8px 0 0;
+  color: #969696;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.agent-progress-dot {
+  width: 6px;
+  height: 6px;
+  flex: 0 0 6px;
+  border-radius: 50%;
+  background: #b9b9b9;
+  animation: agent-breathe 1.6s ease-in-out infinite;
+}
+.agent-progress-dot.paused {
+  animation: none;
+  opacity: 0.6;
+}
+@keyframes agent-breathe {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .agent-progress-dot {
+    animation: none;
+  }
+}
+
+.workspace-shell {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+.activity-rail {
+  width: 56px;
+  flex: 0 0 56px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 6px;
+  background: #202020;
+  border-right: 1px solid #303030;
+}
+.activity-rail button {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  color: #8f8f8f;
+}
+.activity-rail button[aria-pressed="true"] {
+  background: #353535;
+  color: #eee;
+}
+.activity-rail button:hover {
+  color: #eee;
+}
+.review-sidebar[hidden] {
+  display: none;
+}
+.panel-toggle {
+  margin-left: 16px;
 }

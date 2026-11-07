@@ -1,3 +1,4 @@
+import { reviewHistory, reviewPatch } from "./review";
 import { realpath } from "node:fs/promises";
 import { app, BrowserWindow, dialog, ipcMain, Menu } from "electron";
 import { readFile, writeFile } from "node:fs/promises";
@@ -106,6 +107,54 @@ function registerIPC() {
       return fn(...args);
     });
   };
+  const reviewWorkspace = async (root: string) => {
+    if (typeof root !== "string" || !directories.includes(root))
+      throw new Error("Add this repository before reviewing it.");
+    const workspace = await Workspace.open(root);
+    if (workspace.root !== root || !(await workspace.status()).git)
+      throw new Error("Select the repository root explicitly.");
+    return workspace;
+  };
+  handle("review:open", async () => {
+    const picked = await dialog.showOpenDialog(window, {
+      title: "Open repository for review",
+      properties: ["openDirectory"],
+    });
+    if (picked.canceled || !picked.filePaths[0]) return null;
+    const next = await Workspace.open(picked.filePaths[0]);
+    if (!(await next.status()).git)
+      throw new Error("Select a Git repository root.");
+    if (!directories.includes(next.root)) directories.push(next.root);
+    await writeFile(
+      settingsFile(),
+      JSON.stringify({ root: workspace?.root || next.root, directories }),
+      "utf8",
+    );
+    return next.root;
+  });
+  handle("review:status", async (root: string) =>
+    (await reviewWorkspace(root)).status(),
+  );
+  handle(
+    "review:history",
+    async (
+      root: string,
+      limit: number,
+      options?: import("../shared/api").ReviewOptions,
+    ) => {
+      await reviewWorkspace(root);
+      return reviewHistory(root, limit, options);
+    },
+  );
+  handle("review:patch", async (root: string, head: string, base?: string) => {
+    await reviewWorkspace(root);
+    return reviewPatch(root, head, base);
+  });
+  handle("review:diff", async (root: string, file: string, side: DiffSide) => {
+    if (!["index", "worktree"].includes(side))
+      throw new Error("Invalid diff side.");
+    return (await reviewWorkspace(root)).diff(file, side);
+  });
   handle("workspace:restore", async () => {
     try {
       const stored = JSON.parse(await readFile(settingsFile(), "utf8"));

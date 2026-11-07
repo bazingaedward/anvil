@@ -1,3 +1,4 @@
+import { ReviewWorkspace } from "./review-workspace";
 import { ConversationRow } from "./conversation-row";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
@@ -5,10 +6,9 @@ import {
   Folder,
   Plus,
   TerminalSquare,
-  PanelLeftClose,
-  PanelLeftOpen,
+  MessageSquare,
+  GitPullRequest,
   Ellipsis,
-  Search,
 } from "lucide-react";
 import type {
   RepoState,
@@ -26,6 +26,7 @@ import {
 
 export function ConversationWorkspace({
   repo,
+  sidebarOpen,
   tools,
   review,
   terminal,
@@ -34,6 +35,7 @@ export function ConversationWorkspace({
   onSelectDirectory,
 }: {
   repo: RepoState | null;
+  sidebarOpen: boolean;
   tools: ReactNode;
   review: ReactNode;
   terminal: ReactNode;
@@ -61,22 +63,7 @@ export function ConversationWorkspace({
   const [tasks, setTasks] = useState<AgentTask[]>([]);
   const [agentError, setAgentError] = useState("");
   const [sending, setSending] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(() => {
-    try {
-      return localStorage.getItem("anvil:sidebar-collapsed") !== "true";
-    } catch {
-      return true;
-    }
-  });
-  const [search, setSearch] = useState("");
   const toolsMenu = useRef<HTMLDetailsElement>(null);
-  useEffect(() => {
-    try {
-      localStorage.setItem("anvil:sidebar-collapsed", String(!sidebarOpen));
-    } catch {
-      /* Layout preferences are optional. */
-    }
-  }, [sidebarOpen]);
   useEffect(() => {
     const close = (event: PointerEvent) => {
       document
@@ -217,7 +204,7 @@ export function ConversationWorkspace({
       created: 0,
       updated: 0,
     } as Conversation);
-  const visible = filterConversations(drafts, tasks, search, archived).filter(
+  const visible = filterConversations(drafts, tasks, "", archived).filter(
     (item) => !onlyPinned || item.pinned,
   );
   if (oldestFirst) visible.reverse();
@@ -251,7 +238,6 @@ export function ConversationWorkspace({
       setGroups((items) => [...items, result]);
       setOnlyPinned(false);
       setArchived(false);
-      setSearch("");
       setCreatingGroup(false);
       setGroupName("");
     } catch (error) {
@@ -389,7 +375,6 @@ export function ConversationWorkspace({
       setSelected(next.id);
       setArchived(false);
       setOnlyPinned(false);
-      setSearch("");
       input.current?.focus();
     });
     setManaging(false);
@@ -437,507 +422,523 @@ export function ConversationWorkspace({
     });
     setManaging(false);
   }
+  const [reviewOpen, setReviewOpen] = useState(false);
   return (
-    <div className="workspace conversation-workspace">
-      {sidebarOpen && (
-        <aside
-          id="conversation-sidebar"
-          className="conversation-sidebar"
+    <div className="workspace-shell">
+      <nav className="activity-rail" aria-label="Main navigation">
+        <button
+          title="Conversations"
           aria-label="Conversations"
+          aria-pressed={!reviewOpen}
+          onClick={() => setReviewOpen(false)}
         >
-          <div className="sidebar-header">
-            <strong>Anvil</strong>
-            <button
-              aria-label="Collapse sidebar"
-              title="Collapse sidebar"
-              aria-expanded={true}
-              aria-controls="conversation-sidebar"
-              onClick={() => setSidebarOpen(false)}
-            >
-              <PanelLeftClose size={19} />
-            </button>
-          </div>
-          <button
-            className="new-conversation"
-            onClick={() => void create()}
-            disabled={!loaded || managing || sending}
-          >
-            <Plus size={16} />
-            New conversation
-          </button>
-          <label className="conversation-search">
-            <Search size={16} />
-            <input
-              aria-label="Search conversations"
-              placeholder="Search conversations"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-            />
-          </label>
-          <div className="sidebar-list-heading">
-            <select
-              aria-label="Conversation filter"
-              value={archived ? "archived" : onlyPinned ? "pinned" : "all"}
-              onChange={(event) => {
-                setArchived(event.target.value === "archived");
-                setOnlyPinned(event.target.value === "pinned");
-              }}
-            >
-              <option value="all">Chats and tasks</option>
-              <option value="pinned">Pinned</option>
-              <option value="archived">Archived</option>
-            </select>
-            <details className="tools-menu sidebar-list-options">
-              <summary aria-label="List options">
-                <Ellipsis size={17} />
-              </summary>
-              <div className="workspace-tools">
-                <button
-                  onClick={(event) => {
-                    event.currentTarget
-                      .closest("details")
-                      ?.removeAttribute("open");
-                    setCreatingGroup(true);
-                    setGroupError("");
-                  }}
-                >
-                  New group
-                </button>
-                <button
-                  onClick={(event) => {
-                    event.currentTarget
-                      .closest("details")
-                      ?.removeAttribute("open");
-                    setOldestFirst((value) => !value);
-                  }}
-                >
-                  {oldestFirst ? "Sort: newest first" : "Sort: oldest first"}
-                </button>
-              </div>
-            </details>
-          </div>
-          {creatingGroup && (
-            <form
-              className="group-create"
-              onSubmit={(event) => {
-                event.preventDefault();
-                void addGroup();
-              }}
-            >
-              <input
-                autoFocus
-                aria-label="Group name"
-                placeholder="Group name"
-                maxLength={80}
-                value={groupName}
-                disabled={groupBusy}
-                onChange={(event) => setGroupName(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Escape" && !groupBusy)
-                    setCreatingGroup(false);
-                }}
-              />
-              <button disabled={!groupName.trim() || groupBusy}>Create</button>
-              <button
-                type="button"
-                disabled={groupBusy}
-                onClick={() => setCreatingGroup(false)}
-              >
-                Cancel
-              </button>
-              {groupError && <p role="alert">{groupError}</p>}
-            </form>
-          )}
-          <div className="draft-list">
-            {!!pinned.length && (
-              <>
-                <div className="group-label">Pinned</div>
-                {pinned.map(renderConversation)}
-              </>
-            )}
-            {!onlyPinned &&
-              groups
-                .filter(
-                  (group) =>
-                    !search.trim() ||
-                    unpinned.some((item) => item.groupID === group.id),
-                )
-                .map((group) => (
-                  <section
-                    className="conversation-group"
-                    key={group.id}
-                    aria-label={group.name}
-                  >
-                    <ConversationRow
-                      title={group.name}
-                      selected={false}
-                      archived={false}
-                      running={false}
-                      disabled={managing || sending}
-                      collapsed={group.collapsed && !search.trim()}
-                      onSelect={() =>
-                        void action(() =>
-                          saveGroup(group.id, { collapsed: !group.collapsed }),
-                        )
-                      }
-                      onRename={(name) => saveGroup(group.id, { name })}
-                      onDelete={() => void removeGroup(group.id)}
-                    />
-                    {(!group.collapsed || !!search.trim()) && (
-                      <div className="group-conversations">
-                        {unpinned
-                          .filter((item) => item.groupID === group.id)
-                          .map(renderConversation)}
-                        {!unpinned.some(
-                          (item) => item.groupID === group.id,
-                        ) && (
-                          <p className="group-empty">
-                            Move a conversation here from its ⋯ menu.
-                          </p>
-                        )}
-                      </div>
-                    )}
-                  </section>
-                ))}
-            {!onlyPinned && (
-              <>
-                {!!groups.length && (
-                  <div className="group-label">Ungrouped</div>
-                )}
-                {unpinned
-                  .filter((item) => !item.groupID)
-                  .map(renderConversation)}
-              </>
-            )}
-            {loaded && !visible.length && (
-              <p>
-                {search.trim()
-                  ? "No matching conversations"
-                  : archived
-                    ? "No archived conversations"
-                    : "No conversations"}
-              </p>
-            )}
-            {!loaded && <p>Loading conversations…</p>}
-          </div>
-        </aside>
-      )}
-      <main
-        className={`conversation-main ${conversationTasks.length === 0 ? "is-empty" : ""} ${terminalOpen ? "with-terminal" : ""}`}
-        aria-label="Conversation"
+          <MessageSquare size={22} />
+        </button>
+        <button
+          title="Code review"
+          aria-label="Code review"
+          aria-pressed={reviewOpen}
+          onClick={() => setReviewOpen(true)}
+        >
+          <GitPullRequest size={22} />
+        </button>
+      </nav>
+      <ReviewWorkspace
+        roots={repo?.directories || (repo ? [repo.root] : [])}
+        open={reviewOpen}
+        sidebarOpen={sidebarOpen}
       >
-        <header className="conversation-toolbar">
-          {!sidebarOpen && (
-            <button
-              aria-label="Expand sidebar"
-              title="Expand sidebar"
-              aria-expanded={false}
-              aria-controls="conversation-sidebar"
-              onClick={() => setSidebarOpen(true)}
+        <div className="workspace conversation-workspace">
+          {sidebarOpen && (
+            <aside
+              id="conversation-sidebar"
+              className="conversation-sidebar"
+              aria-label="Conversations"
             >
-              <PanelLeftOpen size={19} />
-            </button>
-          )}
-          <span className="conversation-title">{conversationTitle(draft)}</span>
-          <details className="tools-menu" ref={toolsMenu}>
-            <summary
-              aria-label="Workspace tools"
-              title="Files, changes and terminal"
-            >
-              <Ellipsis size={20} />
-            </summary>
-            <div
-              className="workspace-tools"
-              onClick={(event) => {
-                if (
-                  (event.target as HTMLElement).closest(
-                    "button:not(:disabled)",
-                  ) &&
-                  toolsMenu.current
-                )
-                  toolsMenu.current.open = false;
-              }}
-            >
-              {tools}
-              <button
-                aria-label="Toggle terminal"
-                aria-pressed={terminalOpen}
-                title="Terminal"
-                onClick={onTerminal}
-                disabled={!repo}
-              >
-                <TerminalSquare size={16} />
-                <span>Terminal</span>
-              </button>
-            </div>
-          </details>
-        </header>
-        <section
-          className={`conversation-body ${conversationTasks.length ? "has-tasks" : ""}`}
-        >
-          {conversationTasks.length === 0 && (
-            <div className="conversation-intro">
-              <h1>What are we working on?</h1>
-              <p>
-                {draft.folders?.length
-                  ? "Ask about your code, plan a change, or start building."
-                  : "Start a conversation, or add a folder to work on your code."}
-              </p>
-              {!draft.folders?.length && (
-                <button
-                  className="primary-button"
-                  disabled={!loaded}
-                  onClick={() => void addFolders()}
-                >
-                  Add folders (optional)
-                </button>
-              )}
-            </div>
-          )}
-          {conversationTasks.map((task) => (
-            <article className="agent-task" key={task.id}>
-              <p className="agent-prompt">{task.prompt}</p>
-              <div className="response-heading">Anvil</div>
-              <div className="agent-response">
-                {task.text ||
-                  (task.status === "running" ? "Working…" : "No response")}
+              <div className="sidebar-header">
+                <strong>Anvil</strong>
               </div>
-              <small className={`task-state ${task.status}`} role="status">
-                {task.status === "completed"
-                  ? "Acceptance passed"
-                  : task.status === "unverified"
-                    ? "Finished · not verified"
-                    : task.status === "running"
-                      ? task.phase === "checking"
-                        ? "Running acceptance check…"
-                        : task.phase === "repairing"
-                          ? `Repairing · attempt ${(task.round || 1) - 1} of ${task.acceptance?.maxRepairs}`
-                          : task.phase === "stopping"
-                            ? "Stopping…"
-                            : "Working…"
-                      : task.status === "limit"
-                        ? "Limit reached"
-                        : task.status}
-              </small>
-              {task.acceptance && (
-                <details className="acceptance-results">
-                  <summary>
-                    Acceptance · {task.checks?.length || 0} run
-                    {task.checks?.length === 1 ? "" : "s"}
-                  </summary>
-                  <code>{task.acceptance.command}</code>
-                  <p>{task.acceptance.directory}</p>
-                  {task.checks?.map((check) => (
-                    <div className="acceptance-run" key={check.round}>
-                      <strong>
-                        Run {check.round} ·{" "}
-                        {check.cancelled
-                          ? "Cancelled"
-                          : check.timedOut
-                            ? "Timed out"
-                            : check.error
-                              ? "Could not run"
-                              : `Exit ${check.exitCode}`}{" "}
-                        · {(check.durationMs / 1000).toFixed(1)}s
-                      </strong>
-                      <pre>
-                        {check.error || check.output || "(No output)"}
-                        {check.truncated ? "\n[Output truncated]" : ""}
-                      </pre>
-                    </div>
-                  ))}
-                </details>
-              )}
-              {task.error && <p role="alert">{task.error}</p>}
-              {task.permissions.map((permission) => (
-                <section
-                  className="agent-permission"
-                  key={permission.id}
-                  aria-label="Tool approval"
-                >
-                  <strong>Allow {permission.action}?</strong>
-                  <pre>{permission.resources.join("\n")}</pre>
-                  {permission.message && <p>{permission.message}</p>}
-                  <button
-                    className="permission-deny"
-                    onClick={() =>
-                      void action(() =>
-                        window.anvil.replyPermission(
-                          task.id,
-                          permission.id,
-                          false,
-                        ),
-                      )
-                    }
-                  >
-                    Deny
-                  </button>
-                  <button
-                    className="permission-allow"
-                    onClick={() =>
-                      void action(() =>
-                        window.anvil.replyPermission(
-                          task.id,
-                          permission.id,
-                          true,
-                        ),
-                      )
-                    }
-                  >
-                    Allow once
-                  </button>
-                </section>
-              ))}
-            </article>
-          ))}
-        </section>
-        <div className="composer-wrap">
-          {draft.archived && (
-            <p className="archived-notice">
-              This conversation is archived.{" "}
-              <button onClick={() => void archive()} disabled={managing}>
-                Restore to continue
+              <button
+                className="new-conversation"
+                onClick={() => void create()}
+                disabled={!loaded || managing || sending}
+              >
+                <Plus size={16} />
+                New conversation
               </button>
-            </p>
-          )}
-          {!loaded && agentError && (
-            <button onClick={() => setInitialization((value) => value + 1)}>
-              Retry loading history
-            </button>
-          )}
-          <div className="composer">
-            <textarea
-              ref={input}
-              aria-label="Message Anvil"
-              placeholder="Describe a task, ask about your code, or plan a change…"
-              value={draft.text}
-              onChange={(event) => update(event.target.value)}
-              onKeyDown={(event) => {
-                if (
-                  event.key === "Enter" &&
-                  (event.ctrlKey || event.metaKey) &&
-                  !event.nativeEvent.isComposing &&
-                  !readOnly &&
-                  draft.text.trim() &&
-                  !running &&
-                  !sending &&
-                  !managing
-                ) {
-                  event.preventDefault();
-                  void send();
-                }
-              }}
-              disabled={readOnly || sending}
-              rows={2}
-            />
-            <div className="composer-footer">
-              <details
-                className="tools-menu composer-menu"
-                key={`add-${selected}`}
-              >
-                <summary aria-label="Add context">
-                  <Plus size={17} />
-                </summary>
-                <div className="context-popover">
-                  <button
-                    onClick={(event) => {
-                      event.currentTarget
-                        .closest("details")
-                        ?.removeAttribute("open");
-                      void addFolders();
+              <div className="sidebar-list-heading">
+                <select
+                  aria-label="Conversation filter"
+                  value={archived ? "archived" : onlyPinned ? "pinned" : "all"}
+                  onChange={(event) => {
+                    setArchived(event.target.value === "archived");
+                    setOnlyPinned(event.target.value === "pinned");
+                  }}
+                >
+                  <option value="all">Chats and tasks</option>
+                  <option value="pinned">Pinned</option>
+                  <option value="archived">Archived</option>
+                </select>
+                <details className="tools-menu sidebar-list-options">
+                  <summary aria-label="List options">
+                    <Ellipsis size={17} />
+                  </summary>
+                  <div className="workspace-tools">
+                    <button
+                      onClick={(event) => {
+                        event.currentTarget
+                          .closest("details")
+                          ?.removeAttribute("open");
+                        setCreatingGroup(true);
+                        setGroupError("");
+                      }}
+                    >
+                      New group
+                    </button>
+                    <button
+                      onClick={(event) => {
+                        event.currentTarget
+                          .closest("details")
+                          ?.removeAttribute("open");
+                        setOldestFirst((value) => !value);
+                      }}
+                    >
+                      {oldestFirst
+                        ? "Sort: newest first"
+                        : "Sort: oldest first"}
+                    </button>
+                  </div>
+                </details>
+              </div>
+              {creatingGroup && (
+                <form
+                  className="group-create"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    void addGroup();
+                  }}
+                >
+                  <input
+                    autoFocus
+                    aria-label="Group name"
+                    placeholder="Group name"
+                    maxLength={80}
+                    value={groupName}
+                    disabled={groupBusy}
+                    onChange={(event) => setGroupName(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Escape" && !groupBusy)
+                        setCreatingGroup(false);
                     }}
-                    disabled={readOnly || sending || managing}
+                  />
+                  <button disabled={!groupName.trim() || groupBusy}>
+                    Create
+                  </button>
+                  <button
+                    type="button"
+                    disabled={groupBusy}
+                    onClick={() => setCreatingGroup(false)}
                   >
-                    Add local folder…
+                    Cancel
+                  </button>
+                  {groupError && <p role="alert">{groupError}</p>}
+                </form>
+              )}
+              <div className="draft-list">
+                {!!pinned.length && (
+                  <>
+                    <div className="group-label">Pinned</div>
+                    {pinned.map(renderConversation)}
+                  </>
+                )}
+                {!onlyPinned &&
+                  groups.map((group) => (
+                    <section
+                      className="conversation-group"
+                      key={group.id}
+                      aria-label={group.name}
+                    >
+                      <ConversationRow
+                        title={group.name}
+                        selected={false}
+                        archived={false}
+                        running={false}
+                        disabled={managing || sending}
+                        collapsed={group.collapsed}
+                        onSelect={() =>
+                          void action(() =>
+                            saveGroup(group.id, {
+                              collapsed: !group.collapsed,
+                            }),
+                          )
+                        }
+                        onRename={(name) => saveGroup(group.id, { name })}
+                        onDelete={() => void removeGroup(group.id)}
+                      />
+                      {!group.collapsed && (
+                        <div className="group-conversations">
+                          {unpinned
+                            .filter((item) => item.groupID === group.id)
+                            .map(renderConversation)}
+                          {!unpinned.some(
+                            (item) => item.groupID === group.id,
+                          ) && (
+                            <p className="group-empty">
+                              Move a conversation here from its ⋯ menu.
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </section>
+                  ))}
+                {!onlyPinned && (
+                  <>
+                    {!!groups.length && (
+                      <div className="group-label">Ungrouped</div>
+                    )}
+                    {unpinned
+                      .filter((item) => !item.groupID)
+                      .map(renderConversation)}
+                  </>
+                )}
+                {loaded && !visible.length && (
+                  <p>
+                    {archived
+                      ? "No archived conversations"
+                      : "No conversations"}
+                  </p>
+                )}
+                {!loaded && <p>Loading conversations…</p>}
+              </div>
+            </aside>
+          )}
+          <main
+            className={`conversation-main ${conversationTasks.length === 0 ? "is-empty" : ""} ${terminalOpen ? "with-terminal" : ""}`}
+            aria-label="Conversation"
+          >
+            <header className="conversation-toolbar">
+              <span className="conversation-title">
+                {conversationTitle(draft)}
+              </span>
+              <details className="tools-menu" ref={toolsMenu}>
+                <summary
+                  aria-label="Workspace tools"
+                  title="Files, changes and terminal"
+                >
+                  <Ellipsis size={20} />
+                </summary>
+                <div
+                  className="workspace-tools"
+                  onClick={(event) => {
+                    if (
+                      (event.target as HTMLElement).closest(
+                        "button:not(:disabled)",
+                      ) &&
+                      toolsMenu.current
+                    )
+                      toolsMenu.current.open = false;
+                  }}
+                >
+                  {tools}
+                  <button
+                    aria-label="Toggle terminal"
+                    aria-pressed={terminalOpen}
+                    title="Terminal"
+                    onClick={onTerminal}
+                    disabled={!repo}
+                  >
+                    <TerminalSquare size={16} />
+                    <span>Terminal</span>
                   </button>
                 </div>
               </details>
-              <details
-                className="tools-menu composer-menu"
-                key={`folders-${selected}`}
-              >
-                <summary aria-label="Attached folders">
-                  <Folder size={14} /> {draft.folders?.length || 0}
-                </summary>
-                <div className="context-popover folder-popover">
-                  <p>Folders for this conversation</p>
-                  {!draft.folders?.length && <p>No folders attached.</p>}
-                  {(draft.folders || []).map((root) => (
-                    <div className="context-folder" key={root}>
-                      <button
-                        title={root}
-                        onClick={() => onSelectDirectory(root)}
-                      >
-                        {root}
-                      </button>
-                      <button
-                        aria-label={`Revoke access to ${root}`}
-                        title="Remove folder and stop its running task"
-                        onClick={() => void revokeFolder(root)}
-                      >
-                        ×
-                      </button>
-                    </div>
-                  ))}
+            </header>
+            <section
+              className={`conversation-body ${conversationTasks.length ? "has-tasks" : ""}`}
+            >
+              {conversationTasks.length === 0 && (
+                <div className="conversation-intro">
+                  <h1>What are we working on?</h1>
+                  <p>
+                    {draft.folders?.length
+                      ? "Ask about your code, plan a change, or start building."
+                      : "Start a conversation, or add a folder to work on your code."}
+                  </p>
+                  {!draft.folders?.length && (
+                    <button
+                      className="primary-button"
+                      disabled={!loaded}
+                      onClick={() => void addFolders()}
+                    >
+                      Add folders (optional)
+                    </button>
+                  )}
                 </div>
-              </details>
-              <select
-                className="permission-mode"
-                aria-label="Permission mode"
-                title="Ask: confirm edits and commands. Auto: allow scoped file edits, ask for commands and unknown operations. Full access: approve all tools."
-                value={draft.permissionMode || "ask"}
-                disabled={readOnly || sending || !!running || managing}
-                onChange={(event) =>
-                  void changePermissionMode(
-                    event.target.value as PermissionMode,
-                  )
-                }
-              >
-                <option value="ask">Ask each time</option>
-                <option value="auto">Auto</option>
-                <option value="full">Full access</option>
-              </select>
-              <span className="connection-status">
-                {running ? "Working" : "DeepSeek"}
-              </span>
-              {running && (
-                <button
-                  onClick={() =>
-                    void action(() => window.anvil.cancelTask(running.id))
-                  }
-                >
-                  Cancel task
+              )}
+              {conversationTasks.map((task) => (
+                <article className="agent-task" key={task.id}>
+                  <p className="agent-prompt">{task.prompt}</p>
+                  <div className="response-heading">Anvil</div>
+                  {task.text && (
+                    <div className="agent-response">{task.text}</div>
+                  )}
+                  {task.status === "running" ? (
+                    <div
+                      className="agent-progress"
+                      role="status"
+                      aria-live="polite"
+                    >
+                      <span
+                        className={`agent-progress-dot ${task.permissions.length || task.phase === "stopping" ? "paused" : ""}`}
+                        aria-hidden="true"
+                      />
+                      <span>
+                        {task.phase === "stopping"
+                          ? "Stopping…"
+                          : task.permissions.length
+                            ? "Waiting for approval"
+                            : task.phase === "checking"
+                              ? "Checking…"
+                              : task.phase === "repairing"
+                                ? `Repairing · ${(task.round || 1) - 1}/${task.acceptance?.maxRepairs}`
+                                : task.text
+                                  ? "Continuing…"
+                                  : "Working…"}
+                      </span>
+                    </div>
+                  ) : (
+                    <small
+                      className={`task-state ${task.status}`}
+                      role="status"
+                    >
+                      {task.status === "completed"
+                        ? "Acceptance passed"
+                        : task.status === "unverified"
+                          ? "Finished · not verified"
+                          : task.status === "limit"
+                            ? "Limit reached"
+                            : task.status}
+                    </small>
+                  )}
+                  {task.acceptance && (
+                    <details className="acceptance-results">
+                      <summary>
+                        Acceptance · {task.checks?.length || 0} run
+                        {task.checks?.length === 1 ? "" : "s"}
+                      </summary>
+                      <code>{task.acceptance.command}</code>
+                      <p>{task.acceptance.directory}</p>
+                      {task.checks?.map((check) => (
+                        <div className="acceptance-run" key={check.round}>
+                          <strong>
+                            Run {check.round} ·{" "}
+                            {check.cancelled
+                              ? "Cancelled"
+                              : check.timedOut
+                                ? "Timed out"
+                                : check.error
+                                  ? "Could not run"
+                                  : `Exit ${check.exitCode}`}{" "}
+                            · {(check.durationMs / 1000).toFixed(1)}s
+                          </strong>
+                          <pre>
+                            {check.error || check.output || "(No output)"}
+                            {check.truncated ? "\n[Output truncated]" : ""}
+                          </pre>
+                        </div>
+                      ))}
+                    </details>
+                  )}
+                  {task.error && <p role="alert">{task.error}</p>}
+                  {task.permissions.map((permission) => (
+                    <section
+                      className="agent-permission"
+                      key={permission.id}
+                      aria-label="Tool approval"
+                    >
+                      <strong>Allow {permission.action}?</strong>
+                      <pre>{permission.resources.join("\n")}</pre>
+                      {permission.message && <p>{permission.message}</p>}
+                      <button
+                        className="permission-deny"
+                        onClick={() =>
+                          void action(() =>
+                            window.anvil.replyPermission(
+                              task.id,
+                              permission.id,
+                              false,
+                            ),
+                          )
+                        }
+                      >
+                        Deny
+                      </button>
+                      <button
+                        className="permission-allow"
+                        onClick={() =>
+                          void action(() =>
+                            window.anvil.replyPermission(
+                              task.id,
+                              permission.id,
+                              true,
+                            ),
+                          )
+                        }
+                      >
+                        Allow once
+                      </button>
+                    </section>
+                  ))}
+                </article>
+              ))}
+            </section>
+            <div className="composer-wrap">
+              {draft.archived && (
+                <p className="archived-notice">
+                  This conversation is archived.{" "}
+                  <button onClick={() => void archive()} disabled={managing}>
+                    Restore to continue
+                  </button>
+                </p>
+              )}
+              {!loaded && agentError && (
+                <button onClick={() => setInitialization((value) => value + 1)}>
+                  Retry loading history
                 </button>
               )}
-              <button
-                className="send-button"
-                aria-label="Send message"
-                title="Send task"
-                onClick={() => void send()}
-                disabled={
-                  readOnly ||
-                  !draft.text.trim() ||
-                  !!running ||
-                  sending ||
-                  managing
-                }
+              <div className="composer">
+                <textarea
+                  ref={input}
+                  aria-label="Message Anvil"
+                  placeholder="Describe a task, ask about your code, or plan a change…"
+                  value={draft.text}
+                  onChange={(event) => update(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (
+                      event.key === "Enter" &&
+                      (event.ctrlKey || event.metaKey) &&
+                      !event.nativeEvent.isComposing &&
+                      !readOnly &&
+                      draft.text.trim() &&
+                      !running &&
+                      !sending &&
+                      !managing
+                    ) {
+                      event.preventDefault();
+                      void send();
+                    }
+                  }}
+                  disabled={readOnly || sending}
+                  rows={2}
+                />
+                <div className="composer-footer">
+                  <details
+                    className="tools-menu composer-menu"
+                    key={`add-${selected}`}
+                  >
+                    <summary aria-label="Add context">
+                      <Plus size={17} />
+                    </summary>
+                    <div className="context-popover">
+                      <button
+                        onClick={(event) => {
+                          event.currentTarget
+                            .closest("details")
+                            ?.removeAttribute("open");
+                          void addFolders();
+                        }}
+                        disabled={readOnly || sending || managing}
+                      >
+                        Add local folder…
+                      </button>
+                    </div>
+                  </details>
+                  <details
+                    className="tools-menu composer-menu"
+                    key={`folders-${selected}`}
+                  >
+                    <summary aria-label="Attached folders">
+                      <Folder size={14} /> {draft.folders?.length || 0}
+                    </summary>
+                    <div className="context-popover folder-popover">
+                      <p>Folders for this conversation</p>
+                      {!draft.folders?.length && <p>No folders attached.</p>}
+                      {(draft.folders || []).map((root) => (
+                        <div className="context-folder" key={root}>
+                          <button
+                            title={root}
+                            onClick={() => onSelectDirectory(root)}
+                          >
+                            {root}
+                          </button>
+                          <button
+                            aria-label={`Revoke access to ${root}`}
+                            title="Remove folder and stop its running task"
+                            onClick={() => void revokeFolder(root)}
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </details>
+                  <select
+                    className="permission-mode"
+                    aria-label="Permission mode"
+                    title="Ask: confirm edits and commands. Auto: allow scoped file edits, ask for commands and unknown operations. Full access: approve all tools."
+                    value={draft.permissionMode || "ask"}
+                    disabled={readOnly || sending || !!running || managing}
+                    onChange={(event) =>
+                      void changePermissionMode(
+                        event.target.value as PermissionMode,
+                      )
+                    }
+                  >
+                    <option value="ask">Ask each time</option>
+                    <option value="auto">Auto</option>
+                    <option value="full">Full access</option>
+                  </select>
+                  <span className="connection-status">DeepSeek</span>
+                  {running && (
+                    <button
+                      onClick={() =>
+                        void action(() => window.anvil.cancelTask(running.id))
+                      }
+                    >
+                      Cancel task
+                    </button>
+                  )}
+                  <button
+                    className="send-button"
+                    aria-label="Send message"
+                    title="Send task"
+                    onClick={() => void send()}
+                    disabled={
+                      readOnly ||
+                      !draft.text.trim() ||
+                      !!running ||
+                      sending ||
+                      managing
+                    }
+                  >
+                    <ArrowUp size={17} />
+                  </button>
+                </div>
+              </div>
+              <p
+                className={`draft-notice ${storageError ? "storage-error" : ""}`}
+                role="status"
               >
-                <ArrowUp size={17} />
-              </button>
+                {storageError
+                  ? "Could not save this draft locally. Keep this window open to preserve it."
+                  : agentError || "Ctrl / ⌘ + Enter to send"}
+              </p>
             </div>
-          </div>
-          <p
-            className={`draft-notice ${storageError ? "storage-error" : ""}`}
-            role="status"
-          >
-            {storageError
-              ? "Could not save this draft locally. Keep this window open to preserve it."
-              : agentError || "Ctrl / ⌘ + Enter to send"}
-          </p>
+            {terminal}
+          </main>
+          {review}
         </div>
-        {terminal}
-      </main>
-      {review}
+      </ReviewWorkspace>
     </div>
   );
 }

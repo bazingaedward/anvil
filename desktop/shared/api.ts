@@ -102,7 +102,30 @@ export type ConversationState = {
   selected: string;
   legacyDraftsImported: boolean;
 };
+export type ReviewCommit = {
+  hash: string;
+  parents: string[];
+  title: string;
+  author: string;
+  date: string;
+  refs: string[];
+};
+export type ReviewHistory = { commits: ReviewCommit[]; branches: string[] };
+export type ReviewOptions = {
+  branch?: string;
+  remotes?: boolean;
+  stash?: boolean;
+};
 export interface DesktopAPI {
+  openReviewRepository(): Promise<string | null>;
+  reviewStatus(root: string): Promise<RepoState>;
+  reviewHistory(
+    root: string,
+    limit: number,
+    options?: ReviewOptions,
+  ): Promise<ReviewHistory>;
+  reviewPatch(root: string, head: string, base?: string): Promise<string>;
+  reviewDiff(root: string, file: string, side: DiffSide): Promise<DiffDocument>;
   createGroup(
     name: string,
     conversationID?: string,

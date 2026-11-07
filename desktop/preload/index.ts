@@ -1,6 +1,14 @@
 import { contextBridge, ipcRenderer } from "electron";
 import type { DesktopAPI, TerminalEvent, AgentTask } from "../shared/api";
 const api: DesktopAPI = {
+  openReviewRepository: () => ipcRenderer.invoke("review:open"),
+  reviewStatus: (root) => ipcRenderer.invoke("review:status", root),
+  reviewHistory: (root, limit, options) =>
+    ipcRenderer.invoke("review:history", root, limit, options),
+  reviewPatch: (root, head, base) =>
+    ipcRenderer.invoke("review:patch", root, head, base),
+  reviewDiff: (root, file, side) =>
+    ipcRenderer.invoke("review:diff", root, file, side),
   createGroup: (name, conversationID) =>
     ipcRenderer.invoke("groups:create", name, conversationID),
   updateGroup: (id, patch) => ipcRenderer.invoke("groups:update", id, patch),

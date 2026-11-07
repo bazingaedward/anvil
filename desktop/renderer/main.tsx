@@ -22,6 +22,7 @@ import {
   ArrowLeft,
   Search,
   Menu as MenuIcon,
+  PanelLeft,
 } from "lucide-react";
 import type {
   DesktopAPI,
@@ -745,6 +746,18 @@ function App() {
       )}
     </>
   ) : null;
+  const [sidebarOpen, setSidebarOpen] = useState(() => {
+    try {
+      return localStorage.getItem("anvil:sidebar-collapsed") !== "true";
+    } catch {
+      return true;
+    }
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem("anvil:sidebar-collapsed", String(!sidebarOpen));
+    } catch {}
+  }, [sidebarOpen]);
   return (
     <div className="application">
       <div
@@ -759,6 +772,15 @@ function App() {
         >
           <MenuIcon size={20} />
         </button>
+        <button
+          className="application-menu-button panel-toggle"
+          aria-label={sidebarOpen ? "Collapse left panel" : "Expand left panel"}
+          title={sidebarOpen ? "Collapse left panel" : "Expand left panel"}
+          aria-expanded={sidebarOpen}
+          onClick={() => setSidebarOpen((value) => !value)}
+        >
+          <PanelLeft size={19} />
+        </button>
       </div>
       {error && (
         <div className="error-banner" role="alert">
@@ -769,6 +791,7 @@ function App() {
         </div>
       )}
       <ConversationWorkspace
+        sidebarOpen={sidebarOpen}
         repo={repo}
         onOpen={() => void openRepository()}
         onSelectDirectory={(root) => void openRepository(root)}
