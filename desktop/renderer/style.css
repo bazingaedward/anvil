@@ -774,12 +774,12 @@ kbd {
 .tools-menu .count {
   margin-left: auto;
 }
-.conversation-main.is-empty:not(.with-terminal) .conversation-body {
+.conversation-main.is-empty .conversation-body {
   flex: 0 0 auto;
   margin-top: auto;
   padding-bottom: 28px;
 }
-.conversation-main.is-empty:not(.with-terminal) .composer-wrap {
+.conversation-main.is-empty .composer-wrap {
   margin-bottom: auto;
 }
 .conversation-main.is-empty .conversation-intro {
@@ -2533,4 +2533,26 @@ kbd {
   text-decoration: underline;
   padding: 3px;
   background: transparent;
+}
+
+.review-panel[hidden],
+.workspace-panel-content[hidden] {
+  display: none;
+}
+.workspace-panel-content {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+.workspace-panel-content > .terminal-panel {
+  flex: 1;
+  min-height: 0;
+  height: auto;
+}
+.review-panel .terminal-toolbar {
+  gap: 10px;
+  padding: 0 10px;
 }

@@ -36,7 +36,6 @@ export function ConversationWorkspace({
   sidebarOpen,
   tools,
   review,
-  terminal,
   terminalOpen,
   onTerminal,
   onSelectDirectory,
@@ -45,7 +44,6 @@ export function ConversationWorkspace({
   sidebarOpen: boolean;
   tools: ReactNode;
   review: ReactNode;
-  terminal: ReactNode;
   terminalOpen: boolean;
   onTerminal: () => void;
   onOpen: () => void;
@@ -711,7 +709,7 @@ export function ConversationWorkspace({
             </aside>
           )}
           <main
-            className={`conversation-main ${conversationTasks.length === 0 ? "is-empty" : ""} ${terminalOpen ? "with-terminal" : ""}`}
+            className={`conversation-main ${conversationTasks.length === 0 ? "is-empty" : ""}`}
             aria-label="Conversation"
           >
             <header className="conversation-toolbar">
@@ -1161,7 +1159,6 @@ export function ConversationWorkspace({
                 </p>
               )}
             </div>
-            {terminal}
           </main>
           {review}
         </div>

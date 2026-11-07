@@ -324,7 +324,6 @@ function App() {
   const [reviewOpen, setReviewOpen] = useState(false);
   const [reviewDetail, setReviewDetail] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(480);
-  const [terminalHeight, setTerminalHeight] = useState(230);
   const dirty = !!document && text !== document.content;
   const report = useCallback((value: unknown) => setError(message(value)), []);
   const latest = useRef({ document, text, dirty, busy });
@@ -437,26 +436,18 @@ function App() {
       setReviewDetail(true);
     });
   }
-  function resize(event: React.PointerEvent, kind: "sidebar" | "terminal") {
+  function resize(event: React.PointerEvent) {
     event.preventDefault();
     event.currentTarget.setPointerCapture(event.pointerId);
-    const start = kind === "sidebar" ? event.clientX : event.clientY;
-    const initial = kind === "sidebar" ? sidebarWidth : terminalHeight;
+    const start = event.clientX;
+    const initial = sidebarWidth;
     const move = (next: PointerEvent) => {
-      if (kind === "sidebar")
-        setSidebarWidth(
-          Math.max(
-            320,
-            Math.min(window.innerWidth * 0.55, initial + start - next.clientX),
-          ),
-        );
-      else
-        setTerminalHeight(
-          Math.max(
-            130,
-            Math.min(window.innerHeight - 300, initial + start - next.clientY),
-          ),
-        );
+      setSidebarWidth(
+        Math.max(
+          320,
+          Math.min(window.innerWidth * 0.55, initial + start - next.clientX),
+        ),
+      );
     };
     const stop = () => {
       window.removeEventListener("pointermove", move);
@@ -469,11 +460,18 @@ function App() {
   function toggleReview(next: "files" | "changes") {
     if (next !== view) setReviewDetail(false);
     setView(next);
+    setTerminalHidden(true);
     setReviewOpen(true);
   }
   function toggleTerminal() {
     setTerminalStarted(true);
-    setTerminalHidden((value) => !value);
+    if (reviewOpen && !terminalHidden) {
+      setReviewOpen(false);
+      setTerminalHidden(true);
+    } else {
+      setTerminalHidden(false);
+      setReviewOpen(true);
+    }
   }
   const browser = repo ? (
     <div className="review-browser">
@@ -655,33 +653,37 @@ function App() {
     </div>
   ) : null;
   const review =
-    repo && reviewOpen ? (
+    repo && (reviewOpen || terminalStarted) ? (
       <>
-        <div
-          className="resize-column"
-          role="separator"
-          aria-label="Review panel width"
-          aria-orientation="vertical"
-          tabIndex={0}
-          onPointerDown={(event) => resize(event, "sidebar")}
-          onKeyDown={(event) => {
-            if (event.key === "ArrowLeft")
-              setSidebarWidth((value) =>
-                Math.min(window.innerWidth * 0.55, value + 20),
-              );
-            if (event.key === "ArrowRight")
-              setSidebarWidth((value) => Math.max(320, value - 20));
-          }}
-        />
+        {reviewOpen && (
+          <div
+            className="resize-column"
+            role="separator"
+            aria-label="Right panel width"
+            aria-orientation="vertical"
+            tabIndex={0}
+            onPointerDown={(event) => resize(event)}
+            onKeyDown={(event) => {
+              if (event.key === "ArrowLeft")
+                setSidebarWidth((value) =>
+                  Math.min(window.innerWidth * 0.55, value + 20),
+                );
+              if (event.key === "ArrowRight")
+                setSidebarWidth((value) => Math.max(320, value - 20));
+            }}
+          />
+        )}
         <aside
+          hidden={!reviewOpen}
           className="review-panel"
-          aria-label="Files and changes"
+          aria-label="Workspace panel"
           style={{ width: sidebarWidth }}
         >
           <div className="sidebar-tabs">
             <button
-              className={view === "files" ? "active" : ""}
+              className={terminalHidden && view === "files" ? "active" : ""}
               onClick={() => {
+                setTerminalHidden(true);
                 setView("files");
                 setReviewDetail(false);
               }}
@@ -690,9 +692,10 @@ function App() {
               Files
             </button>
             <button
-              className={view === "changes" ? "active" : ""}
+              className={terminalHidden && view === "changes" ? "active" : ""}
               disabled={repo?.git === false}
               onClick={() => {
+                setTerminalHidden(true);
                 setView("changes");
                 setReviewDetail(false);
               }}
@@ -701,52 +704,42 @@ function App() {
               Changes<span className="count">{changes.length}</span>
             </button>
             <button
+              className={!terminalHidden ? "active" : ""}
+              onClick={() => {
+                setTerminalStarted(true);
+                setTerminalHidden(false);
+              }}
+            >
+              <TerminalSquare size={14} />
+              Terminal
+            </button>
+            <button
               className="close-review"
-              aria-label="Close review panel"
-              onClick={() => setReviewOpen(false)}
+              aria-label="Close workspace panel"
+              onClick={() => {
+                setReviewOpen(false);
+                setTerminalHidden(true);
+              }}
             >
               <X size={15} />
             </button>
           </div>
-          {reviewDetail ? editor : browser}
+          <div className="workspace-panel-content" hidden={!terminalHidden}>
+            {reviewDetail ? editor : browser}
+          </div>
+          {terminalStarted && (
+            <div className="workspace-panel-content" hidden={terminalHidden}>
+              <TerminalPanel
+                key={repo.root}
+                root={repo.root}
+                hidden={terminalHidden || !reviewOpen}
+                onError={report}
+              />
+            </div>
+          )}
         </aside>
       </>
     ) : null;
-  const terminalView = repo ? (
-    <>
-      {!terminalHidden && (
-        <div
-          className="resize-row"
-          role="separator"
-          aria-label="Terminal height"
-          aria-orientation="horizontal"
-          tabIndex={0}
-          onPointerDown={(event) => resize(event, "terminal")}
-          onKeyDown={(event) => {
-            if (event.key === "ArrowUp")
-              setTerminalHeight((value) =>
-                Math.min(window.innerHeight - 300, value + 20),
-              );
-            if (event.key === "ArrowDown")
-              setTerminalHeight((value) => Math.max(130, value - 20));
-          }}
-        />
-      )}
-      {terminalStarted && (
-        <div
-          className="terminal-container"
-          style={{ height: terminalHidden ? 0 : terminalHeight }}
-        >
-          <TerminalPanel
-            key={repo.root}
-            root={repo.root}
-            hidden={terminalHidden}
-            onError={report}
-          />
-        </div>
-      )}
-    </>
-  ) : null;
   const [sidebarOpen, setSidebarOpen] = useState(() => {
     try {
       return localStorage.getItem("anvil:sidebar-collapsed") !== "true";
@@ -798,7 +791,6 @@ function App() {
         onSelectDirectory={(root) => void openRepository(root)}
         terminalOpen={!terminalHidden}
         onTerminal={toggleTerminal}
-        terminal={terminalView}
         review={review}
         tools={
           <>
@@ -831,7 +823,7 @@ function App() {
           </>
         }
       />
-      {(reviewOpen || !terminalHidden || dirty || busy) && (
+      {
         <footer className="status-bar">
           <span>
             {repo ? (
@@ -856,7 +848,7 @@ function App() {
                   : ""}
           </span>
         </footer>
-      )}
+      }
     </div>
   );
 }
