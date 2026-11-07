@@ -19,8 +19,12 @@ keygrant exec --redact BYTEPLUS_ARK_API_KEY,BYTEPLUS_ARK_RESPONSES_URL -- npm ru
 With the keygrant MCP integration, use `exec_with_secrets` with the same two
 secret names and `npm run preview` as the command. The credentials must be
 available when the desktop starts. Do not write them into project configuration.
-The current provider adapter uses a BytePlus Ark HTTPS `/responses` URL and
-`deepseek-v4-1-flash-261017`.
+The default configuration uses a BytePlus Ark HTTPS `/responses` URL and
+`deepseek-v4-1-flash-261017`. The composer model menu can add and select other
+HTTPS Responses API configurations. Store the API key in Keygrant and enter its
+environment-variable name, not the key, in model settings. New credential names
+require restarting Anvil with those secrets injected. Existing Anvil sessions
+are reused when switching models. See [model and attachment details](../../docs/composer-and-models.md).
 
 For an existing vault entry named `DEEPSEEK_API_KEY` that holds a **BytePlus** key,
 use `exec_with_secrets` with that name and this macOS command (the mapping stays
@@ -43,21 +47,20 @@ OpenCode configuration is disabled. SDK state is isolated under the desktop's
 user-data directory. Conversations are independent of working folders; Anvil stores task history there
 and reuses the SDK session to retain context across turns and restarts.
 
-SDK tool actions request approval. The main process automatically approves explicit read/edit paths within folders authorized for that conversation; other requests reach the UI with Deny and Allow once.
+SDK tool actions are evaluated against the conversation permission mode. Ask allows scoped reads and asks for edits/commands; Auto also allows scoped edits, while commands and unknown operations require approval. Full access approves tool requests without per-operation prompts. These are application permission policies, not an OS sandbox.
 Cancellation interrupts the session, with a five-second process-kill fallback.
 Closing the desktop stops the active task. Switching the file browser between working folders keeps conversations and active tasks running. A task
 marked completed means its configured acceptance command passed. Without an
 acceptance command, a model finish is recorded as unverified. This executor is
 not an OS sandbox; approved tools run with the user's filesystem permissions.
-Configurable model selection and signed releases remain follow-up work.
+Configurable model selection is available; signed releases remain follow-up work.
 
-Expand **Advanced task settings**, then **Automatic verification (optional)** above the composer to specify a command and one
-of the added working folders. Sending the message authorizes that command to run
-after each model round. Failure output is returned to the same SDK session for
-repair; the command and directory remain fixed for the task. The default allows
-two repairs, 120 seconds per check, and 15 minutes for the whole task. Exhausting
-the repair or time budget records a limit, not a successful completion. Denying a
-tool request stops the task without another repair attempt.
+The internal task API still supports an optional acceptance command, but the
+composer no longer exposes Advanced task settings. Without a configured check,
+a model finish is recorded as unverified. For API-created checks, failure output
+returns to the same SDK session for repair; the command and directory remain
+fixed for the task. Repair and time budgets bound execution, and denying a tool
+request stops the task without another repair attempt.
 
 Check output is capped at 64 KiB per run. Checks receive a minimal OS environment
 without provider credentials; cancellation and check timeouts terminate their
@@ -92,8 +95,8 @@ prompts, assistant messages, verification results and private SDK session links)
 Only public task fields cross IPC. SDK runtime databases remain separate.
 
 Each sidebar conversation has a trailing actions menu for inline rename, archive/restore and delete. Actions target that row without switching the open conversation.
-Search matches titles, drafts and message bodies within the active or archived
-list. History can be browsed and drafts written without selecting a folder.
+The sidebar no longer has a conversation search field. History can be browsed
+and drafts written without selecting a folder.
 Sending requires an installed runtime and provider credentials. Folders are
 optional; a conversation without folders uses a private internal working
 directory and gains no folder grants. See [optional folders](../../docs/optional-conversation-folders.md).
@@ -114,7 +117,6 @@ records; it is not a secure-erasure operation. New versions write only SQLite
 conversation data. Do not run an older preview against the same profile after
 migration: changes it writes to legacy storage are not imported again.
 
-
 Folder access is granted per conversation through the local directory picker and a
 native confirmation. Selected editor folders from older versions are not grants.
 The composer shows authorized folders with revoke buttons; revoking a folder stops
@@ -122,6 +124,5 @@ that conversation's running task before removing access. Shell commands, unknown
 actions, wildcard paths and paths through symlinks still require approval. This is
 a tool approval policy, not OS sandboxing; approved shell commands may access other
 resources. SQLite schema v2 stores grants separately from editable draft metadata.
-
 
 Permission modes (2026-11-03): Ask allows scoped reads only; Auto additionally allows scoped explicit edits and asks for commands/unknown operations; Full access allows all runtime permission requests after native confirmation. Modes are per conversation and cannot change during a running task. This policy is not an OS sandbox. The composer no longer submits legacy acceptance commands; request testing as part of the task.

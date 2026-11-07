@@ -2,25 +2,38 @@
 
 English | [简体中文](README.zh-CN.md)
 
-An open-source, model-agnostic coding harness with a desktop workspace for macOS and Windows.
+**Keep coding when Claude Code—or your current model service—is no longer available.**
 
-**Our long-term goal is to build a model-agnostic coding harness that surpasses Claude on real-world coding tasks.** Claude Code is our primary product benchmark. Progress toward this goal will be measured through reproducible evaluations.
+Anvil is an open-source desktop coding agent for macOS and Windows with replaceable model providers. If your Claude or another provider account is suspended, disabled, or unavailable, configure another working model API in Anvil and continue working with your local code, tools, and Git changes.
 
-Models change. Anvil focuses on the execution loop around them: understanding a repository, choosing tools, making precise edits, running checks, and repairing failures.
+It includes an agent execution loop, tool approvals, persistent conversations, and a code review workspace. The desktop runtime currently uses OpenCode; Claude Code is a primary product benchmark.
+
+### Continue with another provider
+
+1. Obtain working API access. The current integration supports **HTTPS Responses APIs**; BytePlus Ark + DeepSeek has been tested. Other providers and models are not automatically verified.
+2. Follow the [runtime setup](runtime/opencode/README.md) and launch Anvil with credentials injected through Keygrant.
+3. Click the model name in the composer to configure a provider, model ID, Responses URL, and credential environment-variable name, then save and test the connection.
+4. Attach your working folders, choose a permission mode, and continue coding. Folderless conversations are also supported.
+
+Switching models inside Anvil reuses the conversation session. Anvil does not restore suspended accounts or make revoked keys work, and it does not automatically import another product's chat history or subscription allowance. API usage is billed by the selected provider.
+
+**Our long-term goal is a model-agnostic coding harness that surpasses Claude on real-world coding tasks.** This is an ambition, not a demonstrated benchmark result; progress will be measured through reproducible evaluations.
 
 ## Desktop preview
 
-The desktop preview puts coding conversations at the center, with code review alongside them:
+The desktop preview includes:
 
-- Add one or more working folders, with or without Git, and restore conversation drafts after restart.
-- Rename, archive, restore, delete and search conversations, including message content. History and drafts are stored in local SQLite; no server is required.
-- Keep the conversation and composer visible while opening files or reviewing changes in a side panel.
-- Edit UTF-8 text with Monaco; reject stale saves and protect unsaved edits.
-- Review working-tree and staged diffs separately, including new, deleted, and renamed files.
-- Open an interactive terminal on demand using xterm.js and node-pty; collapsing it keeps the process running.
-- Resize the review panel and terminal; restore the last repository on launch.
+- Local conversations with groups, pins, rename, archive/restore, and deletion; Ask, Auto, and Full access permission modes.
+- Multiple working folders per conversation, with or without Git, and folderless chat.
+- Configurable Responses API models, per-conversation selection, streaming replies, and cancellation.
+- File/image attachments through a picker, drag-and-drop, or paste. UTF-8 text and common image formats are supported; images require a capable model. PDF and Office documents are not supported yet.
+- A dedicated code review workspace with a fixed navigation rail, collapsible repository list, colored commit graph, branch filters, commit comparisons, and per-file diffs.
+- Separate staged and working-tree diffs, Monaco editing with stale-save protection, and an on-demand interactive terminal.
+- Local SQLite conversation/task history plus local model configuration and attachment snapshots. No self-hosted backend is required; inference still sends prompts and relevant context to the selected provider.
 
-The macOS and Windows desktops now have an initial OpenCode-backed agent integration: streaming replies, persistent conversations, tool approval and cancellation. The first validated provider is BytePlus Ark Responses with DeepSeek. See the [runtime setup](runtime/opencode/README.md) for building the runtime and launching through keygrant. macOS ARM64 live conversation, context, tool access, cancellation and history restoration have been verified. Stage, commit, and push through the terminal for now.
+BytePlus Ark Responses + DeepSeek is the first tested provider. macOS ARM64 live conversation, context, tool access, cancellation, and history restoration have been verified. The current Windows runtime has also passed a live text-attachment test. Custom models and image input depend on the configured provider's capabilities.
+
+This is still a desktop preview. GitHub PR lists, comments, and merging are not integrated; stage, commit, and push through the terminal for now. See [code review](docs/code-review.md) and [composer/model details](docs/composer-and-models.md) (in Chinese).
 
 Development requires Node.js 22.13+ and Git (the minimum includes unflagged `node:sqlite`). End users of packaged builds do not need Node.js or npm; Git and the project's development tools must be installed separately.
 
@@ -49,7 +62,7 @@ Native terminal dependencies are rebuilt for Electron during installation; sourc
 - Bounded model turns, context size, file size, command output, and execution time.
 - File-tool path checks and stale-read detection to reduce accidental overwrites.
 
-This is an early prototype. Local tests use scripted model responses while exercising real files and test processes. Live model execution and comparisons against Claude have not been validated. Only one real provider adapter exists so far.
+This separate internal CLI prototype is distinct from the desktop OpenCode runtime with verified live model calls described above. CLI tests use scripted model responses while exercising real files and test processes. Its live model execution and comparisons against Claude have not been validated; it has one provider adapter.
 
 ## Run the internal harness
 
