@@ -23,6 +23,10 @@ export type AccountDevice = {
   current: boolean;
 };
 export type ModelProfile = {
+  protocol?: import("./providers").ModelProtocol;
+  contextLimit?: number;
+  outputLimit?: number;
+  tools?: boolean;
   id: string;
   name: string;
   model: string;

@@ -21,7 +21,7 @@ secret names and `npm run preview` as the command. The credentials must be
 available when the desktop starts. Do not write them into project configuration.
 The default configuration uses a BytePlus Ark HTTPS `/responses` URL and
 `deepseek-v4-1-flash-261017`. The composer model menu can add and select other
-HTTPS Responses API configurations. Store the API key in Keygrant and enter its
+HTTPS Responses, Chat Completions, Anthropic Messages and Google Gemini configurations. Store the API key in Keygrant and enter its
 environment-variable name, not the key, in model settings. New credential names
 require restarting Anvil with those secrets injected. Existing Anvil sessions
 are reused when switching models. See [model and attachment details](../../docs/composer-and-models.md).
@@ -126,3 +126,5 @@ a tool approval policy, not OS sandboxing; approved shell commands may access ot
 resources. SQLite schema v2 stores grants separately from editable draft metadata.
 
 Permission modes (2026-11-03): Ask allows scoped reads only; Auto additionally allows scoped explicit edits and asks for commands/unknown operations; Full access allows all runtime permission requests after native confirmation. Modes are per conversation and cannot change during a running task. This policy is not an OS sandbox. The composer no longer submits legacy acceptance commands; request testing as part of the task.
+
+Provider adapters and capability configuration are documented in [model providers](../../docs/model-providers.md). Connection probes now use the same runtime, with tool requests denied and temporary sessions removed.

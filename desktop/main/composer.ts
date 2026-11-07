@@ -1,3 +1,4 @@
+import { modelBaseURL, protocols } from "../shared/providers";
 import {
   mkdirSync,
   readFileSync,
@@ -34,20 +35,26 @@ export function validateModel(value: ModelProfile): ModelProfile {
     !/^[A-Z][A-Z0-9_]*$/.test(value.keyRef)
   )
     throw new Error("Use a model ID and a Keygrant environment variable name.");
-  if (value.endpoint !== "" || value.id !== "ark-default") {
-    const url = new URL(value.endpoint);
+  if (value.protocol !== undefined && !protocols.includes(value.protocol))
+    throw new Error("Unsupported model protocol.");
+  if (value.endpoint !== "" || value.id !== "ark-default")
+    modelBaseURL(value.endpoint, value.protocol || "responses");
+  for (const field of ["contextLimit", "outputLimit"] as const)
     if (
-      url.protocol !== "https:" ||
-      url.username ||
-      url.password ||
-      url.search ||
-      url.hash ||
-      !url.pathname.endsWith("/responses")
+      value[field] !== undefined &&
+      (!Number.isSafeInteger(value[field]) ||
+        value[field]! < 256 ||
+        value[field]! > 10000000)
     )
-      throw new Error(
-        "Use an HTTPS Responses URL without credentials or query parameters.",
-      );
-  }
+      throw new Error("Invalid model token limit.");
+  if (
+    value.outputLimit &&
+    value.contextLimit &&
+    value.outputLimit > value.contextLimit
+  )
+    throw new Error("Output limit exceeds context limit.");
+  if (value.tools !== undefined && typeof value.tools !== "boolean")
+    throw new Error("Invalid tool capability.");
   return {
     id: value.id,
     name: value.name.trim(),
@@ -56,6 +63,14 @@ export function validateModel(value: ModelProfile): ModelProfile {
     endpoint: value.endpoint,
     keyRef: value.keyRef,
     vision: value.vision === true,
+    ...(value.protocol !== undefined ? { protocol: value.protocol } : {}),
+    ...(value.contextLimit !== undefined
+      ? { contextLimit: value.contextLimit }
+      : {}),
+    ...(value.outputLimit !== undefined
+      ? { outputLimit: value.outputLimit }
+      : {}),
+    ...(value.tools !== undefined ? { tools: value.tools } : {}),
   };
 }
 export class ComposerStore {

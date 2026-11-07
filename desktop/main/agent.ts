@@ -220,7 +220,7 @@ export class Agent {
       !(model.endpoint || this.credentials.BYTEPLUS_ARK_RESPONSES_URL)
     )
       throw new Error(
-        `Start Anvil through keygrant with ${model.keyRef} and the Responses URL.`,
+        `Start Anvil through keygrant with ${model.keyRef} and the model API URL.`,
       );
     if (
       !model.vision &&
@@ -409,9 +409,9 @@ export class Agent {
       const env = executionEnvironment();
       for (const name of ["HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY"])
         if (process.env[name]) env[name] = process.env[name]!;
-      env.BYTEPLUS_ARK_API_KEY =
+      env.ANVIL_MODEL_API_KEY =
         this.credentials[task.model?.keyRef || defaultModel.keyRef]!;
-      env.BYTEPLUS_ARK_RESPONSES_URL =
+      env.ANVIL_MODEL_ENDPOINT =
         task.model?.endpoint || this.credentials.BYTEPLUS_ARK_RESPONSES_URL!;
       const child = spawn(this.executable, this.args, {
         cwd: task.directory,

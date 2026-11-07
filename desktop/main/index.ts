@@ -1,3 +1,4 @@
+import { probeModel } from "./model-probe";
 import { Account } from "./account";
 import { createHash, randomUUID } from "node:crypto";
 import { mkdir, cp, access } from "node:fs/promises";
@@ -605,25 +606,17 @@ function registerIPC() {
       );
     const endpoint =
       model.endpoint || providerCredentials.BYTEPLUS_ARK_RESPONSES_URL;
-    if (!endpoint) throw new Error("Responses URL is missing.");
-    const response = await fetch(endpoint, {
-      method: "POST",
-      redirect: "error",
-      headers: {
-        Authorization: `Bearer ${key}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: model.model,
-        input: "Reply OK",
-        max_output_tokens: 16,
-        store: false,
-      }),
-      signal: AbortSignal.timeout(30000),
-    });
-    if (!response.ok)
-      throw new Error(`Model connection failed (HTTP ${response.status}).`);
-    await response.body?.cancel();
+    if (!endpoint) throw new Error("Model API URL is missing.");
+    const runtime =
+      process.platform === "win32" ? "anvil-runtime.exe" : "anvil-runtime";
+    await probeModel(
+      app.isPackaged
+        ? path.join(process.resourcesPath, "runtime", runtime)
+        : path.resolve(here, "../../runtime/opencode/dist", runtime),
+      model,
+      key,
+      endpoint,
+    );
   });
   handle(
     "agent:start",

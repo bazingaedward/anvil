@@ -1,3 +1,4 @@
+import { providerPresets, protocols } from "../shared/providers";
 import { accountScope } from "./account";
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown, X, Plus, Check } from "lucide-react";
@@ -198,13 +199,67 @@ export function ModelPicker({
                 <X size={18} />
               </button>
             </header>
-            <p>Connect a Responses API model. Credentials stay in Keygrant.</p>
+            <p>
+              Connect through OpenCode’s provider adapters. Credentials stay in
+              Keygrant.
+            </p>
+            <label>
+              Provider preset
+              <select
+                value=""
+                onChange={(e) => {
+                  const preset = providerPresets.find(
+                    (p) => p.id === e.target.value,
+                  );
+                  if (preset) {
+                    setEditing({
+                      ...editing,
+                      provider: preset.name,
+                      protocol: preset.protocol,
+                      endpoint: preset.endpoint,
+                      keyRef: preset.keyRef,
+                      model: "",
+                      name: "",
+                      vision: false,
+                    });
+                    setStatus("");
+                  }
+                }}
+              >
+                <option value="">Choose a provider or configure below…</option>
+                {providerPresets.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              API protocol
+              <select
+                value={editing.protocol || "responses"}
+                onChange={(e) => {
+                  setEditing({
+                    ...editing,
+                    protocol: e.target.value as (typeof protocols)[number],
+                  });
+                  setStatus("");
+                }}
+              >
+                <option value="responses">OpenAI Responses</option>
+                <option value="chat-completions">
+                  OpenAI-compatible Chat Completions
+                </option>
+                <option value="anthropic">Anthropic Messages</option>
+                <option value="google">Google Gemini</option>
+              </select>
+            </label>
             {(
               [
                 ["name", "Display name"],
                 ["provider", "Provider name"],
                 ["model", "Model ID"],
-                ["endpoint", "HTTPS Responses URL"],
+                ["endpoint", "HTTPS API base URL (or matching endpoint)"],
                 ["keyRef", "Keygrant environment variable"],
               ] as const
             ).map(([key, label]) => (
@@ -235,6 +290,40 @@ export function ModelPicker({
               />{" "}
               This model supports image input
             </label>
+            <label className="model-capability">
+              <input
+                type="checkbox"
+                checked={editing.tools !== false}
+                onChange={(e) =>
+                  setEditing({ ...editing, tools: e.target.checked })
+                }
+              />
+              This model supports tool calling
+            </label>
+            <div className="model-limits">
+              {(["contextLimit", "outputLimit"] as const).map((field) => (
+                <label key={field}>
+                  {field === "contextLimit"
+                    ? "Context tokens"
+                    : "Maximum output tokens"}
+                  <input
+                    type="number"
+                    min={256}
+                    max={10000000}
+                    placeholder={field === "contextLimit" ? "65536" : "4096"}
+                    value={editing[field] ?? ""}
+                    onChange={(e) =>
+                      setEditing({
+                        ...editing,
+                        [field]: e.target.value
+                          ? Number(e.target.value)
+                          : undefined,
+                      })
+                    }
+                  />
+                </label>
+              ))}
+            </div>
             <p>
               Inject the named secret through Keygrant when starting Anvil. New
               secret names require a restart. Enable images only if supported by

@@ -1,10 +1,14 @@
+import { runtimeProvider } from "../../desktop/shared/providers.ts";
 import path from "node:path";
 import { createInterface } from "node:readline";
 import { mkdir } from "node:fs/promises";
 
 // The only upstream-specific adapter. stdout is Anvil's JSONL protocol.
-const key = process.env.BYTEPLUS_ARK_API_KEY;
-const endpoint = process.env.BYTEPLUS_ARK_RESPONSES_URL;
+const key = process.env.ANVIL_MODEL_API_KEY || process.env.BYTEPLUS_ARK_API_KEY;
+const endpoint =
+  process.env.ANVIL_MODEL_ENDPOINT || process.env.BYTEPLUS_ARK_RESPONSES_URL;
+delete process.env.ANVIL_MODEL_API_KEY;
+delete process.env.ANVIL_MODEL_ENDPOINT;
 delete process.env.BYTEPLUS_ARK_API_KEY;
 delete process.env.BYTEPLUS_ARK_RESPONSES_URL;
 const send = (message) => process.stdout.write(JSON.stringify(message) + "\n");
@@ -29,9 +33,6 @@ async function close() {
 }
 async function run(input) {
   if (!key || !endpoint) throw new Error("Provider credentials are missing.");
-  const url = new URL(endpoint);
-  if (url.protocol !== "https:" || !url.pathname.endsWith("/responses"))
-    throw new Error("Expected an HTTPS Responses endpoint.");
   await mkdir(input.state, { recursive: true });
   for (const kind of ["DATA", "CONFIG", "CACHE", "STATE"])
     process.env[`XDG_${kind}_HOME`] = path.join(
@@ -52,27 +53,7 @@ async function run(input) {
         share: "disabled",
         update: "disable",
         snapshots: false,
-        providers: {
-          ark: {
-            name: "BytePlus Ark",
-            package: "@opencode/ai/providers/openai/responses",
-            settings: {
-              apiKey: key,
-              baseURL: endpoint.replace(/\/responses$/, ""),
-            },
-            models: {
-              [model]: {
-                name: input.model?.name || "DeepSeek",
-                capabilities: {
-                  tools: true,
-                  input: input.model?.vision ? ["text", "image"] : ["text"],
-                  output: ["text"],
-                },
-                limit: { context: 65536, output: 4096 },
-              },
-            },
-          },
-        },
+        providers: { ark: runtimeProvider(input.model, endpoint, key) },
       }),
     },
     fs: { filewatcher: false, fff: false },
@@ -87,6 +68,19 @@ async function run(input) {
           send({ type: "text", text: d.delta });
           break;
         case "permission.asked":
+          if (input.probe) {
+            await host.permission.reply({
+              sessionID,
+              requestID: d.id,
+              reply: "reject",
+            });
+            send({
+              type: "done",
+              status: "failed",
+              error: "Connection probe unexpectedly requested a tool.",
+            });
+            return;
+          }
           send({
             type: "permission",
             permission: {

@@ -10,9 +10,9 @@ It includes an agent execution loop, tool approvals, persistent conversations, a
 
 ### Continue with another provider
 
-1. Obtain working API access. The current integration supports **HTTPS Responses APIs**; BytePlus Ark + DeepSeek has been tested. Other providers and models are not automatically verified.
+1. Obtain working API access. OpenCode adapters support **Responses, Chat Completions, Anthropic Messages and Google Gemini**. BytePlus/DeepSeek text calls have been tested on the first two protocols; other providers and capabilities need verification.
 2. Follow the [runtime setup](runtime/opencode/README.md) and launch Anvil with credentials injected through Keygrant.
-3. Click the model name in the composer to configure a provider, model ID, Responses URL, and credential environment-variable name, then save and test the connection.
+3. Click the model name in the composer to configure a provider, API protocol, model ID, HTTPS API URL, and credential environment-variable name, then save and test the connection.
 4. Attach your working folders, choose a permission mode, and continue coding. Folderless conversations are also supported.
 
 Switching models inside Anvil reuses the conversation session. Anvil does not restore suspended accounts or make revoked keys work, and it does not automatically import another product's chat history or subscription allowance. API usage is billed by the selected provider.
@@ -25,7 +25,7 @@ The desktop preview includes:
 
 - Local conversations with groups, pins, rename, archive/restore, and deletion; Ask, Auto, and Full access permission modes.
 - Multiple working folders per conversation, with or without Git, and folderless chat.
-- Configurable Responses API models, per-conversation selection, streaming replies, and cancellation.
+- Configurable multi-provider models, per-conversation selection, streaming replies, and cancellation.
 - File/image attachments through a picker, drag-and-drop, or paste. UTF-8 text and common image formats are supported; images require a capable model. PDF and Office documents are not supported yet.
 - A dedicated code review workspace with a fixed navigation rail, collapsible repository list, colored commit graph, branch filters, commit comparisons, and per-file diffs.
 - Separate staged and working-tree diffs, Monaco editing with stale-save protection, and an on-demand interactive terminal.
@@ -104,3 +104,5 @@ The separate OAuth smoke test is paused after account/workspace permission failu
 ## License
 
 [MIT License](LICENSE).
+
+Model provider support now includes OpenCode adapters for Responses, Chat Completions, Anthropic Messages and Google Gemini. BytePlus/DeepSeek text calls are verified with Responses and Chat Completions; Anthropic and Gemini still need credential-backed verification. See [provider architecture and setup](docs/model-providers.md).
