@@ -115,3 +115,34 @@ test("new group and moving its conversation are atomic and preserve existing dat
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+test("cloud group replacement preserves local collapse and chats, and rolls back invalid batches", () => {
+  const root = mkdtempSync(path.join(os.tmpdir(), "anvil-sync-groups-"));
+  const store = new ConversationStore(root);
+  try {
+    const a = store.createGroup("A"),
+      b = store.createGroup("B"),
+      chat = store.create();
+    store.updateGroup(a.id, { collapsed: true });
+    store.update(chat.id, { groupID: b.id, text: "local draft" });
+    store.replaceGroups([
+      { id: a.id, name: "Renamed" },
+      { id: "remote", name: "Remote" },
+    ]);
+    assert.equal(store.getGroup(a.id).collapsed, true);
+    assert.equal(store.get(chat.id).groupID, null);
+    assert.equal(store.get(chat.id).text, "local draft");
+    assert.deepEqual(
+      store.groups().map((g) => g.id),
+      [a.id, "remote"],
+    );
+    assert.throws(() => store.replaceGroups([{ id: "invalid", name: "" }]));
+    assert.deepEqual(
+      store.groups().map((g) => g.id),
+      [a.id, "remote"],
+    );
+  } finally {
+    store.close();
+    rmSync(root, { recursive: true, force: true });
+  }
+});

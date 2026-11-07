@@ -1,13 +1,14 @@
+import { accountScope, defaultModelID } from "./account";
 import { useEffect, useState } from "react";
 import type { Attachment } from "../shared/api";
 type Draft = { modelID: string; attachments: Attachment[] };
-const empty: Draft = { modelID: "ark-default", attachments: [] };
+
 export function useComposerDraft(id: string) {
+  const empty: Draft = { modelID: defaultModelID, attachments: [] };
+  const storageKey = "anvil:composer-drafts:" + accountScope;
   const [drafts, setDrafts] = useState<Record<string, Draft>>(() => {
     try {
-      const values = JSON.parse(
-        localStorage.getItem("anvil:composer-drafts") || "{}",
-      );
+      const values = JSON.parse(localStorage.getItem(storageKey) || "{}");
       if (!values || typeof values !== "object" || Array.isArray(values))
         return {};
       return Object.fromEntries(
@@ -36,7 +37,7 @@ export function useComposerDraft(id: string) {
   const [storageError, setStorageError] = useState(false);
   useEffect(() => {
     try {
-      localStorage.setItem("anvil:composer-drafts", JSON.stringify(drafts));
+      localStorage.setItem(storageKey, JSON.stringify(drafts));
       setStorageError(false);
     } catch {
       setStorageError(true);

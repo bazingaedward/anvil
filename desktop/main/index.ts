@@ -1,7 +1,18 @@
-import { ComposerStore } from "./composer";
+import { Account } from "./account";
+import { createHash, randomUUID } from "node:crypto";
+import { mkdir, cp, access } from "node:fs/promises";
+import { ComposerStore, validateModel } from "./composer";
 import { reviewHistory, reviewPatch } from "./review";
 import { realpath } from "node:fs/promises";
-import { app, BrowserWindow, dialog, ipcMain, Menu } from "electron";
+import {
+  app,
+  BrowserWindow,
+  dialog,
+  ipcMain,
+  Menu,
+  safeStorage,
+  shell,
+} from "electron";
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -15,7 +26,6 @@ import type {
   TerminalEvent,
   AcceptanceOptions,
   ConversationPatch,
-  LegacyDraft,
 } from "../shared/api";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -23,7 +33,12 @@ let window: BrowserWindow;
 let workspace: Workspace | undefined;
 let directories: string[] = [];
 let agent: Agent | undefined;
-const composerStore = new ComposerStore(
+if (process.env.ANVIL_TEST_USER_DATA)
+  app.setPath("userData", process.env.ANVIL_TEST_USER_DATA);
+let dataRoot = app.getPath("userData");
+let account: Account;
+let activeUser = "";
+let composerStore = new ComposerStore(
   path.join(app.getPath("userData"), "composer"),
 );
 const providerCredentials: Record<string, string | undefined> = {
@@ -42,7 +57,7 @@ function currentAgent() {
     process.platform === "win32" ? "anvil-runtime.exe" : "anvil-runtime";
   return (agent ??= new Agent(
     workspace?.root || app.getPath("userData"),
-    path.join(app.getPath("userData"), "tasks"),
+    path.join(dataRoot, "tasks"),
     app.isPackaged
       ? path.join(process.resourcesPath, "runtime", runtime)
       : path.resolve(here, "../../runtime/opencode/dist", runtime),
@@ -56,7 +71,7 @@ let terminal: pty.IPty | undefined;
 let dirty = false;
 let closing = false;
 let prompting = false;
-const settingsFile = () => path.join(app.getPath("userData"), "workspace.json");
+const settingsFile = () => path.join(dataRoot, "workspace.json");
 const sendTerminal = (event: TerminalEvent) => {
   if (!window.isDestroyed()) window.webContents.send("terminal:event", event);
 };
@@ -100,6 +115,106 @@ async function selectRepository(root: string) {
   currentAgent().includeDirectory(next.root);
   return { ...status, directories: [...directories] };
 }
+function announceAccount() {
+  if (!window.isDestroyed()) window.webContents.send("account:changed");
+}
+async function deactivate() {
+  stopTerminal();
+  await agent?.close();
+  agent = undefined;
+  workspace = undefined;
+  directories = [];
+  activeUser = "";
+  dirty = false;
+}
+function applyConfig() {
+  const config = account.snapshot?.config;
+  if (!config) return;
+  composerStore.replaceProfiles(config.models);
+  currentAgent().replaceGroups(config.groups);
+  for (const profile of config.models) {
+    if (!(profile.keyRef in providerCredentials))
+      providerCredentials[profile.keyRef] = process.env[profile.keyRef];
+    delete process.env[profile.keyRef];
+  }
+}
+let activation: Promise<void> | undefined;
+function activateAccount() {
+  return (activation ??= activateProfile().finally(() => {
+    activation = undefined;
+  }));
+}
+async function activateProfile() {
+  const user = await account.require();
+  if (activeUser === user.id) return;
+  await deactivate();
+  dataRoot = path.join(
+    app.getPath("userData"),
+    "accounts",
+    createHash("sha256").update(user.id).digest("hex"),
+  );
+  await mkdir(dataRoot, { recursive: true });
+  const marker = path.join(app.getPath("userData"), "legacy-account-imported");
+  try {
+    await access(marker);
+  } catch {
+    try {
+      await access(path.join(app.getPath("userData"), "tasks"));
+      const answer = await dialog.showMessageBox(window, {
+        type: "question",
+        message: "Keep existing local chats with this account?",
+        detail: `Import this computer’s chats and model profiles into ${user.email}. Chats and folder permissions stay on this computer.`,
+        buttons: ["Start fresh", "Import local data"],
+        defaultId: 0,
+        cancelId: 0,
+      });
+      if (answer.response === 1) {
+        for (const item of ["tasks", "composer", "workspace.json"]) {
+          const source = path.join(app.getPath("userData"), item);
+          try {
+            await access(source);
+          } catch {
+            continue;
+          }
+          await cp(source, path.join(dataRoot, item), {
+            recursive: true,
+            force: false,
+            errorOnExist: true,
+          });
+        }
+      }
+      await writeFile(marker, user.id, "utf8");
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    }
+  }
+  composerStore = new ComposerStore(path.join(dataRoot, "composer"));
+  await account.refresh();
+  if (account.snapshot!.revision === 0) {
+    const models = composerStore.models();
+    const groups = currentAgent()
+      .conversations()
+      .groups.map(({ id, name }) => ({ id, name }));
+    try {
+      await account.mutate(() => ({
+        models,
+        groups,
+        preferences: { defaultModelID: models[0].id },
+      }));
+    } catch (error) {
+      await account.refresh();
+      if (account.snapshot!.revision === 0) throw error;
+    }
+  }
+  applyConfig();
+  activeUser = user.id;
+}
+async function changeConfig(change: Parameters<Account["mutate"]>[0]) {
+  const state = await account.mutate(change);
+  applyConfig();
+  announceAccount();
+  return state;
+}
 function registerIPC() {
   const trusted = (
     event: Electron.IpcMainEvent | Electron.IpcMainInvokeEvent,
@@ -113,9 +228,80 @@ function registerIPC() {
   const handle = (channel: string, fn: (...args: any[]) => unknown) => {
     ipcMain.handle(channel, async (event, ...args) => {
       trusted(event);
-      return fn(...args);
+      try {
+        if (!channel.startsWith("account:") && channel !== "window:menu")
+          await activateAccount();
+        return await fn(...args);
+      } catch (error) {
+        if (!account.user && activeUser) {
+          await deactivate();
+          announceAccount();
+        }
+        throw error;
+      }
     });
   };
+  handle("account:status", async (refresh = false) => {
+    try {
+      await activateAccount();
+      if (refresh) {
+        await account.refresh();
+        applyConfig();
+        announceAccount();
+      }
+    } catch (error) {
+      if (account.hasSession) throw error;
+      if (activeUser) {
+        await deactivate();
+        announceAccount();
+      }
+    }
+    return account.state();
+  });
+  handle("account:login", async () => {
+    if (account.user) return;
+    await shell.openExternal(await account.begin());
+  });
+  handle("account:poll", async () => {
+    if (await account.poll()) await activateAccount();
+    return account.state();
+  });
+  handle("account:logout", async () => {
+    if (!(await discardChanges())) return;
+    try {
+      await account.logout();
+    } finally {
+      await deactivate();
+      announceAccount();
+    }
+  });
+  handle("account:devices", () => account.devices());
+  handle("account:revoke", async (id: string) => {
+    await account.revoke(id);
+    await account.refresh();
+  });
+  handle("account:default-model", async (id: string) => {
+    await activateAccount();
+    return changeConfig((c) => {
+      if (!c.models.some((m) => m.id === id)) throw new Error("Unknown model.");
+      c.preferences.defaultModelID = id;
+      return c;
+    });
+  });
+  handle("account:reorder-groups", async (ids: string[]) => {
+    await activateAccount();
+    return changeConfig((c) => {
+      if (
+        !Array.isArray(ids) ||
+        ids.length !== c.groups.length ||
+        new Set(ids).size !== ids.length ||
+        ids.some((id) => !c.groups.some((g) => g.id === id))
+      )
+        throw new Error("Invalid group order.");
+      c.groups = ids.map((id) => c.groups.find((g) => g.id === id)!);
+      return c;
+    });
+  });
   const reviewWorkspace = async (root: string) => {
     if (typeof root !== "string" || !directories.includes(root))
       throw new Error("Add this repository before reviewing it.");
@@ -270,16 +456,41 @@ function registerIPC() {
     currentAgent().revokeFolder(id, root),
   );
   handle("agent:tasks", () => currentAgent().list());
-  handle("conversations:list", (drafts?: LegacyDraft[]) =>
-    currentAgent().conversations(drafts),
-  );
-  handle("groups:create", (name: string, conversationID?: string) =>
-    currentAgent().createGroup(name, conversationID),
-  );
+  handle("conversations:list", () => currentAgent().conversations());
+  handle("groups:create", async (name: string, conversationID?: string) => {
+    const id = randomUUID();
+    if (
+      conversationID &&
+      !currentAgent()
+        .conversations()
+        .conversations.some((c) => c.id === conversationID)
+    )
+      throw new Error("Chat no longer exists.");
+    await changeConfig((c) => {
+      c.groups.push({ id, name });
+      return c;
+    });
+    if (conversationID)
+      currentAgent().updateConversation(conversationID, { groupID: id });
+    return currentAgent()
+      .conversations()
+      .groups.find((g) => g.id === id)!;
+  });
   handle(
     "groups:update",
-    (id: string, patch: { name?: string; collapsed?: boolean }) =>
-      currentAgent().updateGroup(id, patch),
+    async (id: string, patch: { name?: string; collapsed?: boolean }) => {
+      if (patch.name !== undefined)
+        await changeConfig((c) => {
+          const g = c.groups.find((g) => g.id === id);
+          if (!g) throw new Error("Group no longer exists.");
+          g.name = patch.name!;
+          return c;
+        });
+      return currentAgent().updateGroup(
+        id,
+        patch.collapsed === undefined ? {} : { collapsed: patch.collapsed },
+      );
+    },
   );
   handle("groups:delete", async (id: string) => {
     const executor = currentAgent();
@@ -297,7 +508,10 @@ function registerIPC() {
       cancelId: 0,
     });
     if (result.response !== 1) return false;
-    executor.deleteGroup(id);
+    await changeConfig((c) => ({
+      ...c,
+      groups: c.groups.filter((g) => g.id !== id),
+    }));
     return true;
   });
   handle("conversations:fork", (taskID: string) =>
@@ -337,10 +551,27 @@ function registerIPC() {
     return true;
   });
   handle("composer:models", () => composerStore.models());
-  handle("composer:save-model", (value: import("../shared/api").ModelProfile) =>
-    composerStore.put(value),
+  handle(
+    "composer:save-model",
+    async (value: import("../shared/api").ModelProfile) => {
+      const profile = validateModel(value);
+      await changeConfig((c) => ({
+        ...c,
+        models: [...c.models.filter((m) => m.id !== profile.id), profile],
+      }));
+      return composerStore.models();
+    },
   );
-  handle("composer:delete-model", (id: string) => composerStore.remove(id));
+  handle("composer:delete-model", async (id: string) => {
+    await changeConfig((c) => {
+      c.models = c.models.filter((m) => m.id !== id);
+      if (!c.models.length) throw new Error("Keep at least one model.");
+      if (c.preferences.defaultModelID === id)
+        c.preferences.defaultModelID = c.models[0].id;
+      return c;
+    });
+    return composerStore.models();
+  });
   handle("composer:upload", (name: string, bytes: Uint8Array) =>
     composerStore.attach(name, bytes),
   );
@@ -413,7 +644,10 @@ function registerIPC() {
         folders.includes(workspace?.root || "") ? workspace!.root : folders[0],
         acceptance,
         {
-          model: composerStore.model(options?.modelID),
+          model: composerStore.model(
+            options?.modelID ||
+              account.snapshot?.config.preferences.defaultModelID,
+          ),
           attachments: composerStore.attachments(options?.attachmentIDs),
         },
       );
@@ -433,6 +667,7 @@ function registerIPC() {
   );
   ipcMain.on("editor:dirty", (event, value) => {
     trusted(event);
+    if (!activeUser || !account.user) return;
     dirty = value === true;
     window.setDocumentEdited(dirty);
   });
@@ -495,11 +730,13 @@ function registerIPC() {
   });
   ipcMain.on("terminal:input", (event, data) => {
     trusted(event);
+    if (!activeUser || !account.user) return;
     if (typeof data === "string" && data.length <= 64 * 1024)
       terminal?.write(data);
   });
   ipcMain.on("terminal:resize", (event, cols, rows) => {
     trusted(event);
+    if (!activeUser || !account.user) return;
     if (
       Number.isInteger(cols) &&
       Number.isInteger(rows) &&
@@ -515,6 +752,15 @@ function registerIPC() {
 if (process.env.ANVIL_TEST_USER_DATA)
   app.setPath("userData", process.env.ANVIL_TEST_USER_DATA);
 app.whenReady().then(() => {
+  account = new Account(
+    app.getPath("userData"),
+    (value) => {
+      if (!safeStorage.isEncryptionAvailable())
+        throw new Error("Secure credential storage is unavailable.");
+      return safeStorage.encryptString(value);
+    },
+    (value) => safeStorage.decryptString(value),
+  );
   const icon = path.join(app.getAppPath(), "assets", "icon.png");
   if (process.platform === "darwin") app.dock?.setIcon(icon);
   window = new BrowserWindow({

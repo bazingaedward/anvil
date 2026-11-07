@@ -1,6 +1,22 @@
 import { contextBridge, ipcRenderer } from "electron";
 import type { DesktopAPI, TerminalEvent, AgentTask } from "../shared/api";
 const api: DesktopAPI = {
+  accountStatus: (refresh) => ipcRenderer.invoke("account:status", refresh),
+  accountLogin: () => ipcRenderer.invoke("account:login"),
+  accountPoll: () => ipcRenderer.invoke("account:poll"),
+  accountLogout: () => ipcRenderer.invoke("account:logout"),
+  accountDevices: () => ipcRenderer.invoke("account:devices"),
+  revokeDevice: (id) => ipcRenderer.invoke("account:revoke", id),
+  setDefaultModel: (id) => ipcRenderer.invoke("account:default-model", id),
+  reorderGroups: (ids) => ipcRenderer.invoke("account:reorder-groups", ids),
+  onAccountChange: (listener) => {
+    const handler = () => listener();
+    ipcRenderer.on("account:changed", handler);
+    return () => {
+      ipcRenderer.removeListener("account:changed", handler);
+    };
+  },
+
   models: () => ipcRenderer.invoke("composer:models"),
   saveModel: (profile) => ipcRenderer.invoke("composer:save-model", profile),
   deleteModel: (id) => ipcRenderer.invoke("composer:delete-model", id),

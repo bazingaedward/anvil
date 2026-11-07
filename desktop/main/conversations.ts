@@ -422,6 +422,24 @@ export class ConversationStore {
         created: Number(row.created),
       }));
   }
+  replaceGroups(groups: { id: string; name: string }[]) {
+    this.transaction(() => {
+      for (const existing of this.groups())
+        if (!groups.some((group) => group.id === existing.id))
+          this.db
+            .prepare("DELETE FROM conversation_groups WHERE id=?")
+            .run(existing.id);
+      groups.forEach((group, index) => {
+        checkID(group.id);
+        this.validateGroup({ name: group.name });
+        this.db
+          .prepare(
+            "INSERT INTO conversation_groups(id,name,collapsed,created) VALUES(?,?,0,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name,created=excluded.created",
+          )
+          .run(group.id, group.name, index);
+      });
+    });
+  }
   getGroup(id: string) {
     checkID(id);
     const group = this.groups().find((item) => item.id === id);

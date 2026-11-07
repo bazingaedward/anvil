@@ -117,6 +117,9 @@ export class Agent {
     }
     return this.store.revokeFolder(id, root);
   }
+  replaceGroups(groups: { id: string; name: string }[]) {
+    this.store.replaceGroups(groups);
+  }
   createGroup(name: string, conversationID?: string) {
     return this.store.createGroup(name, conversationID);
   }

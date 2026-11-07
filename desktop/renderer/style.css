@@ -2178,3 +2178,359 @@ kbd {
 .answer-actions button:hover {
   color: #ddd;
 }
+
+.account-titlebar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 140px;
+  height: 36px;
+  -webkit-app-region: drag;
+}
+.account-login {
+  height: 100vh;
+  display: grid;
+  place-items: center;
+  background: #1b1b1b;
+  text-align: center;
+  padding: 48px;
+}
+.account-login section {
+  max-width: 520px;
+}
+.account-login h1 {
+  font-size: 34px;
+}
+.account-login h2 {
+  font-size: 22px;
+  font-weight: 500;
+}
+.account-login p {
+  line-height: 1.7;
+  color: #aaa;
+}
+.account-login button {
+  padding: 12px 24px;
+  margin: 8px;
+}
+.account-error {
+  color: #eea493 !important;
+  overflow-wrap: anywhere;
+}
+
+.account-login .google-sign-in {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 10px 16px;
+  background: #fff;
+  color: #1f1f1f;
+  border: 1px solid #747775;
+  border-radius: 24px;
+  font-size: 14px;
+  font-weight: 500;
+}
+.account-login .google-sign-in img {
+  flex: none;
+  object-fit: contain;
+}
+.account-login .google-sign-in:disabled {
+  opacity: 0.65;
+}
+
+.account-trigger {
+  position: fixed;
+  bottom: 12px;
+  left: 8px;
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  z-index: 30;
+  border-radius: 10px;
+  padding: 0;
+  background: transparent;
+}
+.account-trigger:hover,
+.account-trigger[aria-expanded="true"] {
+  background: #333;
+}
+.account-avatar {
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: #354758;
+  color: #edf3f8;
+  font-size: 15px;
+  font-weight: 600;
+  flex: none;
+}
+.account-menu {
+  position: fixed;
+  bottom: 12px;
+  left: 60px;
+  width: 300px;
+  max-width: calc(100vw - 80px);
+  z-index: 80;
+  background: #2b2b2b;
+  border: 1px solid #424242;
+  border-radius: 18px;
+  box-shadow: 0 12px 40px #0007;
+  padding: 10px;
+  color: #eee;
+}
+.account-menu-identity {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 10px;
+}
+.account-menu-identity > div {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+.account-menu-identity strong,
+.account-menu-identity span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.account-menu-identity > div > span {
+  color: #aaa;
+  font-size: 12px;
+}
+.account-menu button {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  background: none;
+  border: 0;
+  text-align: left;
+  padding: 11px 12px;
+  border-radius: 9px;
+  color: #eee;
+  font-size: 14px;
+}
+.account-menu button:hover,
+.account-menu button:focus-visible {
+  background: #414141;
+}
+.account-menu button svg {
+  color: #c2c2c2;
+}
+.account-menu button span {
+  flex: 1;
+}
+.account-menu kbd {
+  font: 12px inherit;
+  color: #999;
+}
+.account-menu-divider {
+  height: 1px;
+  background: #424242;
+  margin: 6px 10px;
+}
+.account-menu .account-error {
+  font-size: 12px;
+  padding: 0 10px;
+}
+.account-settings {
+  padding: 0;
+  border: 1px solid #424242;
+  border-radius: 18px;
+  background: #252525;
+  color: #eee;
+  width: min(760px, calc(100vw - 64px));
+  max-height: calc(100vh - 90px);
+  box-shadow: 0 24px 90px #0008;
+}
+.account-settings::backdrop {
+  background: #0007;
+}
+.settings-layout {
+  display: flex;
+  min-height: 440px;
+}
+.settings-nav {
+  width: 190px;
+  flex: none;
+  padding: 26px 14px;
+  background: #202020;
+  border-right: 1px solid #343434;
+}
+.settings-nav h2 {
+  font-size: 19px;
+  margin: 0 12px 24px;
+}
+.settings-nav nav {
+  display: grid;
+  gap: 5px;
+}
+.settings-nav button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 12px;
+  text-align: left;
+  background: none;
+  border: 0;
+  border-radius: 8px;
+  color: #bbb;
+}
+.settings-nav button.active,
+.settings-nav button:hover {
+  background: #343434;
+  color: #eee;
+}
+.settings-content {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  padding: 28px 30px;
+  max-height: calc(100vh - 92px);
+  overflow: auto;
+}
+.settings-content h2 {
+  font-size: 19px;
+  margin: 0 0 26px;
+}
+.account-close {
+  position: absolute;
+  right: 12px;
+  top: 12px;
+}
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 21px 0;
+  border-bottom: 1px solid #393939;
+}
+.settings-row strong,
+.settings-row label {
+  font-size: 14px;
+  font-weight: 500;
+}
+.settings-row p,
+.settings-profile p {
+  font-size: 12px;
+  line-height: 1.6;
+  color: #999;
+  margin: 5px 0 0;
+}
+.settings-row button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 12px;
+  white-space: nowrap;
+  background: #353535;
+  border: 1px solid #494949;
+  border-radius: 8px;
+}
+.settings-row select {
+  max-width: 190px;
+  background: #333;
+  color: #eee;
+  padding: 8px;
+  border: 1px solid #494949;
+  border-radius: 8px;
+}
+.settings-note {
+  font-size: 12px;
+  color: #999;
+  line-height: 1.7;
+  margin-top: 20px;
+}
+.settings-profile {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 4px 0 22px;
+}
+.settings-profile .account-avatar {
+  width: 44px;
+  height: 44px;
+  font-size: 20px;
+}
+.settings-device {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.device-current {
+  font-size: 11px;
+  color: #aaa;
+}
+.settings-profile p {
+  overflow-wrap: anywhere;
+}
+
+/* Keep account navigation compact, independent of the composer. */
+.account-menu {
+  width: 260px;
+  padding: 7px;
+  border-radius: 13px;
+}
+.account-menu-identity {
+  gap: 10px;
+  padding: 9px 8px;
+}
+.account-menu-identity strong {
+  font-size: 13px;
+  font-weight: 500;
+}
+.account-menu-identity > div > span {
+  font-size: 11px;
+}
+.account-menu .account-avatar {
+  width: 26px;
+  height: 26px;
+  font-size: 13px;
+}
+.account-menu button {
+  gap: 10px;
+  padding: 8px 9px;
+  font-size: 13px;
+  border-radius: 7px;
+}
+.account-menu button svg {
+  width: 17px;
+  height: 17px;
+}
+.account-menu-divider {
+  margin: 4px 8px;
+}
+.account-menu kbd {
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 400;
+  border: 0;
+  padding: 0;
+  background: none;
+  box-shadow: none;
+}
+.composer-image-notice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 4px 12px 8px;
+  font-size: 12px;
+  color: #dfb888;
+}
+.composer-image-notice button {
+  font-size: 12px;
+  color: #ddd;
+  text-decoration: underline;
+  padding: 3px;
+  background: transparent;
+}

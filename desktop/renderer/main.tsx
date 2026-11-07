@@ -1,3 +1,4 @@
+import { AccountGate } from "./account";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import * as monaco from "monaco-editor";
@@ -859,4 +860,8 @@ function App() {
     </div>
   );
 }
-createRoot(document.getElementById("root")!).render(<App />);
+createRoot(document.getElementById("root")!).render(
+  <AccountGate>
+    <App />
+  </AccountGate>,
+);

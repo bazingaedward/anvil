@@ -27,7 +27,6 @@ import type {
   ConversationGroup,
 } from "../shared/api";
 import {
-  readLegacyDrafts,
   conversationTitle as getTitle,
   filterConversations,
 } from "./conversation-data";
@@ -64,6 +63,7 @@ export function ConversationWorkspace({
   const composerDraft = useComposerDraft(selected);
   const [models, setModels] = useState<ModelProfile[]>([]);
   const [attaching, setAttaching] = useState(false);
+  const [modelOpenRequest, setModelOpenRequest] = useState(0);
   const selectedModel = models.find(
     (model) => model.id === composerDraft.modelID,
   );
@@ -142,6 +142,25 @@ export function ConversationWorkspace({
       document.removeEventListener("keydown", escape);
     };
   }, []);
+  useEffect(
+    () =>
+      window.anvil.onAccountChange(() => {
+        void window.anvil
+          .conversations()
+          .then((state) => {
+            setGroups(state.groups);
+            setDrafts((items) =>
+              items.map((item) => ({
+                ...item,
+                groupID: state.conversations.find((c) => c.id === item.id)
+                  ?.groupID,
+              })),
+            );
+          })
+          .catch((e) => setAgentError(String(e)));
+      }),
+    [],
+  );
   const conversationTasks = tasks.filter(
     (task) => task.conversationID === selected,
   );
@@ -150,10 +169,7 @@ export function ConversationWorkspace({
     let live = true;
     async function load() {
       let state = await window.anvil.conversations();
-      if (!state.legacyDraftsImported)
-        state = await window.anvil.conversations(
-          readLegacyDrafts(localStorage),
-        );
+
       if (!live) return;
       if (!state.conversations.length) {
         const first = await window.anvil.createConversation();
@@ -982,6 +998,21 @@ export function ConversationWorkspace({
                     ))}
                   </div>
                 )}
+                {imageMismatch && (
+                  <div className="composer-image-notice" role="status">
+                    <span>
+                      {selectedModel?.name || "Selected model"} is not
+                      configured for images. Choose an image-capable model to
+                      send this attachment.
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setModelOpenRequest((v) => v + 1)}
+                    >
+                      Choose model
+                    </button>
+                  </div>
+                )}
                 <textarea
                   ref={input}
                   aria-label="Message Anvil"
@@ -1071,6 +1102,7 @@ export function ConversationWorkspace({
                     </select>
                   </label>
                   <ModelPicker
+                    openRequest={modelOpenRequest}
                     value={composerDraft.modelID}
                     onChange={(modelID) => composerDraft.update({ modelID })}
                     onModels={setModels}
@@ -1080,7 +1112,13 @@ export function ConversationWorkspace({
                   <button
                     className={`send-button ${running ? "is-running" : ""}`}
                     aria-label={running ? "Stop task" : "Send message"}
-                    title={running ? "Stop task" : "Send · Ctrl / ⌘ + Enter"}
+                    title={
+                      running
+                        ? "Stop task"
+                        : imageMismatch
+                          ? "Choose an image-capable model to send this attachment"
+                          : "Send · Ctrl / ⌘ + Enter"
+                    }
                     onClick={() =>
                       running
                         ? void action(() => window.anvil.cancelTask(running.id))
@@ -1110,7 +1148,6 @@ export function ConversationWorkspace({
               {(storageError ||
                 composerDraft.storageError ||
                 agentError ||
-                imageMismatch ||
                 attaching) && (
                 <p className="draft-notice" role="status">
                   {storageError || composerDraft.storageError

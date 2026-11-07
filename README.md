@@ -29,7 +29,10 @@ The desktop preview includes:
 - File/image attachments through a picker, drag-and-drop, or paste. UTF-8 text and common image formats are supported; images require a capable model. PDF and Office documents are not supported yet.
 - A dedicated code review workspace with a fixed navigation rail, collapsible repository list, colored commit graph, branch filters, commit comparisons, and per-file diffs.
 - Separate staged and working-tree diffs, Monaco editing with stale-save protection, and an on-demand interactive terminal.
-- Local SQLite conversation/task history plus local model configuration and attachment snapshots. No self-hosted backend is required; inference still sends prompts and relevant context to the selected provider.
+- Google sign-in is required in the desktop app. Model profiles (without keys), default model and group definitions/order sync through Cloudflare Workers + D1. Stale saves require a refresh rather than silently overwriting another device.
+- Chats, tasks, attachments and folder grants remain local, partitioned by account. The first login can import legacy local data. Inference still sends prompts and relevant context to the selected provider.
+
+The avatar in the lower-left opens an account menu with account details, settings and sign out. Settings include sync, default model and signed-in devices; groups stay in the chat sidebar. API keys still come from local Keygrant injection. The independent `anvil-cloud` service runs at `https://anvil.keygrant.app`. See [account and sync](docs/account-sync.md).
 
 BytePlus Ark Responses + DeepSeek is the first tested provider. macOS ARM64 live conversation, context, tool access, cancellation, and history restoration have been verified. The current Windows runtime has also passed a live text-attachment test. Custom models and image input depend on the configured provider's capabilities.
 

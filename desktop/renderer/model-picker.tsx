@@ -1,3 +1,4 @@
+import { accountScope } from "./account";
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown, X, Plus, Check } from "lucide-react";
 import type { ModelProfile } from "../shared/api";
@@ -6,7 +7,9 @@ export function ModelPicker({
   onChange,
   disabled,
   onModels,
+  openRequest = 0,
 }: {
+  openRequest?: number;
   value: string;
   onChange(id: string): void;
   disabled: boolean;
@@ -17,7 +20,7 @@ export function ModelPicker({
   const [recent, setRecent] = useState<string[]>(() => {
     try {
       const value = JSON.parse(
-        localStorage.getItem("anvil:recent-models") || "[]",
+        localStorage.getItem("anvil:recent-models:" + accountScope) || "[]",
       );
       return Array.isArray(value)
         ? value.filter((id) => typeof id === "string")
@@ -31,7 +34,10 @@ export function ModelPicker({
     const next = [id, ...recent.filter((item) => item !== id)].slice(0, 8);
     setRecent(next);
     try {
-      localStorage.setItem("anvil:recent-models", JSON.stringify(next));
+      localStorage.setItem(
+        "anvil:recent-models:" + accountScope,
+        JSON.stringify(next),
+      );
     } catch {}
   }
 
@@ -41,15 +47,24 @@ export function ModelPicker({
   const [status, setStatus] = useState("");
   const dialog = useRef<HTMLDialogElement>(null);
   const menu = useRef<HTMLDetailsElement>(null);
+  useEffect(() => {
+    if (openRequest && menu.current) {
+      menu.current.open = true;
+      menu.current.querySelector<HTMLInputElement>("input")?.focus();
+    }
+  }, [openRequest]);
   function accept(items: ModelProfile[]) {
     setModels(items);
     onModels(items);
   }
   useEffect(() => {
-    void window.anvil
-      .models()
-      .then(accept)
-      .catch((e) => setError(String(e)));
+    const reload = () =>
+      void window.anvil
+        .models()
+        .then(accept)
+        .catch((e) => setError(String(e)));
+    reload();
+    return window.anvil.onAccountChange(reload);
   }, []);
   function edit(profile: ModelProfile) {
     setEditing({ ...profile });

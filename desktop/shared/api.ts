@@ -1,3 +1,27 @@
+export type CloudConfig = {
+  models: ModelProfile[];
+  groups: { id: string; name: string }[];
+  preferences: { defaultModelID: string };
+};
+export type AccountUser = {
+  id: string;
+  email: string;
+  name: string;
+  expires: number;
+};
+export type AccountState = {
+  user: AccountUser | null;
+  revision: number;
+  config?: CloudConfig;
+  pending: boolean;
+};
+export type AccountDevice = {
+  id: string;
+  device: string;
+  created: number;
+  expires: number;
+  current: boolean;
+};
 export type ModelProfile = {
   id: string;
   name: string;
@@ -135,6 +159,16 @@ export type ReviewOptions = {
   stash?: boolean;
 };
 export interface DesktopAPI {
+  accountStatus(refresh?: boolean): Promise<AccountState>;
+  accountLogin(): Promise<void>;
+  accountPoll(): Promise<AccountState>;
+  accountLogout(): Promise<void>;
+  accountDevices(): Promise<AccountDevice[]>;
+  revokeDevice(id: string): Promise<void>;
+  setDefaultModel(id: string): Promise<AccountState>;
+  reorderGroups(ids: string[]): Promise<AccountState>;
+  onAccountChange(listener: () => void): () => void;
+
   models(): Promise<ModelProfile[]>;
   saveModel(profile: ModelProfile): Promise<ModelProfile[]>;
   deleteModel(id: string): Promise<ModelProfile[]>;
