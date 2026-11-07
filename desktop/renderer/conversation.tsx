@@ -1,8 +1,15 @@
+import { ModelPicker } from "./model-picker";
+import { useComposerDraft } from "./composer-draft";
+import type { ModelProfile, Attachment } from "../shared/api";
 import { ReviewWorkspace } from "./review-workspace";
 import { ConversationRow } from "./conversation-row";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   ArrowUp,
+  Square,
+  Shield,
+  Paperclip,
+  X,
   Folder,
   Plus,
   TerminalSquare,
@@ -53,6 +60,52 @@ export function ConversationWorkspace({
   const [oldestFirst, setOldestFirst] = useState(false);
   const [drafts, setDrafts] = useState<Conversation[]>([]);
   const [selected, setSelected] = useState("");
+  const composerDraft = useComposerDraft(selected);
+  const [models, setModels] = useState<ModelProfile[]>([]);
+  const [attaching, setAttaching] = useState(false);
+  const selectedModel = models.find(
+    (model) => model.id === composerDraft.modelID,
+  );
+  const imageMismatch =
+    !selectedModel?.vision &&
+    composerDraft.attachments.some((item) => item.mime.startsWith("image/"));
+  async function attach(files?: File[]) {
+    const target = selected;
+    setAttaching(true);
+    setAgentError("");
+    try {
+      if (files && files.length + composerDraft.attachments.length > 8)
+        throw new Error("Select up to eight attachments.");
+      const items: Attachment[] = [];
+      if (files)
+        for (const file of files) {
+          if (file.size > 5 * 1024 * 1024)
+            throw new Error("Each attachment must be at most 5 MB.");
+          items.push(
+            await window.anvil.uploadAttachment(
+              file.name,
+              new Uint8Array(await file.arrayBuffer()),
+            ),
+          );
+        }
+      else items.push(...(await window.anvil.pickAttachments()));
+      if (
+        items.length + composerDraft.attachments.length > 8 ||
+        [...items, ...composerDraft.attachments].reduce(
+          (sum, file) => sum + file.size,
+          0,
+        ) >
+          10 * 1024 * 1024
+      )
+        throw new Error("Use up to eight attachments, 10 MB total.");
+      composerDraft.add(items, target);
+    } catch (e) {
+      setAgentError(String(e));
+    } finally {
+      setAttaching(false);
+    }
+  }
+
   const [loaded, setLoaded] = useState(false);
   const [archived, setArchived] = useState(false);
   const [managing, setManaging] = useState(false);
@@ -176,7 +229,11 @@ export function ConversationWorkspace({
       await window.anvil.updateConversation(selected, {
         text: draft.text,
       });
-      await window.anvil.startTask(selected, draft.text);
+      await window.anvil.startTask(selected, draft.text, undefined, {
+        modelID: composerDraft.modelID,
+        attachmentIDs: composerDraft.attachments.map((item) => item.id),
+      });
+      composerDraft.update({ attachments: [] });
       await patchDraft(selected, { text: "" });
     } catch (error) {
       setAgentError(String(error));
@@ -204,6 +261,12 @@ export function ConversationWorkspace({
       created: 0,
       updated: 0,
     } as Conversation);
+  useEffect(() => {
+    if (input.current) {
+      input.current.style.height = "auto";
+      input.current.style.height = `${Math.min(input.current.scrollHeight, 240)}px`;
+    }
+  }, [draft.text, selected]);
   const visible = filterConversations(drafts, tasks, "", archived).filter(
     (item) => !onlyPinned || item.pinned,
   );
@@ -677,7 +740,19 @@ export function ConversationWorkspace({
               )}
               {conversationTasks.map((task) => (
                 <article className="agent-task" key={task.id}>
-                  <p className="agent-prompt">{task.prompt}</p>
+                  <div className="agent-prompt">
+                    {task.prompt}
+                    {!!task.attachments?.length && (
+                      <div className="sent-attachments">
+                        {task.attachments.map((file) => (
+                          <span key={file.id}>
+                            <Paperclip size={13} />
+                            {file.name}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                   <div className="response-heading">Anvil</div>
                   {task.text && (
                     <div className="agent-response">{task.text}</div>
@@ -806,11 +881,80 @@ export function ConversationWorkspace({
                   Retry loading history
                 </button>
               )}
-              <div className="composer">
+              <div
+                className="composer"
+                onDragOver={(event) => {
+                  event.preventDefault();
+                }}
+                onDrop={(event) => {
+                  event.preventDefault();
+                  if (!readOnly && !sending && !attaching && !running)
+                    void attach(Array.from(event.dataTransfer.files));
+                }}
+                onPaste={(event) => {
+                  const files = Array.from(event.clipboardData.files);
+                  if (
+                    files.length &&
+                    !readOnly &&
+                    !sending &&
+                    !attaching &&
+                    !running
+                  ) {
+                    event.preventDefault();
+                    void attach(files);
+                  }
+                }}
+              >
+                {(!!draft.folders?.length ||
+                  !!composerDraft.attachments.length) && (
+                  <div className="composer-attachments">
+                    {(draft.folders || []).map((root) => (
+                      <span className="attachment-chip" key={root}>
+                        <button
+                          title={root}
+                          onClick={() => onSelectDirectory(root)}
+                        >
+                          <Folder size={14} />
+                          {root.split(/[\\/]/).pop()}
+                        </button>
+                        <button
+                          disabled={sending || !!running}
+                          aria-label={`Remove folder ${root}`}
+                          onClick={() => void revokeFolder(root)}
+                        >
+                          <X size={12} />
+                        </button>
+                      </span>
+                    ))}
+                    {composerDraft.attachments.map((file) => (
+                      <span
+                        className="attachment-chip"
+                        key={file.id}
+                        title={`${file.name} · ${Math.ceil(file.size / 1024)} KB`}
+                      >
+                        <Paperclip size={14} />
+                        <span>{file.name}</span>
+                        <button
+                          disabled={sending}
+                          aria-label={`Remove ${file.name}`}
+                          onClick={() =>
+                            composerDraft.update({
+                              attachments: composerDraft.attachments.filter(
+                                (item) => item.id !== file.id,
+                              ),
+                            })
+                          }
+                        >
+                          <X size={12} />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
                 <textarea
                   ref={input}
                   aria-label="Message Anvil"
-                  placeholder="Describe a task, ask about your code, or plan a change…"
+                  placeholder="Work with Anvil"
                   value={draft.text}
                   onChange={(event) => update(event.target.value)}
                   onKeyDown={(event) => {
@@ -819,7 +963,11 @@ export function ConversationWorkspace({
                       (event.ctrlKey || event.metaKey) &&
                       !event.nativeEvent.isComposing &&
                       !readOnly &&
-                      draft.text.trim() &&
+                      (draft.text.trim() ||
+                        composerDraft.attachments.length > 0) &&
+                      !attaching &&
+                      !imageMismatch &&
+                      !!selectedModel &&
                       !running &&
                       !sending &&
                       !managing
@@ -841,6 +989,23 @@ export function ConversationWorkspace({
                     </summary>
                     <div className="context-popover">
                       <button
+                        disabled={
+                          readOnly ||
+                          sending ||
+                          managing ||
+                          attaching ||
+                          !!running
+                        }
+                        onClick={(event) => {
+                          event.currentTarget
+                            .closest("details")
+                            ?.removeAttribute("open");
+                          void attach();
+                        }}
+                      >
+                        <Paperclip size={16} /> Add files or images…
+                      </button>
+                      <button
                         onClick={(event) => {
                           event.currentTarget
                             .closest("details")
@@ -853,86 +1018,80 @@ export function ConversationWorkspace({
                       </button>
                     </div>
                   </details>
-                  <details
-                    className="tools-menu composer-menu"
-                    key={`folders-${selected}`}
+                  <label
+                    className={`permission-control ${draft.permissionMode === "full" ? "full-access" : ""}`}
                   >
-                    <summary aria-label="Attached folders">
-                      <Folder size={14} /> {draft.folders?.length || 0}
-                    </summary>
-                    <div className="context-popover folder-popover">
-                      <p>Folders for this conversation</p>
-                      {!draft.folders?.length && <p>No folders attached.</p>}
-                      {(draft.folders || []).map((root) => (
-                        <div className="context-folder" key={root}>
-                          <button
-                            title={root}
-                            onClick={() => onSelectDirectory(root)}
-                          >
-                            {root}
-                          </button>
-                          <button
-                            aria-label={`Revoke access to ${root}`}
-                            title="Remove folder and stop its running task"
-                            onClick={() => void revokeFolder(root)}
-                          >
-                            ×
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  </details>
-                  <select
-                    className="permission-mode"
-                    aria-label="Permission mode"
-                    title="Ask: confirm edits and commands. Auto: allow scoped file edits, ask for commands and unknown operations. Full access: approve all tools."
-                    value={draft.permissionMode || "ask"}
-                    disabled={readOnly || sending || !!running || managing}
-                    onChange={(event) =>
-                      void changePermissionMode(
-                        event.target.value as PermissionMode,
-                      )
-                    }
-                  >
-                    <option value="ask">Ask each time</option>
-                    <option value="auto">Auto</option>
-                    <option value="full">Full access</option>
-                  </select>
-                  <span className="connection-status">DeepSeek</span>
-                  {running && (
-                    <button
-                      onClick={() =>
-                        void action(() => window.anvil.cancelTask(running.id))
+                    <Shield size={17} />
+                    <select
+                      className="permission-mode"
+                      aria-label="Permission mode"
+                      title="Ask: confirm edits and commands. Auto: allow scoped file edits, ask for commands and unknown operations. Full access: approve all tools."
+                      value={draft.permissionMode || "ask"}
+                      disabled={readOnly || sending || !!running || managing}
+                      onChange={(event) =>
+                        void changePermissionMode(
+                          event.target.value as PermissionMode,
+                        )
                       }
                     >
-                      Cancel task
-                    </button>
-                  )}
+                      <option value="ask">Ask each time</option>
+                      <option value="auto">Auto</option>
+                      <option value="full">Full access</option>
+                    </select>
+                  </label>
+                  <ModelPicker
+                    value={composerDraft.modelID}
+                    onChange={(modelID) => composerDraft.update({ modelID })}
+                    onModels={setModels}
+                    disabled={readOnly || sending || !!running || managing}
+                  />
+
                   <button
-                    className="send-button"
-                    aria-label="Send message"
-                    title="Send task"
-                    onClick={() => void send()}
+                    className={`send-button ${running ? "is-running" : ""}`}
+                    aria-label={running ? "Stop task" : "Send message"}
+                    title={running ? "Stop task" : "Send · Ctrl / ⌘ + Enter"}
+                    onClick={() =>
+                      running
+                        ? void action(() => window.anvil.cancelTask(running.id))
+                        : void send()
+                    }
                     disabled={
-                      readOnly ||
-                      !draft.text.trim() ||
-                      !!running ||
-                      sending ||
-                      managing
+                      running
+                        ? running.phase === "stopping"
+                        : readOnly ||
+                          (!draft.text.trim() &&
+                            !composerDraft.attachments.length) ||
+                          sending ||
+                          managing ||
+                          attaching ||
+                          imageMismatch ||
+                          !selectedModel
                     }
                   >
-                    <ArrowUp size={17} />
+                    {running ? (
+                      <Square size={15} fill="currentColor" />
+                    ) : (
+                      <ArrowUp size={19} />
+                    )}
                   </button>
                 </div>
               </div>
-              <p
-                className={`draft-notice ${storageError ? "storage-error" : ""}`}
-                role="status"
-              >
-                {storageError
-                  ? "Could not save this draft locally. Keep this window open to preserve it."
-                  : agentError || "Ctrl / ⌘ + Enter to send"}
-              </p>
+              {(storageError ||
+                composerDraft.storageError ||
+                agentError ||
+                imageMismatch ||
+                attaching) && (
+                <p className="draft-notice" role="status">
+                  {storageError || composerDraft.storageError
+                    ? "Could not save this draft locally. Keep this window open."
+                    : attaching
+                      ? "Adding attachments…"
+                      : agentError ||
+                        (imageMismatch
+                          ? "This model does not support images. Choose an image-capable model or remove the image."
+                          : "")}
+                </p>
+              )}
             </div>
             {terminal}
           </main>

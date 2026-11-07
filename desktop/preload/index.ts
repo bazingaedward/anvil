@@ -1,6 +1,13 @@
 import { contextBridge, ipcRenderer } from "electron";
 import type { DesktopAPI, TerminalEvent, AgentTask } from "../shared/api";
 const api: DesktopAPI = {
+  models: () => ipcRenderer.invoke("composer:models"),
+  saveModel: (profile) => ipcRenderer.invoke("composer:save-model", profile),
+  deleteModel: (id) => ipcRenderer.invoke("composer:delete-model", id),
+  testModel: (id) => ipcRenderer.invoke("composer:test-model", id),
+  pickAttachments: () => ipcRenderer.invoke("composer:pick"),
+  uploadAttachment: (name, bytes) =>
+    ipcRenderer.invoke("composer:upload", name, bytes),
   openReviewRepository: () => ipcRenderer.invoke("review:open"),
   reviewStatus: (root) => ipcRenderer.invoke("review:status", root),
   reviewHistory: (root, limit, options) =>
@@ -29,8 +36,8 @@ const api: DesktopAPI = {
   showApplicationMenu: () => ipcRenderer.invoke("window:menu"),
   selectDirectory: (root) => ipcRenderer.invoke("workspace:select", root),
   tasks: () => ipcRenderer.invoke("agent:tasks"),
-  startTask: (id, text, acceptance) =>
-    ipcRenderer.invoke("agent:start", id, text, acceptance),
+  startTask: (id, text, acceptance, options) =>
+    ipcRenderer.invoke("agent:start", id, text, acceptance, options),
   cancelTask: (id) => ipcRenderer.invoke("agent:cancel", id),
   replyPermission: (task, id, allow) =>
     ipcRenderer.invoke("agent:permission", task, id, allow),

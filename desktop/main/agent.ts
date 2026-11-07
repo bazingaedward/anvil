@@ -1,3 +1,5 @@
+import { defaultModel, type StoredAttachment } from "./composer";
+import type { ModelProfile } from "../shared/api";
 import { allowsOperation } from "./folder-access";
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { createInterface } from "node:readline";
@@ -21,6 +23,7 @@ import {
 
 type RecordTask = StoredTask;
 type Active = {
+  attachments?: StoredAttachment[];
   task: RecordTask;
   abort: AbortController;
   child?: ChildProcessWithoutNullStreams;
@@ -184,13 +187,14 @@ export class Agent {
     directories: string[] = [this.repo],
     activeDirectory = this.repo,
     acceptance?: AcceptanceOptions,
+    options?: { model: ModelProfile; attachments: StoredAttachment[] },
   ) {
     if (
       typeof conversationID !== "string" ||
       !conversationID ||
       conversationID.length > 100 ||
       typeof text !== "string" ||
-      !text.trim() ||
+      (!text.trim() && !options?.attachments.length) ||
       text.length > 100000
     )
       throw new Error("Invalid task.");
@@ -200,12 +204,20 @@ export class Agent {
       throw new Error(
         "Agent runtime is not installed. Run npm run runtime:build.",
       );
+    const model = options?.model || defaultModel;
     if (
-      !this.credentials.BYTEPLUS_ARK_API_KEY ||
-      !this.credentials.BYTEPLUS_ARK_RESPONSES_URL
+      !this.credentials[model.keyRef] ||
+      !(model.endpoint || this.credentials.BYTEPLUS_ARK_RESPONSES_URL)
     )
       throw new Error(
-        "Start Anvil through keygrant with the BytePlus API key and Responses URL.",
+        `Start Anvil through keygrant with ${model.keyRef} and the Responses URL.`,
+      );
+    if (
+      !model.vision &&
+      options?.attachments.some((item) => item.mime.startsWith("image/"))
+    )
+      throw new Error(
+        "This model does not support images. Choose an image-capable model or remove the image.",
       );
     if (directories.length && !directories.includes(activeDirectory))
       throw new Error("Choose an authorized working directory.");
@@ -233,7 +245,11 @@ export class Agent {
     const task: RecordTask = {
       id: randomUUID(),
       conversationID,
-      prompt: text.trim(),
+      prompt: text.trim() || "Please inspect the attached files.",
+      model: { ...model },
+      attachments: options?.attachments.map(
+        ({ content, ...metadata }) => metadata,
+      ),
       text: "",
       status: "running",
       phase: "working",
@@ -247,6 +263,7 @@ export class Agent {
       checks: [],
     };
     const active: Active = {
+      attachments: options?.attachments,
       task,
       abort: new AbortController(),
       limit: false,
@@ -361,8 +378,10 @@ export class Agent {
       const env = executionEnvironment();
       for (const name of ["HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY"])
         if (process.env[name]) env[name] = process.env[name]!;
-      for (const [name, value] of Object.entries(this.credentials))
-        if (value) env[name] = value;
+      env.BYTEPLUS_ARK_API_KEY =
+        this.credentials[task.model?.keyRef || defaultModel.keyRef]!;
+      env.BYTEPLUS_ARK_RESPONSES_URL =
+        task.model?.endpoint || this.credentials.BYTEPLUS_ARK_RESPONSES_URL!;
       const child = spawn(this.executable, this.args, {
         cwd: task.directory,
         env,
@@ -507,6 +526,8 @@ export class Agent {
           directories,
           state: task.runtimeState,
           sessionID: task.sessionID,
+          model: task.model,
+          attachments: task.round === 1 ? active.attachments : [],
           text,
         }) + "\n",
       );

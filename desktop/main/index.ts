@@ -1,3 +1,4 @@
+import { ComposerStore } from "./composer";
 import { reviewHistory, reviewPatch } from "./review";
 import { realpath } from "node:fs/promises";
 import { app, BrowserWindow, dialog, ipcMain, Menu } from "electron";
@@ -22,10 +23,18 @@ let window: BrowserWindow;
 let workspace: Workspace | undefined;
 let directories: string[] = [];
 let agent: Agent | undefined;
-const providerCredentials = {
+const composerStore = new ComposerStore(
+  path.join(app.getPath("userData"), "composer"),
+);
+const providerCredentials: Record<string, string | undefined> = {
   BYTEPLUS_ARK_API_KEY: process.env.BYTEPLUS_ARK_API_KEY,
   BYTEPLUS_ARK_RESPONSES_URL: process.env.BYTEPLUS_ARK_RESPONSES_URL,
 };
+for (const profile of composerStore.models()) {
+  if (!(profile.keyRef in providerCredentials))
+    providerCredentials[profile.keyRef] = process.env[profile.keyRef];
+  delete process.env[profile.keyRef];
+}
 delete process.env.BYTEPLUS_ARK_API_KEY;
 delete process.env.BYTEPLUS_ARK_RESPONSES_URL;
 function currentAgent() {
@@ -324,9 +333,72 @@ function registerIPC() {
     await executor.deleteConversation(id);
     return true;
   });
+  handle("composer:models", () => composerStore.models());
+  handle("composer:save-model", (value: import("../shared/api").ModelProfile) =>
+    composerStore.put(value),
+  );
+  handle("composer:delete-model", (id: string) => composerStore.remove(id));
+  handle("composer:upload", (name: string, bytes: Uint8Array) =>
+    composerStore.attach(name, bytes),
+  );
+  handle("composer:pick", async () => {
+    const selection = await dialog.showOpenDialog(window, {
+      properties: ["openFile", "multiSelections"],
+    });
+    if (selection.canceled) return [];
+    if (selection.filePaths.length > 8)
+      throw new Error("Select up to eight attachments.");
+    const files = await Promise.all(
+      selection.filePaths.map(async (file) => {
+        const info = await import("node:fs/promises").then((fs) =>
+          fs.stat(file),
+        );
+        if (info.size > 5 * 1024 * 1024)
+          throw new Error("Each attachment must be at most 5 MB.");
+        return { file, data: await readFile(file) };
+      }),
+    );
+    return files.map(({ file, data }) =>
+      composerStore.attach(path.basename(file), data),
+    );
+  });
+  handle("composer:test-model", async (id: string) => {
+    const model = composerStore.model(id);
+    const key = providerCredentials[model.keyRef];
+    if (!key)
+      throw new Error(
+        `Restart Anvil through Keygrant with ${model.keyRef} injected.`,
+      );
+    const endpoint =
+      model.endpoint || providerCredentials.BYTEPLUS_ARK_RESPONSES_URL;
+    if (!endpoint) throw new Error("Responses URL is missing.");
+    const response = await fetch(endpoint, {
+      method: "POST",
+      redirect: "error",
+      headers: {
+        Authorization: `Bearer ${key}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: model.model,
+        input: "Reply OK",
+        max_output_tokens: 16,
+        store: false,
+      }),
+      signal: AbortSignal.timeout(30000),
+    });
+    if (!response.ok)
+      throw new Error(`Model connection failed (HTTP ${response.status}).`);
+    await response.body?.cancel();
+  });
   handle(
     "agent:start",
-    (id: string, text: string, acceptance?: AcceptanceOptions) => {
+    (
+      id: string,
+      text: string,
+      acceptance?: AcceptanceOptions,
+      options?: import("../shared/api").MessageOptions,
+    ) => {
       const executor = currentAgent();
       const folders =
         executor.conversations().conversations.find((item) => item.id === id)
@@ -337,6 +409,10 @@ function registerIPC() {
         folders,
         folders.includes(workspace?.root || "") ? workspace!.root : folders[0],
         acceptance,
+        {
+          model: composerStore.model(options?.modelID),
+          attachments: composerStore.attachments(options?.attachmentIDs),
+        },
       );
     },
   );

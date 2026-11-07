@@ -1,3 +1,19 @@
+export type ModelProfile = {
+  id: string;
+  name: string;
+  model: string;
+  provider: string;
+  endpoint: string;
+  keyRef: string;
+  vision: boolean;
+};
+export type Attachment = {
+  id: string;
+  name: string;
+  mime: string;
+  size: number;
+};
+export type MessageOptions = { modelID?: string; attachmentIDs?: string[] };
 export type Entry = {
   name: string;
   path: string;
@@ -35,6 +51,8 @@ export type AgentPermission = {
   message?: string;
 };
 export type AgentTask = {
+  model?: ModelProfile;
+  attachments?: Attachment[];
   id: string;
   conversationID: string;
   prompt: string;
@@ -117,6 +135,13 @@ export type ReviewOptions = {
   stash?: boolean;
 };
 export interface DesktopAPI {
+  models(): Promise<ModelProfile[]>;
+  saveModel(profile: ModelProfile): Promise<ModelProfile[]>;
+  deleteModel(id: string): Promise<ModelProfile[]>;
+  testModel(id: string): Promise<void>;
+  pickAttachments(): Promise<Attachment[]>;
+  uploadAttachment(name: string, bytes: Uint8Array): Promise<Attachment>;
+
   openReviewRepository(): Promise<string | null>;
   reviewStatus(root: string): Promise<RepoState>;
   reviewHistory(
@@ -157,6 +182,7 @@ export interface DesktopAPI {
     conversationID: string,
     text: string,
     acceptance?: AcceptanceOptions,
+    options?: MessageOptions,
   ): Promise<AgentTask>;
   cancelTask(id: string): Promise<void>;
   replyPermission(

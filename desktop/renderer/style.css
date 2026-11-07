@@ -1956,3 +1956,201 @@ kbd {
 .panel-toggle {
   margin-left: 16px;
 }
+
+.composer {
+  border-radius: 24px;
+  background: #303030;
+  border: 1px solid #414141;
+  padding: 16px 16px 12px;
+}
+.composer textarea {
+  resize: none;
+  min-height: 64px;
+  max-height: 240px;
+  padding: 6px 4px 12px;
+  overflow-y: auto;
+  background: transparent;
+}
+.composer-footer {
+  gap: 12px;
+  align-items: center;
+}
+.permission-control {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  color: #bcbcbc;
+}
+.permission-control.full-access {
+  color: #ed945d;
+}
+.permission-control .permission-mode {
+  color: inherit;
+  padding-left: 0;
+  max-width: 160px;
+}
+.composer .send-button {
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  border-radius: 50%;
+  padding: 0;
+  margin-left: 0;
+  background: #ededed;
+  color: #202020;
+}
+.composer .send-button.is-running {
+  background: #416bc6;
+  color: white;
+}
+.model-picker {
+  margin-left: auto;
+  min-width: 0;
+  flex-shrink: 1;
+}
+.model-picker > summary {
+  width: auto;
+  max-width: 220px;
+  padding: 0 8px;
+  justify-content: flex-start;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: #dedede;
+  font-size: 12px;
+}
+.model-picker > summary[aria-disabled="true"] {
+  opacity: 0.5;
+  cursor: default;
+}
+.model-picker-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.composer-menu .model-popover {
+  width: 320px;
+  max-width: calc(100vw - 96px);
+  left: auto;
+  right: 0;
+  max-height: 350px;
+  overflow: auto;
+}
+.model-popover > input {
+  width: 100%;
+  padding: 10px;
+  border-bottom: 1px solid #444;
+}
+.model-option {
+  display: flex;
+  align-items: center;
+}
+.model-option > button:first-child {
+  flex: 1;
+  justify-content: space-between;
+  text-align: left;
+}
+.model-option small {
+  display: block;
+  color: #999;
+  font-size: 11px;
+  margin-top: 3px;
+}
+.model-option > button:last-child {
+  width: 30px;
+}
+.model-dialog {
+  background: #252525;
+  color: #eee;
+  border: 1px solid #484848;
+  border-radius: 16px;
+  width: min(520px, 90vw);
+  max-height: 85vh;
+  overflow: auto;
+  padding: 24px;
+}
+.model-dialog::backdrop {
+  background: #0008;
+}
+.model-dialog header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.model-dialog h2 {
+  font-size: 18px;
+  margin: 0;
+}
+.model-dialog p {
+  font-size: 12px;
+  color: #aaa;
+  line-height: 1.6;
+}
+.model-dialog label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 14px;
+  font-size: 12px;
+  color: #bbb;
+}
+.model-dialog label > input:not([type="checkbox"]) {
+  border: 1px solid #484848;
+  border-radius: 6px;
+  padding: 9px;
+  background: #1b1b1b;
+  color: #eee;
+}
+.model-dialog .model-capability {
+  flex-direction: row;
+  align-items: center;
+}
+.model-dialog footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 20px;
+}
+.model-dialog footer button {
+  background: #363636;
+  padding: 8px 10px;
+}
+.model-dialog .model-error {
+  color: #e4a29b;
+}
+.composer-attachments,
+.sent-attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 0 2px 8px;
+}
+.attachment-chip,
+.sent-attachments > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #3b3b3b;
+  border: 1px solid #484848;
+  border-radius: 8px;
+  padding: 3px 7px;
+  color: #ccc;
+  font-size: 12px;
+  max-width: 240px;
+}
+.attachment-chip > span {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.attachment-chip button {
+  min-height: 24px;
+  padding: 0 2px;
+}
+.sent-attachments {
+  padding-top: 10px;
+}
+.composer .draft-notice {
+  margin: 6px 0;
+}

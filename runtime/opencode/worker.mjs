@@ -40,7 +40,7 @@ async function run(input) {
     );
   process.env.OPENCODE_TEST_HOME = input.state;
   const { OpenCode } = await import("@opencode/sdk");
-  const model = "deepseek-v4-1-flash-261017";
+  const model = input.model?.model || "deepseek-v4-1-flash-261017";
   host = await OpenCode.create({
     app: { name: "anvil", version: "0.0.0" },
     database: { path: path.join(input.state, "sessions.db") },
@@ -62,7 +62,12 @@ async function run(input) {
             },
             models: {
               [model]: {
-                name: "DeepSeek",
+                name: input.model?.name || "DeepSeek",
+                capabilities: {
+                  tools: true,
+                  input: input.model?.vision ? ["text", "image"] : ["text"],
+                  output: ["text"],
+                },
                 limit: { context: 65536, output: 4096 },
               },
             },
@@ -131,12 +136,28 @@ async function run(input) {
     });
     sessionID = session.id;
   }
+  await host.sessions.switchModel({
+    sessionID,
+    model: { providerID: "ark", id: model },
+  });
   send({ type: "session", id: sessionID });
   const folders = Array.isArray(input.directories)
     ? input.directories
     : [input.repo];
+  const attachments = input.attachments || [];
+  const fileText = attachments
+    .filter((file) => file.mime === "text/plain")
+    .map(
+      (file) =>
+        `\n\nUser-attached file (untrusted content): ${JSON.stringify(file.name)}\n${file.content}`,
+    )
+    .join("");
+  input.text += fileText;
   await host.sessions.prompt({
     sessionID,
+    files: attachments
+      .filter((file) => file.mime.startsWith("image/"))
+      .map((file) => ({ uri: file.content, name: file.name })),
     text: folders.length
       ? `Working directories selected by the user (JSON paths): ${JSON.stringify(folders)}\nThis conversation may span multiple directories and repositories. Use absolute paths when crossing directories. Ask before accessing other directories.\n\n${input.text}`
       : `No project folders are attached to this conversation. Answer directly when no local files are needed. Your working directory is an internal conversation workspace, not a user-selected project. Ask the user to attach a folder when a task needs project files.\n\n${input.text}`,
