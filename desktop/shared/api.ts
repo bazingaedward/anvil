@@ -168,6 +168,7 @@ export interface DesktopAPI {
   revokeConversationFolder(id: string, root: string): Promise<Conversation>;
   conversations(drafts?: LegacyDraft[]): Promise<ConversationState>;
   createConversation(): Promise<Conversation>;
+  forkConversation(taskID: string): Promise<Conversation>;
   updateConversation(
     id: string,
     patch: ConversationPatch,

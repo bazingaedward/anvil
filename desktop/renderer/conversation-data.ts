@@ -35,7 +35,7 @@ export function conversationTitle(item: Conversation, tasks: AgentTask[]) {
       .split("\n")[0]
       .slice(0, 48) ||
     item.text.trim().split("\n")[0].slice(0, 48) ||
-    "New conversation"
+    "New chat"
   );
 }
 export function filterConversations(

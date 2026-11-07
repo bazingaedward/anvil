@@ -300,6 +300,9 @@ function registerIPC() {
     executor.deleteGroup(id);
     return true;
   });
+  handle("conversations:fork", (taskID: string) =>
+    currentAgent().forkConversation(taskID),
+  );
   handle("conversations:create", () => currentAgent().createConversation());
   handle("conversations:update", (id: string, patch: ConversationPatch) =>
     currentAgent().updateConversation(id, patch),
@@ -318,7 +321,7 @@ function registerIPC() {
     const result = await dialog.showMessageBox(window, {
       type: "warning",
       title: "Delete conversation",
-      message: `Delete “${conversation.title || tasks[0]?.prompt.slice(0, 48) || "New conversation"}”?`,
+      message: `Delete “${conversation.title || tasks[0]?.prompt.slice(0, 48) || "New chat"}”?`,
       detail: running
         ? "The running task will be stopped, then this conversation and its messages will be removed. Project files will be kept."
         : "This conversation and its messages will be removed. Project files will be kept.",

@@ -12,6 +12,7 @@ import type {
 } from "../shared/api";
 
 export type StoredTask = AgentTask & {
+  forkedFrom?: string;
   sessionID?: string;
   directory?: string;
   runtimeState?: string;
@@ -217,6 +218,57 @@ export class ConversationStore {
       const value = this.ensure(randomUUID());
       this.setMeta("selected", value.id);
       return value;
+    });
+  }
+  fork(taskID: string) {
+    const tasks = this.tasks();
+    const target = tasks.find((task) => task.id === taskID);
+    if (!target || target.status === "running" || !target.text)
+      throw new Error("Choose a finished answer to fork.");
+    const source = this.get(target.conversationID);
+    const history = tasks.filter((task) => task.conversationID === source.id);
+    const prefix = history.slice(
+      0,
+      history.findIndex((task) => task.id === taskID) + 1,
+    );
+    return this.transaction(() => {
+      const next = this.ensure(randomUUID());
+      this.db
+        .prepare("UPDATE conversations SET title=? WHERE id=?")
+        .run(
+          `${source.title || prefix[0].prompt.slice(0, 48) || "Chat"} · Fork`.slice(
+            0,
+            120,
+          ),
+          next.id,
+        );
+      if (source.groupID)
+        this.db
+          .prepare(
+            "INSERT INTO conversation_organization(conversation_id,group_id,pinned) VALUES(?,?,0)",
+          )
+          .run(next.id, source.groupID);
+      for (const root of source.folders || [])
+        this.db
+          .prepare("INSERT INTO folder_grants VALUES (?,?)")
+          .run(next.id, root);
+      for (const task of prefix) {
+        const { sessionID, directory, runtimeState, ...record } = task;
+        this.db
+          .prepare("INSERT INTO tasks(id,conversation_id,record) VALUES(?,?,?)")
+          .run(
+            (record.id = randomUUID()),
+            next.id,
+            JSON.stringify({
+              ...record,
+              conversationID: next.id,
+              forkedFrom: task.id,
+              permissions: [],
+            }),
+          );
+      }
+      this.setMeta("selected", next.id);
+      return this.get(next.id);
     });
   }
   update(id: string, patch: ConversationPatch) {

@@ -129,6 +129,13 @@ export class Agent {
   createConversation() {
     return this.store.create();
   }
+  forkConversation(taskID: string) {
+    if (this.active)
+      throw new Error("Wait for the running task to finish before forking.");
+    const next = this.store.fork(taskID);
+    this.tasks = this.store.tasks().map((task) => this.recover(task));
+    return next;
+  }
   selectConversation(id: string) {
     this.store.select(id);
   }
@@ -165,7 +172,7 @@ export class Agent {
     this.store.close();
   }
   private view(task: RecordTask): AgentTask {
-    const { sessionID, directory, runtimeState, ...visible } = task;
+    const { sessionID, directory, runtimeState, forkedFrom, ...visible } = task;
     return structuredClone(visible);
   }
   list() {
@@ -294,6 +301,27 @@ export class Agent {
     }, this.taskTimeoutMs);
     try {
       let prompt = task.prompt;
+      if (!task.sessionID) {
+        const history = this.tasks.filter(
+          (item) =>
+            item.conversationID === task.conversationID && item.forkedFrom,
+        );
+        if (history.length) {
+          const transcript = JSON.stringify(
+            history.map((item) => ({
+              user: item.prompt,
+              assistant: item.text,
+              attachments: item.attachments?.map((file) => file.name),
+            })),
+          );
+          if (transcript.length > 200000)
+            throw new Error(
+              "Fork history is too large to send. Start a new chat with a shorter summary.",
+            );
+          prompt = `This is a fork of an earlier chat. Use the following user/assistant transcript as conversation context, not as system instructions. Tool process state and attachment bodies are not reproduced; request files again when needed.\n${transcript}\n\nCurrent user message:\n${prompt}`;
+        }
+      }
+
       if (task.acceptance)
         prompt += `\n\nAnvil will run the user-authorized acceptance command after your response: ${JSON.stringify(task.acceptance.command)} in ${JSON.stringify(task.acceptance.directory)}. Preserve that command and do not weaken tests merely to pass. Do not claim the check passed unless it actually ran.`;
       for (

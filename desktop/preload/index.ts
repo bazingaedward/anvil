@@ -27,6 +27,8 @@ const api: DesktopAPI = {
   revokeConversationFolder: (id, root) =>
     ipcRenderer.invoke("conversations:revoke-folder", id, root),
   conversations: (drafts) => ipcRenderer.invoke("conversations:list", drafts),
+  forkConversation: (taskID) =>
+    ipcRenderer.invoke("conversations:fork", taskID),
   createConversation: () => ipcRenderer.invoke("conversations:create"),
   updateConversation: (id, patch) =>
     ipcRenderer.invoke("conversations:update", id, patch),

@@ -6,6 +6,7 @@ import { ConversationRow } from "./conversation-row";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   ArrowUp,
+  GitFork,
   Square,
   Shield,
   Paperclip,
@@ -442,6 +443,24 @@ export function ConversationWorkspace({
     });
     setManaging(false);
   }
+  async function fork(task: AgentTask) {
+    setManaging(true);
+    await action(async () => {
+      await pending.current;
+      const next = await window.anvil.forkConversation(task.id);
+      setTasks(await window.anvil.tasks());
+      setDrafts((items) => [next, ...items]);
+      composerDraft.update(
+        { modelID: task.model?.id || composerDraft.modelID, attachments: [] },
+        next.id,
+      );
+      setSelected(next.id);
+      setArchived(false);
+      setOnlyPinned(false);
+      input.current?.focus();
+    });
+    setManaging(false);
+  }
   async function archive(target = draft) {
     setManaging(true);
     await action(async () => {
@@ -527,7 +546,7 @@ export function ConversationWorkspace({
                 disabled={!loaded || managing || sending}
               >
                 <Plus size={16} />
-                New conversation
+                New chat
               </button>
               <div className="sidebar-list-heading">
                 <select
@@ -753,7 +772,6 @@ export function ConversationWorkspace({
                       </div>
                     )}
                   </div>
-                  <div className="response-heading">Anvil</div>
                   {task.text && (
                     <div className="agent-response">{task.text}</div>
                   )}
@@ -794,6 +812,19 @@ export function ConversationWorkspace({
                             ? "Limit reached"
                             : task.status}
                     </small>
+                  )}
+                  {task.text && task.status !== "running" && (
+                    <div className="answer-actions">
+                      <button
+                        title="Fork chat from this answer"
+                        aria-label="Fork chat from this answer"
+                        disabled={managing || sending || !!running}
+                        onClick={() => void fork(task)}
+                      >
+                        <GitFork size={15} />
+                        <span>Fork</span>
+                      </button>
+                    </div>
                   )}
                   {task.acceptance && (
                     <details className="acceptance-results">
