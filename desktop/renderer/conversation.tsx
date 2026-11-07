@@ -36,6 +36,7 @@ export function ConversationWorkspace({
   sidebarOpen,
   tools,
   review,
+  panelToggle,
   terminalOpen,
   onTerminal,
   onSelectDirectory,
@@ -44,6 +45,7 @@ export function ConversationWorkspace({
   sidebarOpen: boolean;
   tools: ReactNode;
   review: ReactNode;
+  panelToggle: ReactNode;
   terminalOpen: boolean;
   onTerminal: () => void;
   onOpen: () => void;
@@ -748,6 +750,7 @@ export function ConversationWorkspace({
                   </button>
                 </div>
               </details>
+              {panelToggle}
             </header>
             <section
               className={`conversation-body ${conversationTasks.length ? "has-tasks" : ""}`}

@@ -2573,3 +2573,31 @@ kbd {
   flex: 1;
   min-width: 0;
 }
+
+.conversation-toolbar .right-panel-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 24px;
+  padding: 0;
+  margin-left: 10px;
+  border-radius: 5px;
+  color: #aaa;
+  background: transparent;
+}
+.conversation-toolbar .right-panel-toggle:hover,
+.conversation-toolbar .right-panel-toggle[aria-expanded="true"] {
+  background: #353535;
+  color: #eee;
+}
+.conversation-toolbar .right-panel-toggle:disabled {
+  opacity: 0.4;
+}
+
+.conversation-toolbar .right-panel-toggle {
+  width: 30px;
+  height: 30px;
+  margin-left: 6px;
+  flex-shrink: 0;
+}

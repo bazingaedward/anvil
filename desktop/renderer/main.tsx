@@ -24,6 +24,7 @@ import {
   Search,
   Menu as MenuIcon,
   PanelLeft,
+  PanelRight,
 } from "lucide-react";
 import type {
   DesktopAPI,
@@ -467,7 +468,6 @@ function App() {
     setTerminalStarted(true);
     if (reviewOpen && !terminalHidden) {
       setReviewOpen(false);
-      setTerminalHidden(true);
     } else {
       setTerminalHidden(false);
       setReviewOpen(true);
@@ -675,6 +675,7 @@ function App() {
         )}
         <aside
           hidden={!reviewOpen}
+          id="workspace-panel"
           className="review-panel"
           aria-label="Workspace panel"
           style={{ width: sidebarWidth }}
@@ -718,7 +719,6 @@ function App() {
               aria-label="Close workspace panel"
               onClick={() => {
                 setReviewOpen(false);
-                setTerminalHidden(true);
               }}
             >
               <X size={15} />
@@ -789,16 +789,37 @@ function App() {
         repo={repo}
         onOpen={() => void openRepository()}
         onSelectDirectory={(root) => void openRepository(root)}
-        terminalOpen={!terminalHidden}
+        terminalOpen={reviewOpen && !terminalHidden}
         onTerminal={toggleTerminal}
         review={review}
+        panelToggle={
+          <button
+            className="right-panel-toggle"
+            aria-label={
+              reviewOpen ? "Collapse right panel" : "Expand right panel"
+            }
+            title={
+              !repo
+                ? "Add a folder to use the workspace panel"
+                : reviewOpen
+                  ? "Collapse right panel"
+                  : "Expand right panel"
+            }
+            aria-expanded={reviewOpen}
+            aria-controls="workspace-panel"
+            disabled={!repo}
+            onClick={() => setReviewOpen((open) => !open)}
+          >
+            <PanelRight size={16} />
+          </button>
+        }
         tools={
           <>
             <button
               onClick={() => toggleReview("files")}
               disabled={!repo}
               aria-label="Open files"
-              aria-pressed={reviewOpen && view === "files"}
+              aria-pressed={reviewOpen && terminalHidden && view === "files"}
             >
               <Folder size={15} />
               <span>Files</span>
@@ -812,7 +833,7 @@ function App() {
                   ? "Select a Git repository folder to review changes"
                   : "Review changes"
               }
-              aria-pressed={reviewOpen && view === "changes"}
+              aria-pressed={reviewOpen && terminalHidden && view === "changes"}
             >
               <GitCompareArrows size={15} />
               <span>Changes</span>
@@ -823,32 +844,6 @@ function App() {
           </>
         }
       />
-      {
-        <footer className="status-bar">
-          <span>
-            {repo ? (
-              <>
-                {repo.git !== false && <GitBranch size={12} />}
-                {repo.branch || "Folder"}
-                <span className="status-separator" />
-                {changes.length} changed{" "}
-                {changes.length === 1 ? "file" : "files"}
-              </>
-            ) : (
-              "Local coding workspace"
-            )}
-          </span>
-          <span>
-            {busy
-              ? "Working…"
-              : dirty
-                ? "Unsaved changes"
-                : document
-                  ? `${language(document.path)} · UTF-8`
-                  : ""}
-          </span>
-        </footer>
-      }
     </div>
   );
 }
