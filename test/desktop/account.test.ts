@@ -18,9 +18,14 @@ test("account login keeps token out of renderer state, serializes revisions, pre
     preferences: { defaultModelID: defaultModel.id },
   };
   const puts: number[] = [];
-  globalThis.fetch = async (input, options) => {
+  globalThis.fetch = async () => {
+    throw new Error("Node fetch must not bypass the injected account transport");
+  };
+  const fetchAccount: typeof fetch = async (input, options) => {
     const url = String(input);
     assert.ok(url.startsWith(CLOUD_URL + "/"));
+    assert.equal(options?.redirect, "error");
+    assert.ok(options?.signal instanceof AbortSignal);
     const route = url.slice(CLOUD_URL.length);
     const body = options?.body ? JSON.parse(String(options.body)) : undefined;
     if (route === "/auth/start") {
@@ -62,6 +67,7 @@ test("account login keeps token out of renderer state, serializes revisions, pre
       root,
       (v) => Buffer.from(v),
       (b) => b.toString(),
+      fetchAccount,
     );
     await assert.rejects(account.require(), /Sign in/);
     await account.begin();

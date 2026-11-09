@@ -20,6 +20,8 @@ export class Account {
     private root: string,
     private encrypt: (value: string) => Buffer,
     private decrypt: (value: Buffer) => string,
+    private fetchAccount: (url: string, options: RequestInit) => Promise<Response> =
+      globalThis.fetch,
   ) {
     try {
       this.token = this.decrypt(
@@ -44,7 +46,7 @@ export class Account {
     data?: unknown,
     anonymous = false,
   ): Promise<T> {
-    const response = await fetch(CLOUD_URL + route, {
+    const response = await this.fetchAccount(CLOUD_URL + route, {
       method,
       headers: {
         "Content-Type": "application/json",

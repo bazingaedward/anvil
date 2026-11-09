@@ -11,6 +11,7 @@ import {
   dialog,
   ipcMain,
   Menu,
+  net,
   safeStorage,
   shell,
 } from "electron";
@@ -753,6 +754,7 @@ app.whenReady().then(() => {
       return safeStorage.encryptString(value);
     },
     (value) => safeStorage.decryptString(value),
+    (url, options) => net.fetch(url, options),
   );
   const icon = path.join(app.getAppPath(), "assets", "icon.png");
   if (process.platform === "darwin") app.dock?.setIcon(icon);
