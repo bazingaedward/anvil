@@ -1,3 +1,4 @@
+import { codexModel } from "../shared/providers";
 import { ModelPicker } from "./model-picker";
 import { useComposerDraft } from "./composer-draft";
 import type { ModelProfile, Attachment } from "../shared/api";
@@ -811,9 +812,8 @@ export function ConversationWorkspace({
                               ? "Checking…"
                               : task.phase === "repairing"
                                 ? `Repairing · ${(task.round || 1) - 1}/${task.acceptance?.maxRepairs}`
-                                : task.text
-                                  ? "Continuing…"
-                                  : "Working…"}
+                                : task.activity ||
+                                  (task.text ? "Continuing…" : "Working…")}
                       </span>
                     </div>
                   ) : (
@@ -1088,7 +1088,11 @@ export function ConversationWorkspace({
                     <select
                       className="permission-mode"
                       aria-label="Permission mode"
-                      title="Ask: confirm edits and commands. Auto: allow scoped file edits, ask for commands and unknown operations. Full access: approve all tools."
+                      title={
+                        selectedModel?.id === codexModel.id
+                          ? "Codex — Ask: read-only sandbox, approve escalation. Auto: sandboxed commands and workspace edits, approve escalation. Full access: no sandbox or approval. Codex may read outside attached folders."
+                          : "Ask: confirm edits and commands. Auto: allow scoped file edits, ask for commands and unknown operations. Full access: approve all tools."
+                      }
                       value={draft.permissionMode || "ask"}
                       disabled={readOnly || sending || !!running || managing}
                       onChange={(event) =>

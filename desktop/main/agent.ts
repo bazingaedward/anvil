@@ -1,5 +1,6 @@
 import { defaultModel, type StoredAttachment } from "./composer";
 import type { ModelProfile } from "../shared/api";
+import { codexModel } from "../shared/providers";
 import { allowsOperation } from "./folder-access";
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { createInterface } from "node:readline";
@@ -24,6 +25,7 @@ import {
 type RecordTask = StoredTask;
 type Active = {
   attachments?: StoredAttachment[];
+  managedProxy?: string;
   task: RecordTask;
   abort: AbortController;
   child?: ChildProcessWithoutNullStreams;
@@ -50,6 +52,7 @@ export class Agent {
     private credentials: Record<string, string | undefined>,
     private args: string[] = [],
     private taskTimeoutMs = TASK_TIMEOUT,
+    private managedRuntime?: { executable: string; args: string[] },
   ) {
     this.state = path.join(storage, "conversations");
     mkdirSync(this.state, { recursive: true });
@@ -197,7 +200,11 @@ export class Agent {
     directories: string[] = [this.repo],
     activeDirectory = this.repo,
     acceptance?: AcceptanceOptions,
-    options?: { model: ModelProfile; attachments: StoredAttachment[] },
+    options?: {
+      model: ModelProfile;
+      attachments: StoredAttachment[];
+      managedProxy?: string;
+    },
   ) {
     if (
       typeof conversationID !== "string" ||
@@ -210,18 +217,25 @@ export class Agent {
       throw new Error("Invalid task.");
     if (this.active)
       throw new Error("Wait for the current task to finish or cancel it.");
-    if (!existsSync(this.executable))
-      throw new Error(
-        "Agent runtime is not installed. Run npm run runtime:build.",
-      );
     const model = options?.model || defaultModel;
-    if (
-      !this.credentials[model.keyRef] ||
-      !(model.endpoint || this.credentials.BYTEPLUS_ARK_RESPONSES_URL)
-    )
-      throw new Error(
-        `Start Anvil through keygrant with ${model.keyRef} and the model API URL.`,
-      );
+    if (model.id === codexModel.id) {
+      if (!this.managedRuntime || !existsSync(this.managedRuntime.executable))
+        throw new Error(
+          "The local Codex adapter is not installed. Update Anvil.",
+        );
+    } else {
+      if (!existsSync(this.executable))
+        throw new Error(
+          "Agent runtime is not installed. Run npm run runtime:build.",
+        );
+      if (
+        !this.credentials[model.keyRef] ||
+        !(model.endpoint || this.credentials.BYTEPLUS_ARK_RESPONSES_URL)
+      )
+        throw new Error(
+          `Start Anvil through keygrant with ${model.keyRef} and the model API URL.`,
+        );
+    }
     if (
       !model.vision &&
       options?.attachments.some((item) => item.mime.startsWith("image/"))
@@ -242,6 +256,13 @@ export class Agent {
     const previous = [...this.tasks]
       .reverse()
       .find((task) => task.conversationID === conversationID && task.sessionID);
+    if (
+      previous &&
+      (previous.model?.id === codexModel.id) !== (model.id === codexModel.id)
+    )
+      throw new Error(
+        "Start a new chat or fork this chat to switch between local Codex and API models.",
+      );
     // A folderless conversation gets its own cwd, without granting folder access.
     // The worker moves the existing SDK session when folders change.
     const directory = directories.length
@@ -274,6 +295,7 @@ export class Agent {
     };
     const active: Active = {
       attachments: options?.attachments,
+      managedProxy: options?.managedProxy,
       task,
       abort: new AbortController(),
       limit: false,
@@ -290,6 +312,7 @@ export class Agent {
     active.task.status = status;
     active.task.error = error;
     active.task.phase = undefined;
+    active.task.activity = undefined;
     active.task.permissions = [];
     if (this.active === active) this.active = undefined;
     this.publish(active.task);
@@ -335,6 +358,7 @@ export class Agent {
         if (abort.signal.aborted) break;
         task.round = round;
         task.phase = round === 1 ? "working" : "repairing";
+        task.activity = undefined;
         if (round > 1) task.text += `\n\n— Repair ${round - 1} —\n\n`;
         this.publish(task);
         const result = await this.modelRound(active, prompt, directories);
@@ -406,20 +430,32 @@ export class Agent {
         resolve({ status: "cancelled" });
         return;
       }
+      const managed = task.model?.id === codexModel.id;
       const env = executionEnvironment();
-      for (const name of ["HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY"])
+      for (const name of ["HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "NO_PROXY"])
         if (process.env[name]) env[name] = process.env[name]!;
-      env.ANVIL_MODEL_API_KEY =
-        this.credentials[task.model?.keyRef || defaultModel.keyRef]!;
-      env.ANVIL_MODEL_ENDPOINT =
-        task.model?.endpoint || this.credentials.BYTEPLUS_ARK_RESPONSES_URL!;
-      const child = spawn(this.executable, this.args, {
-        cwd: task.directory,
-        env,
-        windowsHide: true,
-        detached: process.platform !== "win32",
-        stdio: "pipe",
-      });
+      if (managed) {
+        env.ELECTRON_RUN_AS_NODE = "1";
+        if (process.env.CODEX_HOME) env.CODEX_HOME = process.env.CODEX_HOME;
+        if (active.managedProxy)
+          env.HTTPS_PROXY = env.HTTP_PROXY = active.managedProxy;
+      } else {
+        env.ANVIL_MODEL_API_KEY =
+          this.credentials[task.model?.keyRef || defaultModel.keyRef]!;
+        env.ANVIL_MODEL_ENDPOINT =
+          task.model?.endpoint || this.credentials.BYTEPLUS_ARK_RESPONSES_URL!;
+      }
+      const child = spawn(
+        managed ? this.managedRuntime!.executable : this.executable,
+        managed ? this.managedRuntime!.args : this.args,
+        {
+          cwd: task.directory,
+          env,
+          windowsHide: true,
+          detached: process.platform !== "win32",
+          stdio: "pipe",
+        },
+      );
       active.child = child;
       let result: RoundResult | undefined,
         settled = false,
@@ -428,6 +464,7 @@ export class Agent {
       const finish = () => {
         if (settled) return;
         settled = true;
+        if (managed) killProcessTree(child);
         if (shutdown) clearTimeout(shutdown);
         if (hardStop) clearTimeout(hardStop);
         abort.signal.removeEventListener("abort", cancel);
@@ -482,6 +519,11 @@ export class Agent {
             if (task.text.length + message.text.length > 1024 * 1024)
               throw new Error("Response too long");
             task.text += this.redact(message.text);
+          } else if (
+            message.type === "activity" &&
+            typeof message.text === "string"
+          ) {
+            task.activity = this.redact(message.text.slice(0, 200));
           } else if (
             message.type === "permission" &&
             typeof message.permission?.id === "string" &&
@@ -555,6 +597,7 @@ export class Agent {
           type: "start",
           repo: task.directory,
           directories,
+          permissionMode: this.store.get(task.conversationID).permissionMode,
           state: task.runtimeState,
           sessionID: task.sessionID,
           model: task.model,

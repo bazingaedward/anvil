@@ -3,7 +3,14 @@ import react from "@vitejs/plugin-react";
 import { resolve } from "node:path";
 export default defineConfig({
   main: {
-    build: { rollupOptions: { input: resolve("desktop/main/index.ts") } },
+    build: {
+      rollupOptions: {
+        input: {
+          index: resolve("desktop/main/index.ts"),
+          "codex-worker": resolve("desktop/main/codex-worker.ts"),
+        },
+      },
+    },
   },
   preload: {
     build: {

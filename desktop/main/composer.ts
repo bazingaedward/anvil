@@ -1,4 +1,4 @@
-import { modelBaseURL, protocols } from "../shared/providers";
+import { codexModel, modelBaseURL, protocols } from "../shared/providers";
 import {
   mkdirSync,
   readFileSync,
@@ -23,6 +23,10 @@ export type StoredAttachment = Attachment & { content: string };
 export function validateModel(value: ModelProfile): ModelProfile {
   if (!value || typeof value !== "object")
     throw new Error("Invalid model configuration.");
+  if (value.id === codexModel.id)
+    throw new Error(
+      "The local Codex executor cannot be edited as an API model.",
+    );
   for (const field of ["id", "name", "model", "provider", "keyRef"] as const)
     if (
       typeof value[field] !== "string" ||

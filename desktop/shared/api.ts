@@ -87,6 +87,7 @@ export type AgentTask = {
   text: string;
   status:
     "running" | "completed" | "unverified" | "cancelled" | "failed" | "limit";
+  activity?: string;
   phase?: "working" | "checking" | "repairing" | "stopping";
   round?: number;
   acceptance?: AcceptanceOptions;

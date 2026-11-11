@@ -1,3 +1,4 @@
+import { codexModel } from "../shared/providers";
 import { probeModel } from "./model-probe";
 import { Account } from "./account";
 import { createHash, randomUUID } from "node:crypto";
@@ -19,6 +20,7 @@ import {
   Menu,
   net,
   safeStorage,
+  session,
   shell,
 } from "electron";
 import { readFile, writeFile } from "node:fs/promises";
@@ -73,6 +75,12 @@ function currentAgent() {
       if (!window.isDestroyed()) window.webContents.send("agent:task", task);
     },
     providerCredentials,
+    [],
+    undefined,
+    {
+      executable: process.execPath,
+      args: [path.join(here, "codex-worker.js")],
+    },
   ));
 }
 let terminal: pty.IPty | undefined;
@@ -578,7 +586,8 @@ function registerIPC() {
     await executor.deleteConversation(id);
     return true;
   });
-  handle("composer:models", () => composerStore.models());
+  const availableModels = () => [...composerStore.models(), codexModel];
+  handle("composer:models", availableModels);
   handle(
     "composer:save-model",
     async (value: import("../shared/api").ModelProfile) => {
@@ -587,10 +596,12 @@ function registerIPC() {
         ...c,
         models: [...c.models.filter((m) => m.id !== profile.id), profile],
       }));
-      return composerStore.models();
+      return availableModels();
     },
   );
   handle("composer:delete-model", async (id: string) => {
+    if (id === codexModel.id)
+      throw new Error("The local Codex executor cannot be removed.");
     await changeConfig((c) => {
       c.models = c.models.filter((m) => m.id !== id);
       if (!c.models.length) throw new Error("Keep at least one model.");
@@ -598,7 +609,7 @@ function registerIPC() {
         c.preferences.defaultModelID = c.models[0].id;
       return c;
     });
-    return composerStore.models();
+    return availableModels();
   });
   handle("composer:upload", (name: string, bytes: Uint8Array) =>
     composerStore.attach(name, bytes),
@@ -647,12 +658,33 @@ function registerIPC() {
   });
   handle(
     "agent:start",
-    (
+    async (
       id: string,
       text: string,
       acceptance?: AcceptanceOptions,
       options?: import("../shared/api").MessageOptions,
     ) => {
+      const userAtStart = activeUser;
+      const modelID =
+        options?.modelID || account.snapshot?.config.preferences.defaultModelID;
+      const model =
+        modelID === codexModel.id ? codexModel : composerStore.model(modelID);
+      let managedProxy: string | undefined;
+      if (
+        model.id === codexModel.id &&
+        !process.env.HTTPS_PROXY &&
+        !process.env.ALL_PROXY
+      ) {
+        const proxy = await session.defaultSession.resolveProxy(
+          "https://chatgpt.com",
+        );
+        const first = proxy.split(";")[0].trim();
+        const match = /^(PROXY|HTTPS|SOCKS5?|SOCKS) (\S+)$/.exec(first);
+        if (match)
+          managedProxy = `${match[1] === "PROXY" ? "http" : match[1] === "HTTPS" ? "https" : "socks5h"}://${match[2]}`;
+      }
+      if (activeUser !== userAtStart || !account.user)
+        throw new Error("The account changed. Send the message again.");
       const executor = currentAgent();
       const folders =
         executor.conversations().conversations.find((item) => item.id === id)
@@ -664,10 +696,8 @@ function registerIPC() {
         folders.includes(workspace?.root || "") ? workspace!.root : folders[0],
         acceptance,
         {
-          model: composerStore.model(
-            options?.modelID ||
-              account.snapshot?.config.preferences.defaultModelID,
-          ),
+          model,
+          managedProxy,
           attachments: composerStore.attachments(options?.attachmentIDs),
         },
       );

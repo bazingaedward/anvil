@@ -1,4 +1,4 @@
-import { providerPresets, protocols } from "../shared/providers";
+import { codexModel, providerPresets, protocols } from "../shared/providers";
 import { accountScope } from "./account";
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown, X, Plus, Check } from "lucide-react";
@@ -142,13 +142,15 @@ export function ModelPicker({
                   </span>
                   {model.id === value && <Check size={15} />}
                 </button>
-                <button
-                  disabled={disabled}
-                  aria-label={`Configure ${model.name}`}
-                  onClick={() => edit(model)}
-                >
-                  ···
-                </button>
+                {model.id !== codexModel.id && (
+                  <button
+                    disabled={disabled}
+                    aria-label={`Configure ${model.name}`}
+                    onClick={() => edit(model)}
+                  >
+                    ···
+                  </button>
+                )}
               </div>
             ))}
           <button
@@ -340,7 +342,7 @@ export function ModelPicker({
                 type="button"
                 disabled={
                   busy ||
-                  models.length < 2 ||
+                  models.filter((m) => m.id !== codexModel.id).length < 2 ||
                   !models.some((m) => m.id === editing.id)
                 }
                 onClick={async () => {
