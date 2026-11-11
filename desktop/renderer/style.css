@@ -1826,6 +1826,8 @@ kbd {
   margin: 12px 24px;
 }
 .review-spinning {
+  transform-box: view-box;
+  transform-origin: center;
   animation: review-spin 1s linear infinite;
 }
 @keyframes review-spin {
@@ -2629,12 +2631,23 @@ kbd {
   gap: 12px;
   color: #ccc;
   font-size: 16px;
+}
+.review-fetch-notice > div > span:last-child {
+  min-width: 0;
   overflow-wrap: anywhere;
   max-height: 180px;
   overflow-y: auto;
 }
-.review-fetch-notice svg {
-  flex-shrink: 0;
+.review-fetch-spinner {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  overflow: hidden;
+}
+.review-fetch-spinner svg {
+  display: block;
 }
 .review-fetch-notice [role="alert"] {
   color: #efa28f;

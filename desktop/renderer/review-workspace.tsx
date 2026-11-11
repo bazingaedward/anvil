@@ -186,9 +186,7 @@ function RepositoryReview({ root, active }: { root: string; active: boolean }) {
       await window.anvil.fetchRemotes(root);
       clear();
       await refresh(true);
-      setFetchNotice(
-        (notice) => notice && { message: "Remote updates fetched." },
-      );
+      setFetchNotice(null);
     } catch (e) {
       setFetchNotice({ message: String(e), failed: true });
     } finally {
@@ -311,11 +309,9 @@ function RepositoryReview({ root, active }: { root: string; active: boolean }) {
         <div className="review-fetch-notice">
           <div role={fetchNotice.failed ? "alert" : "status"}>
             {fetching && (
-              <RefreshCw
-                size={22}
-                className="review-spinning"
-                aria-hidden="true"
-              />
+              <span className="review-fetch-spinner" aria-hidden="true">
+                <RefreshCw size={20} className="review-spinning" />
+              </span>
             )}
             <span>{fetchNotice.message}</span>
           </div>
