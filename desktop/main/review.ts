@@ -97,3 +97,15 @@ export async function reviewPatch(root: string, head: string, base?: string) {
       ];
   return (await git(root, args)).toString();
 }
+
+export async function fetchRemotes(root: string): Promise<void> {
+  if (!(await Workspace.open(root).then((workspace) => workspace.status())).git)
+    throw new Error("Open the repository root to fetch remotes.");
+  if (!(await git(root, ["remote"])).toString().trim())
+    throw new Error("No remotes configured for this repository.");
+  await git(
+    root,
+    ["fetch", "--all", "--no-prune", "--no-recurse-submodules"],
+    120_000,
+  );
+}

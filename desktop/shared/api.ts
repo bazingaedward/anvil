@@ -182,6 +182,7 @@ export interface DesktopAPI {
 
   openReviewRepository(): Promise<string | null>;
   reviewStatus(root: string): Promise<RepoState>;
+  fetchRemotes(root: string): Promise<void>;
   reviewHistory(
     root: string,
     limit: number,

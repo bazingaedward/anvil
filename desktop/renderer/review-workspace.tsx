@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
+  CloudDownload,
   FolderGit2,
   GitBranch,
   RefreshCw,
@@ -147,6 +148,9 @@ function RepositoryReview({ root, active }: { root: string; active: boolean }) {
   const [base, setBase] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [fetching, setFetching] = useState(false);
+  const [fetchMessage, setFetchMessage] = useState("");
+  const fetchPending = useRef(false);
   const [detailBusy, setDetailBusy] = useState(false);
   const request = useRef(0),
     refreshRequest = useRef(0);
@@ -166,6 +170,24 @@ function RepositoryReview({ root, active }: { root: string; active: boolean }) {
       if (id === refreshRequest.current) setError(String(e));
     } finally {
       if (id === refreshRequest.current) setBusy(false);
+    }
+  }
+  async function fetchRemoteUpdates() {
+    if (fetchPending.current) return;
+    fetchPending.current = true;
+    setFetching(true);
+    setFetchMessage("");
+    setError("");
+    try {
+      await window.anvil.fetchRemotes(root);
+      setFetchMessage("Remote updates fetched.");
+      clear();
+      await refresh();
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      fetchPending.current = false;
+      setFetching(false);
     }
   }
   useEffect(() => {
@@ -256,18 +278,34 @@ function RepositoryReview({ root, active }: { root: string; active: boolean }) {
             <GitBranch size={14} /> {state?.branch}
           </span>
         </div>
-        <button
-          title="Refresh repository"
-          aria-label="Refresh repository"
-          disabled={busy}
-          onClick={() => {
-            clear();
-            void refresh();
-          }}
-        >
-          <RefreshCw size={17} className={busy ? "review-spinning" : ""} />
-        </button>
+        <div className="review-actions">
+          <button
+            title="Fetch remote updates"
+            aria-label="Fetch remote updates"
+            aria-busy={fetching}
+            disabled={busy || fetching}
+            onClick={() => void fetchRemoteUpdates()}
+          >
+            <CloudDownload size={19} />
+          </button>
+          <button
+            title="Refresh repository"
+            aria-label="Refresh repository"
+            disabled={busy || fetching}
+            onClick={() => {
+              clear();
+              void refresh();
+            }}
+          >
+            <RefreshCw size={17} className={busy ? "review-spinning" : ""} />
+          </button>
+        </div>
       </header>
+      {(fetching || fetchMessage) && (
+        <p role="status" className="review-muted">
+          {fetching ? "Fetching remote updates…" : fetchMessage}
+        </p>
+      )}
       <nav className="review-views">
         {[
           ["history", "Commit graph"],

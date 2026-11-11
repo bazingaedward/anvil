@@ -3,7 +3,7 @@ import { Account } from "./account";
 import { createHash, randomUUID } from "node:crypto";
 import { mkdir, cp, access } from "node:fs/promises";
 import { ComposerStore, validateModel } from "./composer";
-import { reviewHistory, reviewPatch } from "./review";
+import { fetchRemotes, reviewHistory, reviewPatch } from "./review";
 import { realpath } from "node:fs/promises";
 import {
   app,
@@ -343,6 +343,10 @@ function registerIPC() {
       return reviewHistory(root, limit, options);
     },
   );
+  handle("review:fetch", async (root: string) => {
+    await reviewWorkspace(root);
+    await fetchRemotes(root);
+  });
   handle("review:patch", async (root: string, head: string, base?: string) => {
     await reviewWorkspace(root);
     return reviewPatch(root, head, base);

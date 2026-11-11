@@ -21,7 +21,11 @@ const MAX_TEXT = 2 * 1024 * 1024;
 const version = (data: Buffer) =>
   createHash("sha256").update(data).digest("hex");
 
-export function git(root: string, args: string[]): Promise<Buffer> {
+export function git(
+  root: string,
+  args: string[],
+  timeout = 15_000,
+): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     execFile(
       "git",
@@ -29,7 +33,7 @@ export function git(root: string, args: string[]): Promise<Buffer> {
       {
         encoding: "buffer",
         maxBuffer: 8 * 1024 * 1024,
-        timeout: 15_000,
+        timeout,
         windowsHide: true,
         env: {
           ...process.env,
