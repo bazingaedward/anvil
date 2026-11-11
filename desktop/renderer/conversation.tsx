@@ -1,3 +1,4 @@
+import { AgentQuestions } from "./agent-questions";
 import { codexModel } from "../shared/providers";
 import { ModelPicker } from "./model-picker";
 import { useComposerDraft } from "./composer-draft";
@@ -793,6 +794,25 @@ export function ConversationWorkspace({
                   {task.text && (
                     <div className="agent-response">{task.text}</div>
                   )}
+                  {task.questions?.map((group) => (
+                    <AgentQuestions
+                      key={group.id}
+                      group={group}
+                      disabled={readOnly || sending || !!running || managing}
+                      onAnswer={async (values) => {
+                        setSending(true);
+                        try {
+                          await window.anvil.answerQuestions(
+                            task.id,
+                            group.id,
+                            values,
+                          );
+                        } finally {
+                          setSending(false);
+                        }
+                      }}
+                    />
+                  ))}
                   {task.status === "running" ? (
                     <div
                       className="agent-progress"
@@ -824,7 +844,13 @@ export function ConversationWorkspace({
                       {task.status === "completed"
                         ? "Acceptance passed"
                         : task.status === "unverified"
-                          ? "Finished · not verified"
+                          ? task.questions?.some(
+                              (group) => !group.answer && !group.readOnly,
+                            )
+                            ? "Waiting for your answer"
+                            : task.questions?.length
+                              ? "Finished"
+                              : "Finished · not verified"
                           : task.status === "limit"
                             ? "Limit reached"
                             : task.status}

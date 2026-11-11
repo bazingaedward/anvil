@@ -12,6 +12,7 @@ import type {
 } from "../shared/api";
 
 export type StoredTask = AgentTask & {
+  questionReply?: { taskID: string; questionID: string; answers: string[] };
   forkedFrom?: string;
   sessionID?: string;
   directory?: string;

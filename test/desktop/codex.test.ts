@@ -34,6 +34,10 @@ require('node:readline').createInterface({input:process.stdin}).on('line',line=>
  if(m.method==='turn/start') {
    reply({turn:{id:'turn-1'}});note('turn/started',{turn:{id:'turn-1'}});
    const text=m.params.input[0].text;
+   if(text.includes('ASYNC_DEMO')) {
+     const item={type:'agentMessage',id:'ask-1',delivery:'async',text:'Pick a task',questions:[{title:'Pick a task',options:['Review','Test']}]};
+     note('item/started',{item});note('item/completed',{item});finish('completed');return;
+   }
    if(text.includes('CRASH')) {process.exit(7);return;}
    if(text.includes('WAIT')) {note('item/started',{item:{type:'commandExecution'}});return;}
    const method=text.includes('ASK_COMMAND')?'item/commandExecution/requestApproval':text.includes('ASK_FILE')?'item/fileChange/requestApproval':text.includes('ASK_PERMISSIONS')?'item/permissions/requestApproval':text.includes('UNKNOWN')?'item/tool/requestUserInput':null;
@@ -316,4 +320,16 @@ test("managed tasks run without an API runtime/key, persist sessions, isolate ba
     await new Promise((r) => setTimeout(r, 20));
   assert.equal(restored.list().at(-1)!.status, "failed");
   assert.match(restored.list().at(-1)!.error!, /denied/);
+});
+
+test("Codex forwards structured asynchronous questions even without text deltas", async (t) => {
+  const f = fixture(t);
+  const events = await run(f.root, "ASYNC_DEMO");
+  const questions = events.filter((event) => event.type === "questions");
+  assert.equal(questions.length, 2); // the Agent owns idempotent persistence
+  assert.deepEqual(questions[0].group, {
+    id: "ask-1",
+    questions: [{ title: "Pick a task", options: ["Review", "Test"] }],
+  });
+  assert.equal(events.at(-1).status, "completed");
 });

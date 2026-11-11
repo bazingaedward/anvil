@@ -2781,3 +2781,119 @@ kbd {
 .review-remove-notice button {
   flex-shrink: 0;
 }
+
+/* Structured questions stay in the conversation after the agent's turn ends. */
+.agent-questions {
+  max-width: 720px;
+  margin: 20px 0;
+  padding: 20px;
+  border: 1px solid #454545;
+  border-radius: 14px;
+  background: #232323;
+}
+.agent-questions > header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 18px;
+  color: #aaa;
+  font-size: 13px;
+}
+.agent-questions fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0 0 20px;
+  min-width: 0;
+}
+.agent-questions legend,
+.question-answers strong {
+  font-size: 15px;
+  line-height: 1.5;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.question-options {
+  display: grid;
+  gap: 8px;
+  margin: 14px 0 10px;
+}
+.question-options label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 13px;
+  border: 1px solid #454545;
+  border-radius: 9px;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+.question-options label:hover {
+  background: #303030;
+}
+.question-options label.selected {
+  border-color: #829ac4;
+  background: #29364b;
+}
+.question-options input {
+  flex: none;
+  accent-color: #a8c7fa;
+}
+.agent-questions textarea {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  resize: vertical;
+  min-height: 64px;
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid #454545;
+  border-radius: 9px;
+  background: #1d1d1d;
+  color: inherit;
+  font: inherit;
+  font-size: 14px;
+}
+.agent-questions textarea:focus-visible {
+  outline: 2px solid #829ac4;
+  outline-offset: 2px;
+}
+.agent-questions footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.agent-questions footer span {
+  font-size: 12px;
+  color: #aaa;
+}
+.agent-questions footer button {
+  flex: none;
+  padding: 9px 16px;
+  border: 0;
+  border-radius: 8px;
+  background: #e8e8e8;
+  color: #222;
+  cursor: pointer;
+}
+.agent-questions footer button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.question-answers p {
+  display: flex;
+  gap: 8px;
+  margin: 8px 0 16px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.question-answers svg {
+  flex: none;
+  margin-top: 3px;
+  color: #91bd9d;
+}
+.question-error {
+  color: #efab9d;
+  font-size: 13px;
+}

@@ -58,6 +58,8 @@ const api: DesktopAPI = {
   showApplicationMenu: () => ipcRenderer.invoke("window:menu"),
   selectDirectory: (root) => ipcRenderer.invoke("workspace:select", root),
   tasks: () => ipcRenderer.invoke("agent:tasks"),
+  answerQuestions: (task, question, answers) =>
+    ipcRenderer.invoke("agent:answer-questions", task, question, answers),
   startTask: (id, text, acceptance, options) =>
     ipcRenderer.invoke("agent:start", id, text, acceptance, options),
   cancelTask: (id) => ipcRenderer.invoke("agent:cancel", id),

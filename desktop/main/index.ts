@@ -231,6 +231,18 @@ async function changeConfig(change: Parameters<Account["mutate"]>[0]) {
   announceAccount();
   return state;
 }
+async function codexProxy() {
+  if (process.env.HTTPS_PROXY || process.env.ALL_PROXY) return undefined;
+  const proxy = await session.defaultSession.resolveProxy(
+    "https://chatgpt.com",
+  );
+  const match = /^(PROXY|HTTPS|SOCKS5?|SOCKS) (\S+)$/.exec(
+    proxy.split(";")[0].trim(),
+  );
+  return match
+    ? `${match[1] === "PROXY" ? "http" : match[1] === "HTTPS" ? "https" : "socks5h"}://${match[2]}`
+    : undefined;
+}
 function registerIPC() {
   const trusted = (
     event: Electron.IpcMainEvent | Electron.IpcMainInvokeEvent,
@@ -669,20 +681,8 @@ function registerIPC() {
         options?.modelID || account.snapshot?.config.preferences.defaultModelID;
       const model =
         modelID === codexModel.id ? codexModel : composerStore.model(modelID);
-      let managedProxy: string | undefined;
-      if (
-        model.id === codexModel.id &&
-        !process.env.HTTPS_PROXY &&
-        !process.env.ALL_PROXY
-      ) {
-        const proxy = await session.defaultSession.resolveProxy(
-          "https://chatgpt.com",
-        );
-        const first = proxy.split(";")[0].trim();
-        const match = /^(PROXY|HTTPS|SOCKS5?|SOCKS) (\S+)$/.exec(first);
-        if (match)
-          managedProxy = `${match[1] === "PROXY" ? "http" : match[1] === "HTTPS" ? "https" : "socks5h"}://${match[2]}`;
-      }
+      const managedProxy =
+        model.id === codexModel.id ? await codexProxy() : undefined;
       if (activeUser !== userAtStart || !account.user)
         throw new Error("The account changed. Send the message again.");
       const executor = currentAgent();
@@ -701,6 +701,16 @@ function registerIPC() {
           attachments: composerStore.attachments(options?.attachmentIDs),
         },
       );
+    },
+  );
+  handle(
+    "agent:answer-questions",
+    async (task: string, question: string, answers: string[]) => {
+      const userAtStart = activeUser;
+      const proxy = await codexProxy();
+      if (activeUser !== userAtStart || !account.user)
+        throw new Error("The account changed. Send the answer again.");
+      return currentAgent().answerQuestions(task, question, answers, proxy);
     },
   );
   handle("agent:cancel", (id: string) => currentAgent().cancel(id));

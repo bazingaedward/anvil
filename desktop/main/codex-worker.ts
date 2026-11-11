@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import { createInterface } from "node:readline";
 import { executionEnvironment } from "./acceptance";
+import { parseQuestionGroup } from "./agent-questions";
 import { findCodex } from "./codex-executable";
 import type { PermissionMode } from "../shared/api";
 import type { StoredAttachment } from "./composer";
@@ -163,6 +164,16 @@ async function start(input: Start) {
       } else if (message.id !== undefined) approval(message);
       else if (p.threadId === threadID) {
         if (message.method === "turn/started") turnID = p.turn.id;
+        if (
+          (message.method === "item/started" ||
+            message.method === "item/completed") &&
+          p.item?.type === "agentMessage" &&
+          p.item.questions?.length
+        )
+          send({
+            type: "questions",
+            group: parseQuestionGroup(p.item.id, p.item.questions),
+          });
         if (
           message.method === "item/started" &&
           p.item?.type === "agentMessage"

@@ -11,7 +11,7 @@ Anvil 的直接模型接入依赖 API 凭据和 OpenCode。增加本地 Codex �
 - 保留官方登录数据，由 Codex 自己读取和刷新；不复制、读取或记录凭据，不注入 OpenAI API Key。
 - 映射线程、流式文本、工具活动、审批和结束事件到现有 Anvil 任务协议。只在 turn/completed 成功后结束；复用现有验收命令、修复轮次和任务超时。
 - 会话 ID 按执行后端隔离，继续对话使用 thread/resume；切换执行后端必须明确处理上下文，不把 OpenCode session ID 传给 Codex。
-- 权限采用 Codex sandbox 和 Anvil 审批共同控制，禁止因为适配层缺少处理而默认同意未知请求。取消先发 turn/interrupt，超时后结束进程树。首版不自动执行服务端要求用户填写的复杂表单。
+- 权限采用 Codex sandbox 和 Anvil 审批共同控制，禁止因为适配层缺少处理而默认同意未知请求。取消先发 turn/interrupt，超时后结束进程树。支持异步提问卡片和回答续聊；阻塞式提问与 MCP 复杂表单仍未接入，详见 [交互式提问原理](agent-questions.md)。
 - 目录来自当前会话已授权文件夹；无文件夹使用独立会话工作目录。文本附件按不可信内容传递，图片走 Codex 图片输入。
 
 ## 使用与权限

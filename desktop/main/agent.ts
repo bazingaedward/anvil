@@ -1,6 +1,7 @@
 import { defaultModel, type StoredAttachment } from "./composer";
 import type { ModelProfile } from "../shared/api";
 import { codexModel } from "../shared/providers";
+import { parseQuestionGroup, validateQuestionAnswers } from "./agent-questions";
 import { allowsOperation } from "./folder-access";
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { createInterface } from "node:readline";
@@ -178,8 +179,32 @@ export class Agent {
     this.store.close();
   }
   private view(task: RecordTask): AgentTask {
-    const { sessionID, directory, runtimeState, forkedFrom, ...visible } = task;
-    return structuredClone(visible);
+    const {
+      sessionID,
+      directory,
+      runtimeState,
+      forkedFrom,
+      questionReply,
+      ...visible
+    } = task;
+    const view = structuredClone(visible);
+    if (view.questions)
+      view.questions = view.questions.map((group) => {
+        const reply = this.tasks.find(
+          (item) =>
+            item.conversationID === task.conversationID &&
+            item.questionReply?.taskID === task.id &&
+            item.questionReply.questionID === group.id,
+        );
+        return {
+          ...group,
+          readOnly: !!forkedFrom,
+          answer: reply?.questionReply
+            ? { values: [...reply.questionReply.answers], taskID: reply.id }
+            : undefined,
+        };
+      });
+    return view;
   }
   list() {
     return this.tasks.map((task) => this.view(task));
@@ -204,6 +229,7 @@ export class Agent {
       model: ModelProfile;
       attachments: StoredAttachment[];
       managedProxy?: string;
+      questionReply?: RecordTask["questionReply"];
     },
   ) {
     if (
@@ -275,6 +301,7 @@ export class Agent {
     if (!directories.length) mkdirSync(directory, { recursive: true });
     const task: RecordTask = {
       id: randomUUID(),
+      questionReply: options?.questionReply,
       conversationID,
       prompt: text.trim() || "Please inspect the attached files.",
       model: { ...model },
@@ -307,6 +334,54 @@ export class Agent {
     active.done = this.execute(active, [...directories]);
     return this.view(task);
   }
+  answerQuestions(
+    taskID: string,
+    questionID: string,
+    answers: unknown,
+    managedProxy?: string,
+  ) {
+    const source = this.tasks.find((task) => task.id === taskID);
+    const group = source?.questions?.find((item) => item.id === questionID);
+    if (
+      !source ||
+      !group ||
+      !source.sessionID ||
+      source.forkedFrom ||
+      source.model?.id !== codexModel.id
+    )
+      throw new Error("This question is no longer available in this chat.");
+    if (
+      this.tasks.some(
+        (task) =>
+          task.conversationID === source.conversationID &&
+          task.questionReply?.taskID === taskID &&
+          task.questionReply.questionID === questionID,
+      )
+    )
+      throw new Error("This question has already been answered.");
+    const values = validateQuestionAnswers(group, answers);
+    const folders = this.store.get(source.conversationID).folders || [];
+    const prompt = group.questions
+      .map((question, index) => `${question.title}\n${values[index]}`)
+      .join("\n\n");
+    const reply = this.start(
+      source.conversationID,
+      prompt,
+      folders,
+      folders.includes(source.directory || "") ? source.directory : folders[0],
+      undefined,
+      {
+        model: codexModel,
+        attachments: [],
+        managedProxy,
+        questionReply: { taskID, questionID, answers: values },
+      },
+    );
+    // The new task is the durable receipt. A crash before this notification cannot
+    // make the source question answerable twice when the history is reloaded.
+    this.publish(source);
+    return reply;
+  }
   private finish(active: Active, status: AgentTask["status"], error?: string) {
     if (active.task.status !== "running") return;
     active.task.status = status;
@@ -327,6 +402,8 @@ export class Agent {
     }, this.taskTimeoutMs);
     try {
       let prompt = task.prompt;
+      if (task.questionReply)
+        prompt = `The user is answering your asynchronous question (message ID ${JSON.stringify(task.questionReply.questionID)}). Continue this conversation using the following question/answer pairs:\n\n${prompt}`;
       if (!task.sessionID) {
         const history = this.tasks.filter(
           (item) =>
@@ -338,6 +415,7 @@ export class Agent {
               user: item.prompt,
               assistant: item.text,
               attachments: item.attachments?.map((file) => file.name),
+              questions: item.questions?.map((group) => group.questions),
             })),
           );
           if (transcript.length > 200000)
@@ -519,6 +597,30 @@ export class Agent {
             if (task.text.length + message.text.length > 1024 * 1024)
               throw new Error("Response too long");
             task.text += this.redact(message.text);
+          } else if (
+            message.type === "questions" &&
+            task.model?.id === codexModel.id
+          ) {
+            const group = parseQuestionGroup(
+              message.group?.id,
+              message.group?.questions,
+            );
+            task.questions ||= [];
+            const previous = task.questions.findIndex(
+              (item) => item.id === group.id,
+            );
+            if (previous >= 0) {
+              if (
+                JSON.stringify(task.questions[previous]) ===
+                JSON.stringify(group)
+              )
+                return;
+              task.questions[previous] = group;
+            } else {
+              if (task.questions.length >= 20)
+                throw new Error("Too many question groups.");
+              task.questions.push(group);
+            }
           } else if (
             message.type === "activity" &&
             typeof message.text === "string"

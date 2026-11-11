@@ -78,7 +78,14 @@ export type AgentPermission = {
   resources: string[];
   message?: string;
 };
+export type AgentQuestionGroup = {
+  id: string;
+  questions: { title: string; options?: string[] }[];
+  answer?: { values: string[]; taskID: string };
+  readOnly?: boolean;
+};
 export type AgentTask = {
+  questions?: AgentQuestionGroup[];
   model?: ModelProfile;
   attachments?: Attachment[];
   id: string;
@@ -228,6 +235,11 @@ export interface DesktopAPI {
   showApplicationMenu(): Promise<void>;
   selectDirectory(root: string): Promise<RepoState | null>;
   tasks(): Promise<AgentTask[]>;
+  answerQuestions(
+    taskID: string,
+    questionID: string,
+    answers: string[],
+  ): Promise<AgentTask>;
   startTask(
     conversationID: string,
     text: string,
