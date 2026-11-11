@@ -149,12 +149,15 @@ function RepositoryReview({ root, active }: { root: string; active: boolean }) {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [fetching, setFetching] = useState(false);
-  const [fetchMessage, setFetchMessage] = useState("");
+  const [fetchNotice, setFetchNotice] = useState<{
+    message: string;
+    failed?: boolean;
+  } | null>(null);
   const fetchPending = useRef(false);
   const [detailBusy, setDetailBusy] = useState(false);
   const request = useRef(0),
     refreshRequest = useRef(0);
-  async function refresh() {
+  async function refresh(throwOnError = false) {
     const id = ++refreshRequest.current;
     setBusy(true);
     try {
@@ -167,6 +170,7 @@ function RepositoryReview({ root, active }: { root: string; active: boolean }) {
       setHistory(h);
       setError("");
     } catch (e) {
+      if (throwOnError) throw e;
       if (id === refreshRequest.current) setError(String(e));
     } finally {
       if (id === refreshRequest.current) setBusy(false);
@@ -176,15 +180,17 @@ function RepositoryReview({ root, active }: { root: string; active: boolean }) {
     if (fetchPending.current) return;
     fetchPending.current = true;
     setFetching(true);
-    setFetchMessage("");
+    setFetchNotice({ message: "Fetching from remote(s)…" });
     setError("");
     try {
       await window.anvil.fetchRemotes(root);
-      setFetchMessage("Remote updates fetched.");
       clear();
-      await refresh();
+      await refresh(true);
+      setFetchNotice(
+        (notice) => notice && { message: "Remote updates fetched." },
+      );
     } catch (e) {
-      setError(String(e));
+      setFetchNotice({ message: String(e), failed: true });
     } finally {
       fetchPending.current = false;
       setFetching(false);
@@ -301,10 +307,20 @@ function RepositoryReview({ root, active }: { root: string; active: boolean }) {
           </button>
         </div>
       </header>
-      {(fetching || fetchMessage) && (
-        <p role="status" className="review-muted">
-          {fetching ? "Fetching remote updates…" : fetchMessage}
-        </p>
+      {active && fetchNotice && (
+        <div className="review-fetch-notice">
+          <div role={fetchNotice.failed ? "alert" : "status"}>
+            {fetching && (
+              <RefreshCw
+                size={22}
+                className="review-spinning"
+                aria-hidden="true"
+              />
+            )}
+            <span>{fetchNotice.message}</span>
+          </div>
+          <button onClick={() => setFetchNotice(null)}>Dismiss</button>
+        </div>
       )}
       <nav className="review-views">
         {[

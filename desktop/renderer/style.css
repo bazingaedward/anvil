@@ -2607,3 +2607,46 @@ kbd {
   align-items: center;
   gap: 8px;
 }
+
+.review-fetch-notice {
+  position: fixed;
+  z-index: 100;
+  top: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(380px, calc(100vw - 32px));
+  padding: 22px 24px 18px;
+  border: 1px solid #555;
+  border-radius: 10px;
+  background: #252525;
+  box-shadow: 0 12px 36px #0006;
+  text-align: center;
+}
+.review-fetch-notice > div {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: #ccc;
+  font-size: 16px;
+  overflow-wrap: anywhere;
+  max-height: 180px;
+  overflow-y: auto;
+}
+.review-fetch-notice svg {
+  flex-shrink: 0;
+}
+.review-fetch-notice [role="alert"] {
+  color: #efa28f;
+}
+.review-fetch-notice > button {
+  margin-top: 20px;
+  padding: 5px 24px;
+  border: 1px solid #666;
+  border-radius: 999px;
+  background: #2c2c2c;
+  color: #ccc;
+}
+.review-fetch-notice > button:hover {
+  background: #383838;
+}
