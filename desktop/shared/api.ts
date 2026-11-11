@@ -157,7 +157,9 @@ export type ReviewCommit = {
   refs: string[];
 };
 export type ReviewHistory = { commits: ReviewCommit[]; branches: string[] };
+export type ReviewSearch = { commits: ReviewCommit[]; next: number | null };
 export type ReviewOptions = {
+  commit?: string;
   branch?: string;
   remotes?: boolean;
   stash?: boolean;
@@ -183,6 +185,13 @@ export interface DesktopAPI {
   openReviewRepository(): Promise<string | null>;
   reviewStatus(root: string): Promise<RepoState>;
   fetchRemotes(root: string): Promise<void>;
+  searchHistory(
+    root: string,
+    query: string,
+    cursor: number,
+    options: ReviewOptions,
+  ): Promise<ReviewSearch>;
+  openRepositoryTerminal(root: string): Promise<void>;
   reviewHistory(
     root: string,
     limit: number,

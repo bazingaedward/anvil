@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   CloudDownload,
+  TerminalSquare,
   FolderGit2,
   GitBranch,
   RefreshCw,
@@ -15,6 +16,7 @@ import type {
   ReviewHistory,
 } from "../shared/api";
 import { CodeDiff } from "./code-editor";
+import { ReviewSearchPanel } from "./review-search";
 import { graphRows } from "./review-graph";
 const name = (root: string) => root.split(/[\\/]/).pop() || root;
 const colors = [
@@ -141,7 +143,39 @@ function RepositoryReview({ root, active }: { root: string; active: boolean }) {
   const [branch, setBranch] = useState("");
   const [remotes, setRemotes] = useState(true);
   const [stash, setStash] = useState(false);
-  const [search, setSearch] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [historyCommit, setHistoryCommit] = useState("");
+  const [terminalBusy, setTerminalBusy] = useState(false);
+  const searchButton = useRef<HTMLButtonElement>(null);
+  const graph = useRef<HTMLDivElement>(null);
+  function closeSearch() {
+    setSearchOpen(false);
+    searchButton.current?.focus();
+  }
+  useEffect(() => {
+    if (!active) return;
+    const key = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "f") {
+        event.preventDefault();
+        setSearchOpen(true);
+      } else if (event.key === "Escape" && searchOpen) {
+        event.preventDefault();
+        closeSearch();
+      }
+    };
+    window.addEventListener("keydown", key);
+    return () => window.removeEventListener("keydown", key);
+  }, [active, searchOpen]);
+  async function openTerminal() {
+    setTerminalBusy(true);
+    try {
+      await window.anvil.openRepositoryTerminal(root);
+    } catch (e) {
+      setFetchNotice({ message: String(e), failed: true });
+    } finally {
+      setTerminalBusy(false);
+    }
+  }
   const [diff, setDiff] = useState<DiffDocument>();
   const [patch, setPatch] = useState("");
   const [selected, setSelected] = useState("");
@@ -163,7 +197,12 @@ function RepositoryReview({ root, active }: { root: string; active: boolean }) {
     try {
       const [s, h] = await Promise.all([
         window.anvil.reviewStatus(root),
-        window.anvil.reviewHistory(root, limit, { branch, remotes, stash }),
+        window.anvil.reviewHistory(root, limit, {
+          branch,
+          remotes,
+          stash,
+          commit: historyCommit || undefined,
+        }),
       ]);
       if (id !== refreshRequest.current) return;
       setState(s);
@@ -199,7 +238,10 @@ function RepositoryReview({ root, active }: { root: string; active: boolean }) {
     return () => {
       ++refreshRequest.current;
     };
-  }, [active, limit, branch, remotes, stash]);
+  }, [active, limit, branch, remotes, stash, historyCommit]);
+  useEffect(() => {
+    if (historyCommit && graph.current) graph.current.scrollTop = 0;
+  }, [history]);
   function clear() {
     ++request.current;
     setSelected("");
@@ -234,13 +276,6 @@ function RepositoryReview({ root, active }: { root: string; active: boolean }) {
   }
   const rows = useMemo(() => graphRows(history.commits), [history]);
   const graphWidth = Math.max(84, ...rows.map((row) => row.width * 18 + 24));
-  const query = search.trim().toLowerCase();
-  const matches = (commit: ReviewHistory["commits"][number]) =>
-    !query ||
-    [commit.title, commit.author, commit.hash, ...commit.refs]
-      .join(" ")
-      .toLowerCase()
-      .includes(query);
   const detail = (
     <div className="review-detail">
       <header>
@@ -284,6 +319,23 @@ function RepositoryReview({ root, active }: { root: string; active: boolean }) {
         </div>
         <div className="review-actions">
           <button
+            ref={searchButton}
+            title="Search commits (⌘F / Ctrl+F)"
+            aria-label="Search repository history"
+            aria-expanded={searchOpen}
+            onClick={() => (searchOpen ? closeSearch() : setSearchOpen(true))}
+          >
+            <Search size={18} />
+          </button>
+          <button
+            title="Open repository in Terminal"
+            aria-label="Open repository in Terminal"
+            disabled={terminalBusy}
+            onClick={() => void openTerminal()}
+          >
+            <TerminalSquare size={19} />
+          </button>
+          <button
             title="Fetch remote updates"
             aria-label="Fetch remote updates"
             aria-busy={fetching}
@@ -305,6 +357,20 @@ function RepositoryReview({ root, active }: { root: string; active: boolean }) {
           </button>
         </div>
       </header>
+      {active && searchOpen && (
+        <ReviewSearchPanel
+          root={root}
+          options={{ branch, remotes, stash }}
+          onClose={closeSearch}
+          onSelect={(commit) => {
+            setHistoryCommit(commit.hash);
+            setMode("history");
+            setLimit(100);
+            closeSearch();
+            void inspect(commit.hash);
+          }}
+        />
+      )}
       {active && fetchNotice && (
         <div className="review-fetch-notice">
           <div role={fetchNotice.failed ? "alert" : "status"}>
@@ -351,6 +417,7 @@ function RepositoryReview({ root, active }: { root: string; active: boolean }) {
               value={branch}
               onChange={(e) => {
                 clear();
+                setHistoryCommit("");
                 setBranch(e.target.value);
               }}
             >
@@ -368,6 +435,7 @@ function RepositoryReview({ root, active }: { root: string; active: boolean }) {
                 type="checkbox"
                 checked={remotes}
                 onChange={(e) => {
+                  setHistoryCommit("");
                   setRemotes(e.target.checked);
                   setBranch("");
                   clear();
@@ -380,20 +448,12 @@ function RepositoryReview({ root, active }: { root: string; active: boolean }) {
                 type="checkbox"
                 checked={stash}
                 onChange={(e) => {
+                  setHistoryCommit("");
                   setStash(e.target.checked);
                   clear();
                 }}
               />{" "}
               Stashes
-            </label>
-            <label className="graph-search">
-              <Search size={15} />
-              <input
-                aria-label="Find commit"
-                placeholder="Find commit, author or hash…"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
             </label>
           </div>
           {base && (
@@ -409,13 +469,23 @@ function RepositoryReview({ root, active }: { root: string; active: boolean }) {
               </button>
             </div>
           )}
-          {query && (
-            <p className="review-search-note">
-              {history.commits.filter(matches).length} matching commits · other
-              rows stay visible to preserve branch connections
-            </p>
+          {historyCommit && (
+            <div className="review-comparison">
+              History from {historyCommit.slice(0, 8)}
+              <button
+                onClick={() => {
+                  setHistoryCommit("");
+                  clear();
+                }}
+              >
+                Back to latest history
+              </button>
+            </div>
           )}
-          <div className={`graph-scroll ${selected ? "has-detail" : ""}`}>
+          <div
+            ref={graph}
+            className={`graph-scroll ${selected ? "has-detail" : ""}`}
+          >
             <table className="commit-table">
               <thead>
                 <tr>
@@ -430,7 +500,7 @@ function RepositoryReview({ root, active }: { root: string; active: boolean }) {
                 {rows.map(({ commit, column, color, edges, incoming }) => (
                   <tr
                     key={commit.hash}
-                    className={`${selected === commit.hash ? "selected" : ""} ${matches(commit) ? "" : "muted-match"}`}
+                    className={selected === commit.hash ? "selected" : ""}
                   >
                     <td className="graph-cell">
                       <svg width={graphWidth} height={36} aria-hidden="true">

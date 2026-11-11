@@ -25,6 +25,9 @@ const api: DesktopAPI = {
   uploadAttachment: (name, bytes) =>
     ipcRenderer.invoke("composer:upload", name, bytes),
   openReviewRepository: () => ipcRenderer.invoke("review:open"),
+  searchHistory: (root, query, cursor, options) =>
+    ipcRenderer.invoke("review:search", root, query, cursor, options),
+  openRepositoryTerminal: (root) => ipcRenderer.invoke("review:terminal", root),
   fetchRemotes: (root) => ipcRenderer.invoke("review:fetch", root),
   reviewStatus: (root) => ipcRenderer.invoke("review:status", root),
   reviewHistory: (root, limit, options) =>

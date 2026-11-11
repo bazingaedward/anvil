@@ -138,3 +138,101 @@ test("fetch updates remote history while preserving HEAD, index and dirty files"
   await mkdir(path.join(local, "nested"));
   await assert.rejects(fetchRemotes(path.join(local, "nested")), /root/);
 });
+
+test("search spans unloaded history, paginates, respects scopes and opens old commit context", async (t) => {
+  const { searchHistory } = await import("../../desktop/main/review");
+  const root = await mkdtemp(path.join(os.tmpdir(), "anvil-search-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await git(root, ["init", "-b", "main"]);
+  await git(root, ["config", "user.name", "Search Author"]);
+  await git(root, ["config", "user.email", "test@example.invalid"]);
+  await writeFile(path.join(root, "file"), "base");
+  await git(root, ["add", "."]);
+  const tree = (await git(root, ["write-tree"])).toString().trim();
+  let head = "";
+  const ids: string[] = [];
+  for (let i = 0; i < 105; i++) {
+    head = (
+      await git(root, [
+        "commit-tree",
+        tree,
+        ...(head ? ["-p", head] : []),
+        "-m",
+        `record ${i}`,
+      ])
+    )
+      .toString()
+      .trim();
+    ids.push(head);
+  }
+  await git(root, ["update-ref", "refs/heads/main", head]);
+  await git(root, ["tag", "release-needle", ids[0]]);
+  assert.ok(
+    !(await reviewHistory(root, 100)).commits.some((c) => c.hash === ids[0]),
+  );
+  assert.equal(
+    (await searchHistory(root, ids[0].slice(0, 12))).commits[0].hash,
+    ids[0],
+  );
+  assert.equal(
+    (await searchHistory(root, "RELEASE-NEEDLE")).commits[0].hash,
+    ids[0],
+  );
+  const first = await searchHistory(root, "Search Author");
+  assert.equal(first.commits.length, 50);
+  const second = await searchHistory(root, "Search Author", first.next!);
+  const third = await searchHistory(root, "Search Author", second.next!);
+  assert.equal(
+    new Set(
+      [...first.commits, ...second.commits, ...third.commits].map(
+        (c) => c.hash,
+      ),
+    ).size,
+    105,
+  );
+  assert.equal(third.next, null);
+  const remote = (
+    await git(root, [
+      "commit-tree",
+      tree,
+      "-p",
+      head,
+      "-m",
+      "remote-only-message",
+    ])
+  )
+    .toString()
+    .trim();
+  await git(root, ["update-ref", "refs/remotes/origin/feature", remote]);
+  assert.equal(
+    (await searchHistory(root, "remote-only-message")).commits.length,
+    1,
+  );
+  assert.equal(
+    (await searchHistory(root, "remote-only-message", 0, { remotes: false }))
+      .commits.length,
+    0,
+  );
+  assert.equal(
+    (
+      await searchHistory(root, "remote-only-message", 0, {
+        branch: "refs/heads/main",
+      })
+    ).commits.length,
+    0,
+  );
+  assert.equal(
+    (await searchHistory(root, "no such [literal] --option")).commits.length,
+    0,
+  );
+  assert.equal(
+    (await reviewHistory(root, 100, { commit: ids[0] })).commits[0].hash,
+    ids[0],
+  );
+  assert.ok((await reviewPatch(root, ids[0])).includes("record 0"));
+  await assert.rejects(searchHistory(root, "record", -1), /Invalid/);
+  await assert.rejects(
+    searchHistory(root, "record", 0, { branch: "--all" }),
+    /Unknown/,
+  );
+});

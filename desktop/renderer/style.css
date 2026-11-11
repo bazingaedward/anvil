@@ -1619,19 +1619,6 @@ kbd {
   gap: 6px;
   color: #aaa;
 }
-.graph-search {
-  margin-left: auto;
-  border: 1px solid #383838;
-  border-radius: 6px;
-  padding: 6px 10px;
-}
-.graph-search input {
-  background: transparent;
-  color: #ddd;
-  border: 0;
-  outline: none;
-  width: 200px;
-}
 .graph-scroll {
   flex: 1;
   min-height: 120px;
@@ -1678,9 +1665,6 @@ kbd {
 .commit-table tr:hover,
 .commit-table tr.selected {
   background: #2c2c2c;
-}
-.commit-table tr.muted-match td:not(.graph-cell) {
-  opacity: 0.3;
 }
 .graph-cell svg {
   display: block;
@@ -1799,14 +1783,10 @@ kbd {
 .review-changes .review-detail {
   border-top: 0;
 }
-.review-muted,
-.review-search-note {
+.review-muted {
   color: #888;
   font-size: 12px;
   padding: 8px 24px;
-}
-.review-search-note {
-  margin: 0;
 }
 .review-error {
   color: #e5a19d;
@@ -2662,4 +2642,72 @@ kbd {
 }
 .review-fetch-notice > button:hover {
   background: #383838;
+}
+
+.repository-review {
+  position: relative;
+}
+.review-actions > button {
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+}
+.review-search-panel {
+  position: absolute;
+  z-index: 50;
+  right: 24px;
+  top: 68px;
+  width: min(480px, calc(100% - 32px));
+  padding: 16px;
+  background: #252525;
+  border: 1px solid #555;
+  border-radius: 10px;
+  box-shadow: 0 12px 36px #0006;
+}
+.review-search-panel header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.review-search-panel > input {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #666;
+  border-radius: 5px;
+}
+.review-search-scope {
+  color: #aaa;
+  font-size: 12px;
+}
+.review-search-results {
+  max-height: min(420px, 50vh);
+  overflow-y: auto;
+}
+.review-search-results > button {
+  display: flex;
+  align-items: flex-start;
+  flex-direction: column;
+  width: 100%;
+  text-align: left;
+  padding: 10px;
+  gap: 5px;
+}
+.review-search-results > button strong {
+  font-weight: 500;
+}
+.review-search-results > button span {
+  color: #aaa;
+  font-size: 12px;
+}
+.review-search-results > button strong,
+.review-search-results > button span {
+  overflow-wrap: anywhere;
+}
+.review-search-results > p {
+  color: #aaa;
+  padding: 8px;
+}
+.review-search-results > [role="alert"] {
+  color: #efa28f;
 }
