@@ -2711,3 +2711,73 @@ kbd {
 .review-search-results > [role="alert"] {
   color: #efa28f;
 }
+
+.review-repository-row {
+  display: flex;
+  align-items: center;
+  border-radius: 8px;
+}
+.review-repository-row[data-active="true"] {
+  background: #353535;
+}
+.review-repository-row:hover {
+  background: #2a2a2a;
+}
+.review-repository-row[data-active="true"]:hover {
+  background: #353535;
+}
+.review-repository-row .review-repository {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+}
+.review-repository-more {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  margin-right: 8px;
+  opacity: 0;
+}
+.review-repository-row:hover .review-repository-more,
+.review-repository-row:focus-within .review-repository-more,
+.review-repository-more[aria-expanded="true"] {
+  opacity: 1;
+}
+.review-repository-menu {
+  position: fixed;
+  z-index: 150;
+  width: 180px;
+  padding: 5px;
+  border: 1px solid #555;
+  border-radius: 7px;
+  background: #252525;
+  box-shadow: 0 8px 24px #0006;
+}
+.review-repository-menu button {
+  width: 100%;
+  justify-content: flex-start;
+  padding: 7px 10px;
+}
+.review-remove-notice {
+  position: fixed;
+  z-index: 100;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: calc(100vw - 32px);
+  padding: 10px 14px;
+  border: 1px solid #555;
+  border-radius: 8px;
+  background: #252525;
+  box-shadow: 0 8px 24px #0006;
+}
+.review-remove-notice span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.review-remove-notice button {
+  flex-shrink: 0;
+}

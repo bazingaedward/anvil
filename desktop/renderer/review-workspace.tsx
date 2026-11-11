@@ -1,5 +1,8 @@
+import { createPortal } from "react-dom";
+import { accountScope } from "./account";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
+  MoreVertical,
   CloudDownload,
   TerminalSquare,
   FolderGit2,
@@ -41,6 +44,105 @@ export function ReviewWorkspace({
   const [repositories, setRepositories] = useState<string[]>([]);
   const [active, setActive] = useState("");
   const [error, setError] = useState("");
+  const hiddenKey = "anvil:review-hidden:" + accountScope;
+  const [hidden, setHidden] = useState<string[]>(() => {
+    try {
+      const value = JSON.parse(localStorage.getItem(hiddenKey) || "[]");
+      return Array.isArray(value)
+        ? value.filter((root): root is string => typeof root === "string")
+        : [];
+    } catch {
+      return [];
+    }
+  });
+  const hiddenRef = useRef(hidden);
+  const visible = repositories.filter((root) => !hidden.includes(root));
+  const [removed, setRemoved] = useState<{
+    root: string;
+    wasActive: boolean;
+  } | null>(null);
+  const [menu, setMenu] = useState<{
+    root: string;
+    left: number;
+    top: number;
+  } | null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const menuTrigger = useRef<HTMLButtonElement | null>(null);
+  const sidebarRef = useRef<HTMLElement>(null);
+  function changeHidden(next: string[]) {
+    localStorage.setItem(hiddenKey, JSON.stringify(next));
+    hiddenRef.current = next;
+    setHidden(next);
+  }
+  useEffect(() => {
+    if (!menu) return;
+    menuRef.current?.querySelector<HTMLButtonElement>("button")?.focus();
+    const outside = (event: PointerEvent) => {
+      if (
+        !menuRef.current?.contains(event.target as Node) &&
+        !menuTrigger.current?.contains(event.target as Node)
+      )
+        setMenu(null);
+    };
+    const key = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setMenu(null);
+        menuTrigger.current?.focus();
+      }
+      if (event.key === "Tab") setMenu(null);
+    };
+    const scroll = () => setMenu(null);
+    document.addEventListener("pointerdown", outside);
+    document.addEventListener("keydown", key);
+    window.addEventListener("resize", scroll);
+    sidebarRef.current?.addEventListener("scroll", scroll);
+    const sidebar = sidebarRef.current;
+    return () => {
+      document.removeEventListener("pointerdown", outside);
+      document.removeEventListener("keydown", key);
+      window.removeEventListener("resize", scroll);
+      sidebar?.removeEventListener("scroll", scroll);
+    };
+  }, [menu]);
+  useEffect(() => {
+    if (!open || !sidebarOpen) setMenu(null);
+  }, [open, sidebarOpen]);
+  function remove(root: string) {
+    try {
+      changeHidden([
+        ...hiddenRef.current.filter((item) => item !== root),
+        root,
+      ]);
+      const index = visible.indexOf(root);
+      const next = visible[index + 1] || visible[index - 1] || "";
+      const wasActive = active === root;
+      if (wasActive) setActive(next);
+      setRemoved({ root, wasActive });
+      setMenu(null);
+      setError("");
+      requestAnimationFrame(() =>
+        sidebarRef.current
+          ?.querySelector<HTMLButtonElement>(
+            ".review-repository[aria-pressed=true], [aria-label='Open repository']",
+          )
+          ?.focus(),
+      );
+    } catch (e) {
+      setError(String(e));
+    }
+  }
+  function undo() {
+    if (!removed) return;
+    try {
+      changeHidden(hiddenRef.current.filter((root) => root !== removed.root));
+      if (removed.wasActive || !active) setActive(removed.root);
+      setRemoved(null);
+      setError("");
+    } catch (e) {
+      setError(String(e));
+    }
+  }
   useEffect(() => {
     let cancelled = false;
     void Promise.all(
@@ -55,7 +157,11 @@ export function ReviewWorkspace({
       if (cancelled) return;
       const valid = items.filter((item): item is string => !!item);
       setRepositories((old) => [...new Set([...old, ...valid])]);
-      setActive((old) => old || valid[0] || "");
+      setActive((old) =>
+        old && !hiddenRef.current.includes(old)
+          ? old
+          : valid.find((root) => !hiddenRef.current.includes(root)) || "",
+      );
     });
     return () => {
       cancelled = true;
@@ -65,6 +171,8 @@ export function ReviewWorkspace({
     try {
       const root = await window.anvil.openReviewRepository();
       if (!root) return;
+      changeHidden(hiddenRef.current.filter((item) => item !== root));
+      if (removed?.root === root) setRemoved(null);
       setRepositories((old) => [...new Set([...old, root])]);
       setActive(root);
       setError("");
@@ -77,6 +185,7 @@ export function ReviewWorkspace({
       <div style={{ display: open ? "none" : "contents" }}>{children}</div>
       <div className="review-workspace" hidden={!open}>
         <aside
+          ref={sidebarRef}
           id="review-sidebar"
           className="review-sidebar"
           hidden={!sidebarOpen}
@@ -92,19 +201,52 @@ export function ReviewWorkspace({
               <Plus size={17} />
             </button>
           </div>
-          {repositories.map((root) => (
-            <button
+          {visible.map((root) => (
+            <div
               key={root}
-              className="review-repository"
-              aria-pressed={active === root}
-              title={root}
-              onClick={() => setActive(root)}
+              className="review-repository-row"
+              data-active={active === root}
             >
-              <FolderGit2 size={18} />
-              <span>{name(root)}</span>
-            </button>
+              <button
+                className="review-repository"
+                aria-pressed={active === root}
+                title={root}
+                onClick={() => {
+                  setActive(root);
+                  setMenu(null);
+                }}
+              >
+                <FolderGit2 size={18} />
+                <span>{name(root)}</span>
+              </button>
+              <button
+                className="review-repository-more"
+                aria-label={`Repository actions for ${name(root)}`}
+                title="Repository actions"
+                aria-haspopup="menu"
+                aria-expanded={menu?.root === root}
+                onClick={(event) => {
+                  if (menu?.root === root) {
+                    setMenu(null);
+                    return;
+                  }
+                  menuTrigger.current = event.currentTarget;
+                  const rect = event.currentTarget.getBoundingClientRect();
+                  setMenu({
+                    root,
+                    left: Math.max(
+                      8,
+                      Math.min(rect.right - 180, window.innerWidth - 188),
+                    ),
+                    top: Math.min(rect.bottom + 4, window.innerHeight - 56),
+                  });
+                }}
+              >
+                <MoreVertical size={17} />
+              </button>
+            </div>
           ))}
-          {!repositories.length && (
+          {!visible.length && (
             <button onClick={() => void add()}>Open repository…</button>
           )}
           {error && <p role="alert">{error}</p>}
@@ -129,6 +271,35 @@ export function ReviewWorkspace({
           ))}
         </main>
       </div>
+      {open && removed && (
+        <div className="review-remove-notice" role="status">
+          <span>Removed {name(removed.root)} from list.</span>
+          <button onClick={undo}>Undo</button>
+          <button
+            aria-label="Dismiss removal notification"
+            onClick={() => setRemoved(null)}
+          >
+            <X size={15} />
+          </button>
+        </div>
+      )}
+      {open &&
+        sidebarOpen &&
+        menu &&
+        createPortal(
+          <div
+            ref={menuRef}
+            role="menu"
+            aria-label={`Repository actions for ${name(menu.root)}`}
+            className="review-repository-menu"
+            style={{ left: menu.left, top: menu.top }}
+          >
+            <button role="menuitem" onClick={() => remove(menu.root)}>
+              Remove from list
+            </button>
+          </div>,
+          document.body,
+        )}
     </>
   );
 }
