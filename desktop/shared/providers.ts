@@ -2,9 +2,9 @@ import type { ModelProfile } from "./api";
 // Local executor: never saved as an API model or synced to account configuration.
 export const codexModel: ModelProfile = {
   id: "managed-codex",
-  name: "Codex (local)",
+  name: "Codex（本地）",
   model: "codex-default",
-  provider: "ChatGPT subscription",
+  provider: "ChatGPT 订阅",
   endpoint: "",
   keyRef: "",
   vision: true,

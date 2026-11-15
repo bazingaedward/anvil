@@ -58,27 +58,26 @@ export function ReviewSearchPanel({
     <section
       className="review-search-panel"
       role="dialog"
-      aria-label="Search repository history"
+      aria-label="搜索仓库历史"
     >
       <header>
-        <strong>Search commits</strong>
-        <button aria-label="Close history search" onClick={onClose}>
+        <strong>搜索提交</strong>
+        <button aria-label="关闭历史搜索" onClick={onClose}>
           <X size={16} />
         </button>
       </header>
       <input
         autoFocus
-        aria-label="Search commits"
+        aria-label="搜索提交"
         maxLength={200}
-        placeholder="Message, author, SHA, branch or tag…"
+        placeholder="提交说明、作者、SHA、分支或标签…"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
       />
       <p className="review-search-scope">
-        {options.branch?.replace(/^refs\/(heads|remotes)\//, "") ||
-          "All branches"}{" "}
-        · {options.remotes ? "including remotes" : "local refs"}
-        {options.stash ? " · stashes" : ""} · full local history
+        {options.branch?.replace(/^refs\/(heads|remotes)\//, "") || "所有分支"}{" "}
+        · {options.remotes ? "包含远程分支" : "本地引用"}
+        {options.stash ? " · 包含暂存记录" : ""} · 完整本地历史
       </p>
       <div className="review-search-results">
         {result.commits.map((commit) => (
@@ -92,19 +91,17 @@ export function ReviewSearchPanel({
           </button>
         ))}
         {error && <p role="alert">{error}</p>}
-        {busy && <p role="status">Searching…</p>}
+        {busy && <p role="status">正在搜索…</p>}
         {!busy && !error && query.trim() && !result.commits.length && (
-          <p>No matching commits.</p>
+          <p>没有匹配的提交。</p>
         )}
-        {!query.trim() && (
-          <p>Search fetched history without changing your files.</p>
-        )}
+        {!query.trim() && <p>搜索已获取的历史，不会修改文件。</p>}
         {result.next !== null && (
           <button
             disabled={busy}
             onClick={() => void load(result.next!, ++request.current)}
           >
-            Load more results
+            加载更多结果
           </button>
         )}
       </div>

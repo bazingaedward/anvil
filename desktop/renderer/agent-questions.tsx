@@ -23,15 +23,11 @@ export function AgentQuestions({
   );
   const locked = disabled || busy || group.readOnly;
   return (
-    <section className="agent-questions" aria-label="Agent questions">
+    <section className="agent-questions" aria-label="需要你回答">
       <header>
         <MessageCircleQuestion size={17} />
         <span>
-          {group.answer
-            ? "Answered"
-            : group.readOnly
-              ? "From original chat"
-              : "Your input"}
+          {group.answer ? "已回答" : group.readOnly ? "来自原聊天" : "请回答"}
         </span>
       </header>
       {group.answer ? (
@@ -100,11 +96,9 @@ export function AgentQuestions({
               <textarea
                 rows={2}
                 maxLength={4000}
-                aria-label={`Your answer: ${question.title}`}
+                aria-label={`你的回答：${question.title}`}
                 placeholder={
-                  question.options?.length
-                    ? "Or write your own answer…"
-                    : "Write your answer…"
+                  question.options?.length ? "或输入自己的答案…" : "输入答案…"
                 }
                 value={custom[index] || ""}
                 onChange={(event) => {
@@ -121,14 +115,14 @@ export function AgentQuestions({
             <footer>
               <span>
                 {disabled
-                  ? "Finish the running task or restore this chat to reply."
-                  : "Choose an option or write your own answer."}
+                  ? "结束当前任务或恢复此聊天后即可回答。"
+                  : "选择一个选项，或输入自己的答案。"}
               </span>
               <button
                 type="submit"
                 disabled={locked || values.some((value) => !value.trim())}
               >
-                {busy ? "Sending…" : "Send answers"}
+                {busy ? "正在发送…" : "提交回答"}
               </button>
             </footer>
           )}

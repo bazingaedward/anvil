@@ -1,3 +1,4 @@
+import { MemoryStore } from "./memory";
 import { DatabaseSync } from "node:sqlite";
 import { randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
@@ -88,6 +89,7 @@ function validatePatch(patch: ConversationPatch) {
 
 export class ConversationStore {
   private db: DatabaseSync;
+  readonly memory: MemoryStore;
   constructor(storage: string) {
     mkdirSync(storage, { recursive: true });
     this.db = new DatabaseSync(path.join(storage, "conversations.sqlite"));
@@ -98,7 +100,7 @@ export class ConversationStore {
       const version = Number(
         this.db.prepare("PRAGMA user_version").get()!.user_version,
       );
-      if (version > 4)
+      if (version > 5)
         throw new Error(
           "Conversation database belongs to a newer Anvil version.",
         );
@@ -121,9 +123,12 @@ export class ConversationStore {
           CREATE TABLE IF NOT EXISTS permission_modes (conversation_id TEXT PRIMARY KEY REFERENCES conversations(id) ON DELETE CASCADE, mode TEXT NOT NULL);
           CREATE TABLE IF NOT EXISTS conversation_groups (id TEXT PRIMARY KEY, name TEXT NOT NULL, collapsed INTEGER NOT NULL DEFAULT 0, created INTEGER NOT NULL);
           CREATE TABLE IF NOT EXISTS conversation_organization (conversation_id TEXT PRIMARY KEY REFERENCES conversations(id) ON DELETE CASCADE, group_id TEXT REFERENCES conversation_groups(id) ON DELETE SET NULL, pinned INTEGER NOT NULL DEFAULT 0);
-          PRAGMA user_version=4;
+          CREATE TABLE IF NOT EXISTS memory_notes (id TEXT PRIMARY KEY, record TEXT NOT NULL, revision INTEGER NOT NULL, updated INTEGER NOT NULL);
+          CREATE TABLE IF NOT EXISTS task_handoffs (conversation_id TEXT PRIMARY KEY REFERENCES conversations(id) ON DELETE CASCADE, record TEXT NOT NULL, revision INTEGER NOT NULL);
+          PRAGMA user_version=5;
         `);
       });
+      this.memory = new MemoryStore(this.db, path.join(storage, "memory"));
       this.importTasks(path.join(storage, "conversations", "tasks.json"));
     } catch (error) {
       this.db.close();

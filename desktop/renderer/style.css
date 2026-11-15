@@ -2897,3 +2897,38 @@ kbd {
   color: #efab9d;
   font-size: 13px;
 }
+.markdown-response { white-space: normal; line-height: 1.7; }
+.markdown-response > :first-child { margin-top: 0; }
+.markdown-response p { margin: 0 0 1em; }
+.markdown-response h1,.markdown-response h2,.markdown-response h3 { line-height:1.35; margin:1.2em 0 .6em; }
+.markdown-response h1 { font-size:1.5em; }
+.markdown-response h2 { font-size:1.3em; }
+.markdown-response h3 { font-size:1.1em; }
+.markdown-response ul,.markdown-response ol { padding-left:1.6em; }
+.markdown-response blockquote { margin:1em 0; border-left:3px solid #555; padding-left:1em; color:#bdbdbd; }
+.markdown-response code { background:#2b2b2b; border-radius:4px; padding:2px 5px; font-size:.9em; }
+.markdown-response pre { overflow-x:auto; background:#222; padding:14px; border-radius:8px; white-space:pre; }
+.markdown-response pre code { padding:0; background:none; }
+.markdown-response a { color:#9abbea; text-decoration:underline; }
+.markdown-table { overflow-x:auto; margin:1em 0; }
+.markdown-table table { border-collapse:collapse; width:100%; font-size:.95em; }
+.markdown-table th,.markdown-table td { padding:8px 12px; border-bottom:1px solid #3c3c3c; text-align:left; }
+.markdown-table th { background:#262626; }
+.context-dialog { width:min(600px,85vw); max-height:82vh; overflow:auto; background:#242424; color:#ddd; border:1px solid #444; border-radius:14px; padding:22px; }
+.context-dialog::backdrop { background:#0008; }
+.context-dialog header { display:flex; align-items:center; justify-content:space-between; }
+.context-dialog h2 { margin:0; font-size:18px; }
+.context-dialog h3 { font-size:14px; margin:18px 0 8px; }
+.context-dialog fieldset { border:0; border-top:1px solid #444; padding:16px 0; margin:18px 0 0; min-width:0; }
+.context-dialog legend { padding-right:10px; }
+.context-dialog label { display:block; margin:10px 0; font-size:13px; }
+.context-dialog textarea,.context-dialog input:not([type=checkbox]),.context-dialog select { display:block; width:100%; box-sizing:border-box; margin-top:6px; background:#303030; color:inherit; border:1px solid #555; border-radius:6px; padding:8px; font:inherit; }
+.context-dialog textarea { resize:vertical; }
+.context-help,.context-note small { color:#aaa; font-size:12px; line-height:1.5; }
+.context-check { display:flex!important; gap:9px; align-items:flex-start; }
+.context-note { display:flex; gap:8px; align-items:center; }
+.context-note label { flex:1; min-width:0; }
+.context-note small { display:block; overflow-wrap:anywhere; }
+.context-columns { display:flex; gap:12px; }
+.context-columns label { flex:1; min-width:0; }
+.context-evidence pre { white-space:pre-wrap; font:inherit; font-size:13px; max-height:200px; overflow:auto; }

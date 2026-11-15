@@ -1,4 +1,5 @@
-import { tasks } from "./tasks.mjs";
+import { tasks as calibrationTasks } from "./tasks.mjs";
+import { repoTasks } from "./repo-tasks.mjs";
 import { verify, writeFiles } from "./verify.mjs";
 import {
   mkdtemp,
@@ -14,6 +15,11 @@ import os from "node:os";
 import { startRuntime } from "../desktop/main/runtime.ts";
 import { defaultModel } from "../desktop/main/composer.ts";
 const args = process.argv.slice(2);
+const suite =
+  args.find((x) => x.startsWith("--suite="))?.slice(8) || "calibration";
+if (!["calibration", "repository"].includes(suite))
+  throw Error("Unknown suite");
+const tasks = suite === "repository" ? repoTasks : calibrationTasks;
 const selected = args.find((x) => x.startsWith("--task="))?.slice(7);
 if (args.includes("--list")) {
   console.log(tasks.map((t) => `${t.id}\t${t.category}`).join("\n"));
@@ -39,6 +45,11 @@ const output = path.resolve(
 await mkdir(output, { recursive: true });
 const summary = {
   schemaVersion: 1,
+  suite,
+  state: "running",
+  evaluatorHash: createHash("sha256")
+    .update(await readFile(new URL("./verify.mjs", import.meta.url)))
+    .digest("hex"),
   startedAt: new Date().toISOString(),
   model: defaultModel.model,
   protocol: "responses",
@@ -58,7 +69,7 @@ const summary = {
     .digest("hex"),
   platform: process.platform,
   timeoutMs: 180000,
-  permissions: "allow-all; trusted synthetic fixtures only; not sandboxed",
+  permissions: "allow-all; trusted evaluation fixtures only; not sandboxed",
   tokens: null,
   cost: null,
   workspace: root,
@@ -75,6 +86,7 @@ for (const task of chosen) {
   await writeFiles(repo, task.files);
   await writeFiles(repo, {
     "README.md":
+      task.files["README.md"] ||
       "This is a small coding evaluation fixture. Use Node.js built-ins; do not install dependencies. Modify only files required by the task. No network operations are needed.",
   });
   let sessionID,
@@ -162,7 +174,12 @@ for (const task of chosen) {
     `${task.id}: ${result.passed ? "PASS" : "FAIL"} (${result.status}, ${result.elapsedMs}ms)`,
   );
 }
+summary.state = "completed";
+summary.finishedAt = new Date().toISOString();
+await save();
 console.log(`Results: ${output}`);
 console.log(
   `Passed ${summary.results.filter((x) => x.passed).length}/${summary.results.length}`,
 );
+
+if (summary.results.some((result) => !result.passed)) process.exitCode = 1;

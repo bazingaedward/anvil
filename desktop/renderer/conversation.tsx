@@ -1,3 +1,7 @@
+import { AnswerActions } from "./answer-actions";
+import type { MemoryInput } from "../shared/memory";
+import { MarkdownResponse } from "./markdown-response";
+import { ContextDialog } from "./context-dialog";
 import { AgentQuestions } from "./agent-questions";
 import { codexModel } from "../shared/providers";
 import { ModelPicker } from "./model-picker";
@@ -8,7 +12,6 @@ import { ConversationRow } from "./conversation-row";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   ArrowUp,
-  GitFork,
   Square,
   Shield,
   Paperclip,
@@ -53,6 +56,8 @@ export function ConversationWorkspace({
   onOpen: () => void;
   onSelectDirectory: (root: string) => void;
 }) {
+  const [memoryDraft, setMemoryDraft] = useState<MemoryInput>();
+  const [contextOpen, setContextOpen] = useState(false);
   const [groups, setGroups] = useState<ConversationGroup[]>([]);
   const [creatingGroup, setCreatingGroup] = useState(false);
   const [groupName, setGroupName] = useState("");
@@ -78,12 +83,12 @@ export function ConversationWorkspace({
     setAgentError("");
     try {
       if (files && files.length + composerDraft.attachments.length > 8)
-        throw new Error("Select up to eight attachments.");
+        throw new Error("最多选择 8 个附件。");
       const items: Attachment[] = [];
       if (files)
         for (const file of files) {
           if (file.size > 5 * 1024 * 1024)
-            throw new Error("Each attachment must be at most 5 MB.");
+            throw new Error("单个附件不得超过 5 MB。");
           items.push(
             await window.anvil.uploadAttachment(
               file.name,
@@ -100,7 +105,7 @@ export function ConversationWorkspace({
         ) >
           10 * 1024 * 1024
       )
-        throw new Error("Use up to eight attachments, 10 MB total.");
+        throw new Error("最多使用 8 个附件，总大小不得超过 10 MB。");
       composerDraft.add(items, target);
     } catch (e) {
       setAgentError(String(e));
@@ -525,18 +530,18 @@ export function ConversationWorkspace({
   const [reviewOpen, setReviewOpen] = useState(false);
   return (
     <div className="workspace-shell">
-      <nav className="activity-rail" aria-label="Main navigation">
+      <nav className="activity-rail" aria-label="主导航">
         <button
-          title="Conversations"
-          aria-label="Conversations"
+          title="聊天"
+          aria-label="聊天"
           aria-pressed={!reviewOpen}
           onClick={() => setReviewOpen(false)}
         >
           <MessageSquare size={22} />
         </button>
         <button
-          title="Code review"
-          aria-label="Code review"
+          title="代码审查"
+          aria-label="代码审查"
           aria-pressed={reviewOpen}
           onClick={() => setReviewOpen(true)}
         >
@@ -553,7 +558,7 @@ export function ConversationWorkspace({
             <aside
               id="conversation-sidebar"
               className="conversation-sidebar"
-              aria-label="Conversations"
+              aria-label="聊天"
             >
               <div className="sidebar-header">
                 <strong>Anvil</strong>
@@ -564,23 +569,23 @@ export function ConversationWorkspace({
                 disabled={!loaded || managing || sending}
               >
                 <Plus size={16} />
-                New chat
+                新聊天
               </button>
               <div className="sidebar-list-heading">
                 <select
-                  aria-label="Conversation filter"
+                  aria-label="聊天筛选"
                   value={archived ? "archived" : onlyPinned ? "pinned" : "all"}
                   onChange={(event) => {
                     setArchived(event.target.value === "archived");
                     setOnlyPinned(event.target.value === "pinned");
                   }}
                 >
-                  <option value="all">Chats and tasks</option>
-                  <option value="pinned">Pinned</option>
-                  <option value="archived">Archived</option>
+                  <option value="all">聊天与任务</option>
+                  <option value="pinned">已置顶</option>
+                  <option value="archived">已归档</option>
                 </select>
                 <details className="tools-menu sidebar-list-options">
-                  <summary aria-label="List options">
+                  <summary aria-label="列表选项">
                     <Ellipsis size={17} />
                   </summary>
                   <div className="workspace-tools">
@@ -593,7 +598,7 @@ export function ConversationWorkspace({
                         setGroupError("");
                       }}
                     >
-                      New group
+                      新建分组
                     </button>
                     <button
                       onClick={(event) => {
@@ -603,9 +608,7 @@ export function ConversationWorkspace({
                         setOldestFirst((value) => !value);
                       }}
                     >
-                      {oldestFirst
-                        ? "Sort: newest first"
-                        : "Sort: oldest first"}
+                      {oldestFirst ? "排序：最新优先" : "排序：最早优先"}
                     </button>
                   </div>
                 </details>
@@ -620,8 +623,8 @@ export function ConversationWorkspace({
                 >
                   <input
                     autoFocus
-                    aria-label="Group name"
-                    placeholder="Group name"
+                    aria-label="分组名称"
+                    placeholder="分组名称"
                     maxLength={80}
                     value={groupName}
                     disabled={groupBusy}
@@ -632,14 +635,14 @@ export function ConversationWorkspace({
                     }}
                   />
                   <button disabled={!groupName.trim() || groupBusy}>
-                    Create
+                    创建
                   </button>
                   <button
                     type="button"
                     disabled={groupBusy}
                     onClick={() => setCreatingGroup(false)}
                   >
-                    Cancel
+                    取消
                   </button>
                   {groupError && <p role="alert">{groupError}</p>}
                 </form>
@@ -647,7 +650,7 @@ export function ConversationWorkspace({
               <div className="draft-list">
                 {!!pinned.length && (
                   <>
-                    <div className="group-label">Pinned</div>
+                    <div className="group-label">已置顶</div>
                     {pinned.map(renderConversation)}
                   </>
                 )}
@@ -684,7 +687,7 @@ export function ConversationWorkspace({
                             (item) => item.groupID === group.id,
                           ) && (
                             <p className="group-empty">
-                              Move a conversation here from its ⋯ menu.
+                              从聊天的 ⋯ 菜单将其移至此分组。
                             </p>
                           )}
                         </div>
@@ -694,7 +697,7 @@ export function ConversationWorkspace({
                 {!onlyPinned && (
                   <>
                     {!!groups.length && (
-                      <div className="group-label">Ungrouped</div>
+                      <div className="group-label">未分组</div>
                     )}
                     {unpinned
                       .filter((item) => !item.groupID)
@@ -702,29 +705,34 @@ export function ConversationWorkspace({
                   </>
                 )}
                 {loaded && !visible.length && (
-                  <p>
-                    {archived
-                      ? "No archived conversations"
-                      : "No conversations"}
-                  </p>
+                  <p>{archived ? "暂无归档聊天" : "暂无聊天"}</p>
                 )}
-                {!loaded && <p>Loading conversations…</p>}
+                {!loaded && <p>正在加载聊天…</p>}
               </div>
             </aside>
           )}
           <main
             className={`conversation-main ${conversationTasks.length === 0 ? "is-empty" : ""}`}
-            aria-label="Conversation"
+            aria-label="聊天"
           >
+            {contextOpen && (
+              <ContextDialog
+                key={selected}
+                conversationID={selected}
+                disabled={!!running || sending}
+                initialMemory={memoryDraft}
+                onClose={() => {
+                  setContextOpen(false);
+                  setMemoryDraft(undefined);
+                }}
+              />
+            )}
             <header className="conversation-toolbar">
               <span className="conversation-title">
                 {conversationTitle(draft)}
               </span>
               <details className="tools-menu" ref={toolsMenu}>
-                <summary
-                  aria-label="Workspace tools"
-                  title="Files, changes and terminal"
-                >
+                <summary aria-label="工作区工具" title="文件、变更和终端">
                   <Ellipsis size={20} />
                 </summary>
                 <div
@@ -739,16 +747,22 @@ export function ConversationWorkspace({
                       toolsMenu.current.open = false;
                   }}
                 >
+                  <button
+                    disabled={!selected}
+                    onClick={() => setContextOpen(true)}
+                  >
+                    记忆
+                  </button>
                   {tools}
                   <button
-                    aria-label="Toggle terminal"
+                    aria-label="展开或收起终端"
                     aria-pressed={terminalOpen}
-                    title="Terminal"
+                    title="终端"
                     onClick={onTerminal}
                     disabled={!repo}
                   >
                     <TerminalSquare size={16} />
-                    <span>Terminal</span>
+                    <span>终端</span>
                   </button>
                 </div>
               </details>
@@ -759,11 +773,11 @@ export function ConversationWorkspace({
             >
               {conversationTasks.length === 0 && (
                 <div className="conversation-intro">
-                  <h1>What are we working on?</h1>
+                  <h1>今天想做些什么？</h1>
                   <p>
                     {draft.folders?.length
-                      ? "Ask about your code, plan a change, or start building."
-                      : "Start a conversation, or add a folder to work on your code."}
+                      ? "了解代码、规划修改，或开始开发。"
+                      : "开始聊天，或添加文件夹来处理代码。"}
                   </p>
                   {!draft.folders?.length && (
                     <button
@@ -771,13 +785,17 @@ export function ConversationWorkspace({
                       disabled={!loaded}
                       onClick={() => void addFolders()}
                     >
-                      Add folders (optional)
+                      添加文件夹（可选）
                     </button>
                   )}
                 </div>
               )}
               {conversationTasks.map((task) => (
-                <article className="agent-task" key={task.id}>
+                <article
+                  className="agent-task"
+                  key={task.id}
+                  id={`task-${task.id}`}
+                >
                   <div className="agent-prompt">
                     {task.prompt}
                     {!!task.attachments?.length && (
@@ -791,9 +809,7 @@ export function ConversationWorkspace({
                       </div>
                     )}
                   </div>
-                  {task.text && (
-                    <div className="agent-response">{task.text}</div>
-                  )}
+                  {task.text && <MarkdownResponse text={task.text} />}
                   {task.questions?.map((group) => (
                     <AgentQuestions
                       key={group.id}
@@ -825,15 +841,15 @@ export function ConversationWorkspace({
                       />
                       <span>
                         {task.phase === "stopping"
-                          ? "Stopping…"
+                          ? "正在停止…"
                           : task.permissions.length
-                            ? "Waiting for approval"
+                            ? "等待授权"
                             : task.phase === "checking"
-                              ? "Checking…"
+                              ? "正在检查…"
                               : task.phase === "repairing"
-                                ? `Repairing · ${(task.round || 1) - 1}/${task.acceptance?.maxRepairs}`
+                                ? `正在修复 · ${(task.round || 1) - 1}/${task.acceptance?.maxRepairs}`
                                 : task.activity ||
-                                  (task.text ? "Continuing…" : "Working…")}
+                                  (task.text ? "正在继续…" : "处理中…")}
                       </span>
                     </div>
                   ) : (
@@ -842,37 +858,41 @@ export function ConversationWorkspace({
                       role="status"
                     >
                       {task.status === "completed"
-                        ? "Acceptance passed"
+                        ? "验收通过"
                         : task.status === "unverified"
                           ? task.questions?.some(
                               (group) => !group.answer && !group.readOnly,
                             )
-                            ? "Waiting for your answer"
+                            ? "等待你的回答"
                             : task.questions?.length
-                              ? "Finished"
-                              : "Finished · not verified"
+                              ? "已结束"
+                              : "已结束 · 未验证"
                           : task.status === "limit"
-                            ? "Limit reached"
+                            ? "已达到限制"
                             : task.status}
                     </small>
                   )}
                   {task.text && task.status !== "running" && (
-                    <div className="answer-actions">
-                      <button
-                        title="Fork chat from this answer"
-                        aria-label="Fork chat from this answer"
-                        disabled={managing || sending || !!running}
-                        onClick={() => void fork(task)}
-                      >
-                        <GitFork size={15} />
-                        <span>Fork</span>
-                      </button>
-                    </div>
+                    <AnswerActions
+                      text={task.text}
+                      disabled={managing || sending || !!running}
+                      onFork={() => void fork(task)}
+                      onMemory={() => {
+                        setMemoryDraft({
+                          title: task.prompt.trim().slice(0, 120) || "回答记忆",
+                          body: task.text.slice(0, 1200),
+                          kind: "reference",
+                          scope: null,
+                          sourceTaskID: task.id,
+                        });
+                        setContextOpen(true);
+                      }}
+                    />
                   )}
                   {task.acceptance && (
                     <details className="acceptance-results">
                       <summary>
-                        Acceptance · {task.checks?.length || 0} run
+                        验收 · {task.checks?.length || 0} 运行
                         {task.checks?.length === 1 ? "" : "s"}
                       </summary>
                       <code>{task.acceptance.command}</code>
@@ -880,19 +900,19 @@ export function ConversationWorkspace({
                       {task.checks?.map((check) => (
                         <div className="acceptance-run" key={check.round}>
                           <strong>
-                            Run {check.round} ·{" "}
+                            运行 {check.round} ·{" "}
                             {check.cancelled
-                              ? "Cancelled"
+                              ? "已取消"
                               : check.timedOut
-                                ? "Timed out"
+                                ? "已超时"
                                 : check.error
-                                  ? "Could not run"
-                                  : `Exit ${check.exitCode}`}{" "}
+                                  ? "无法运行"
+                                  : `退出码 ${check.exitCode}`}{" "}
                             · {(check.durationMs / 1000).toFixed(1)}s
                           </strong>
                           <pre>
-                            {check.error || check.output || "(No output)"}
-                            {check.truncated ? "\n[Output truncated]" : ""}
+                            {check.error || check.output || "（无输出）"}
+                            {check.truncated ? "\n[输出已截断]" : ""}
                           </pre>
                         </div>
                       ))}
@@ -903,9 +923,9 @@ export function ConversationWorkspace({
                     <section
                       className="agent-permission"
                       key={permission.id}
-                      aria-label="Tool approval"
+                      aria-label="工具授权"
                     >
-                      <strong>Allow {permission.action}?</strong>
+                      <strong>允许 {permission.action}?</strong>
                       <pre>{permission.resources.join("\n")}</pre>
                       {permission.message && <p>{permission.message}</p>}
                       <button
@@ -920,7 +940,7 @@ export function ConversationWorkspace({
                           )
                         }
                       >
-                        Deny
+                        拒绝
                       </button>
                       <button
                         className="permission-allow"
@@ -934,7 +954,7 @@ export function ConversationWorkspace({
                           )
                         }
                       >
-                        Allow once
+                        允许一次
                       </button>
                     </section>
                   ))}
@@ -944,15 +964,15 @@ export function ConversationWorkspace({
             <div className="composer-wrap">
               {draft.archived && (
                 <p className="archived-notice">
-                  This conversation is archived.{" "}
+                  此聊天已归档。{" "}
                   <button onClick={() => void archive()} disabled={managing}>
-                    Restore to continue
+                    恢复后继续
                   </button>
                 </p>
               )}
               {!loaded && agentError && (
                 <button onClick={() => setInitialization((value) => value + 1)}>
-                  Retry loading history
+                  重新加载历史
                 </button>
               )}
               <div
@@ -993,7 +1013,7 @@ export function ConversationWorkspace({
                         </button>
                         <button
                           disabled={sending || !!running}
-                          aria-label={`Remove folder ${root}`}
+                          aria-label={`移除文件夹 ${root}`}
                           onClick={() => void revokeFolder(root)}
                         >
                           <X size={12} />
@@ -1010,7 +1030,7 @@ export function ConversationWorkspace({
                         <span>{file.name}</span>
                         <button
                           disabled={sending}
-                          aria-label={`Remove ${file.name}`}
+                          aria-label={`移除 ${file.name}`}
                           onClick={() =>
                             composerDraft.update({
                               attachments: composerDraft.attachments.filter(
@@ -1028,22 +1048,21 @@ export function ConversationWorkspace({
                 {imageMismatch && (
                   <div className="composer-image-notice" role="status">
                     <span>
-                      {selectedModel?.name || "Selected model"} is not
-                      configured for images. Choose an image-capable model to
-                      send this attachment.
+                      {selectedModel?.name || "所选模型"}{" "}
+                      未启用图片功能，请选择支持图片的模型后发送此附件。
                     </span>
                     <button
                       type="button"
                       onClick={() => setModelOpenRequest((v) => v + 1)}
                     >
-                      Choose model
+                      选择模型
                     </button>
                   </div>
                 )}
                 <textarea
                   ref={input}
-                  aria-label="Message Anvil"
-                  placeholder="Work with Anvil"
+                  aria-label="向 Anvil 发送消息"
+                  placeholder="与 Anvil 一起工作"
                   value={draft.text}
                   onChange={(event) => update(event.target.value)}
                   onKeyDown={(event) => {
@@ -1073,7 +1092,7 @@ export function ConversationWorkspace({
                     className="tools-menu composer-menu"
                     key={`add-${selected}`}
                   >
-                    <summary aria-label="Add context">
+                    <summary aria-label="添加上下文">
                       <Plus size={17} />
                     </summary>
                     <div className="context-popover">
@@ -1092,7 +1111,7 @@ export function ConversationWorkspace({
                           void attach();
                         }}
                       >
-                        <Paperclip size={16} /> Add files or images…
+                        <Paperclip size={16} /> 添加文件或图片…
                       </button>
                       <button
                         onClick={(event) => {
@@ -1103,7 +1122,7 @@ export function ConversationWorkspace({
                         }}
                         disabled={readOnly || sending || managing}
                       >
-                        Add local folder…
+                        添加本地文件夹…
                       </button>
                     </div>
                   </details>
@@ -1113,11 +1132,11 @@ export function ConversationWorkspace({
                     <Shield size={17} />
                     <select
                       className="permission-mode"
-                      aria-label="Permission mode"
+                      aria-label="权限模式"
                       title={
                         selectedModel?.id === codexModel.id
-                          ? "Codex — Ask: read-only sandbox, approve escalation. Auto: sandboxed commands and workspace edits, approve escalation. Full access: no sandbox or approval. Codex may read outside attached folders."
-                          : "Ask: confirm edits and commands. Auto: allow scoped file edits, ask for commands and unknown operations. Full access: approve all tools."
+                          ? "Codex：逐次询问使用只读沙箱，额外权限需审批；自动模式允许沙箱内命令和工作区修改，额外权限需审批；完全访问不使用沙箱或审批。Codex 可能读取附加目录之外的文件。"
+                          : "逐次询问：编辑和命令需确认。自动模式：允许授权范围内的文件修改，命令及未知操作需确认。完全访问：允许所有工具操作。"
                       }
                       value={draft.permissionMode || "ask"}
                       disabled={readOnly || sending || !!running || managing}
@@ -1127,9 +1146,9 @@ export function ConversationWorkspace({
                         )
                       }
                     >
-                      <option value="ask">Ask each time</option>
-                      <option value="auto">Auto</option>
-                      <option value="full">Full access</option>
+                      <option value="ask">逐次询问</option>
+                      <option value="auto">自动</option>
+                      <option value="full">完全访问</option>
                     </select>
                   </label>
                   <ModelPicker
@@ -1142,13 +1161,13 @@ export function ConversationWorkspace({
 
                   <button
                     className={`send-button ${running ? "is-running" : ""}`}
-                    aria-label={running ? "Stop task" : "Send message"}
+                    aria-label={running ? "停止任务" : "发送消息"}
                     title={
                       running
-                        ? "Stop task"
+                        ? "停止任务"
                         : imageMismatch
-                          ? "Choose an image-capable model to send this attachment"
-                          : "Send · Ctrl / ⌘ + Enter"
+                          ? "请选择支持图片的模型后发送此附件"
+                          : "发送 · Ctrl / ⌘ + Enter"
                     }
                     onClick={() =>
                       running
@@ -1182,12 +1201,12 @@ export function ConversationWorkspace({
                 attaching) && (
                 <p className="draft-notice" role="status">
                   {storageError || composerDraft.storageError
-                    ? "Could not save this draft locally. Keep this window open."
+                    ? "无法在本地保存草稿，请保持此窗口打开。"
                     : attaching
-                      ? "Adding attachments…"
+                      ? "正在添加附件…"
                       : agentError ||
                         (imageMismatch
-                          ? "This model does not support images. Choose an image-capable model or remove the image."
+                          ? "此模型不支持图片，请更换支持图片的模型或移除图片。"
                           : "")}
                 </p>
               )}

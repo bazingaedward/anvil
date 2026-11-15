@@ -218,9 +218,7 @@ export function ConversationRow({
         >
           <input
             ref={input}
-            aria-label={
-              collapsed === undefined ? "Conversation title" : "Group name"
-            }
+            aria-label={collapsed === undefined ? "聊天标题" : "分组名称"}
             maxLength={collapsed === undefined ? 120 : 80}
             value={name}
             disabled={saving}
@@ -234,14 +232,14 @@ export function ConversationRow({
           />
           <button
             type="submit"
-            aria-label="Save title"
+            aria-label="保存标题"
             disabled={saving || !name.trim()}
           >
             <Check size={15} />
           </button>
           <button
             type="button"
-            aria-label="Cancel rename"
+            aria-label="取消重命名"
             disabled={saving}
             onClick={() => setEditing(false)}
           >
@@ -271,13 +269,13 @@ export function ConversationRow({
               ))}
             {pinned && <Pin size={13} />}
             <span>{title}</span>
-            {running && <span className="activity-dot" aria-label="Running" />}
+            {running && <span className="activity-dot" aria-label="运行中" />}
           </button>
           <button
             ref={trigger}
             className="conversation-row-more"
-            aria-label={`Actions for ${title}`}
-            title="Conversation actions"
+            aria-label={`${title}的操作`}
+            title="聊天操作"
             aria-haspopup="menu"
             aria-expanded={open}
             disabled={disabled}
@@ -299,7 +297,7 @@ export function ConversationRow({
             ref={menu}
             className="conversation-row-menu"
             role="menu"
-            aria-label={`Actions for ${title}`}
+            aria-label={`${title}的操作`}
             style={position}
             onPointerOver={(event) => {
               if (
@@ -348,7 +346,7 @@ export function ConversationRow({
                 }}
               >
                 <Pin size={17} />
-                {pinned ? "Unpin" : "Pin"}
+                {pinned ? "取消置顶" : "置顶"}
               </button>
             )}
             <button
@@ -361,7 +359,7 @@ export function ConversationRow({
               }}
             >
               <Pencil size={17} />
-              Rename
+              重命名
             </button>
             {onMove && (
               <button
@@ -381,7 +379,7 @@ export function ConversationRow({
                 }}
               >
                 <Folder size={17} />
-                Move to group
+                移至分组
                 <ChevronRight size={15} />
               </button>
             )}
@@ -389,7 +387,7 @@ export function ConversationRow({
               <button
                 role="menuitem"
                 disabled={running}
-                title={running ? "Stop the task before archiving" : undefined}
+                title={running ? "请先停止任务再归档" : undefined}
                 onClick={() => {
                   close();
                   onArchive();
@@ -400,7 +398,7 @@ export function ConversationRow({
                 ) : (
                   <Archive size={17} />
                 )}
-                {archived ? "Restore" : "Archive"}
+                {archived ? "恢复" : "归档"}
               </button>
             )}
             <div className="conversation-menu-separator" role="separator" />
@@ -413,7 +411,7 @@ export function ConversationRow({
               }}
             >
               <Trash2 size={17} />
-              {collapsed === undefined ? "Delete" : "Delete group"}
+              {collapsed === undefined ? "删除" : "删除分组"}
             </button>
           </div>,
           document.body,
@@ -426,7 +424,7 @@ export function ConversationRow({
             className="conversation-row-menu group-submenu"
             style={subPosition}
             role={creatingGroup ? "dialog" : "menu"}
-            aria-label={creatingGroup ? "New group" : "Move to group"}
+            aria-label={creatingGroup ? "新建分组" : "移至分组"}
             onPointerEnter={keepSubmenu}
             onPointerLeave={leaveSubmenu}
             onKeyDown={(event) => {
@@ -477,10 +475,10 @@ export function ConversationRow({
                   void createAndMove();
                 }}
               >
-                <label htmlFor="new-conversation-group">New group</label>
+                <label htmlFor="new-conversation-group">新建分组</label>
                 <input
                   id="new-conversation-group"
-                  aria-label="New group name"
+                  aria-label="新分组名称"
                   value={groupName}
                   maxLength={80}
                   disabled={groupSaving}
@@ -491,7 +489,7 @@ export function ConversationRow({
                   type="submit"
                   disabled={groupSaving || !groupName.trim()}
                 >
-                  Create and move
+                  创建并移动
                 </button>
                 <button
                   type="button"
@@ -501,7 +499,7 @@ export function ConversationRow({
                     focusSubmenu.current = true;
                   }}
                 >
-                  Cancel
+                  取消
                 </button>
               </form>
             ) : (
@@ -527,7 +525,7 @@ export function ConversationRow({
                       onMove?.(null);
                     }}
                   >
-                    Ungrouped
+                    未分组
                   </button>
                 )}
                 {!!(groups?.length || groupID) && (
@@ -544,7 +542,7 @@ export function ConversationRow({
                     setGroupError("");
                   }}
                 >
-                  New group…
+                  新建分组…
                 </button>
               </>
             )}

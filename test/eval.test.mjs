@@ -4,8 +4,9 @@ import { mkdtemp, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { tasks } from "../eval/tasks.mjs";
+import { repoTasks } from "../eval/repo-tasks.mjs";
 import { verify, writeFiles } from "../eval/verify.mjs";
-for (const task of tasks)
+for (const task of [...tasks, ...repoTasks])
   test(`eval verifier rejects starter and accepts reference: ${task.id}`, async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), "anvil-eval-test-"));
     try {

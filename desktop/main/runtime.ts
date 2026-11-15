@@ -32,6 +32,7 @@ export type RuntimeInput = {
   repo: string;
   state: string;
   directories: string[];
+  memoryDirectories?: string[];
   sessionID?: string;
   model?: ModelProfile;
   attachments?: StoredAttachment[];

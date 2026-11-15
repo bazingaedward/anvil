@@ -9,6 +9,7 @@ import type { StoredAttachment } from "./composer";
 type Start = {
   repo: string;
   directories: string[];
+  memoryDirectories?: string[];
   sessionID?: string;
   text: string;
   permissionMode?: PermissionMode;
@@ -263,7 +264,10 @@ async function start(input: Start) {
       : mode === "auto"
         ? {
             type: "workspaceWrite",
-            writableRoots: input.directories,
+            writableRoots: [
+              ...input.directories,
+              ...(input.memoryDirectories || []),
+            ],
             networkAccess: false,
             excludeTmpdirEnvVar: true,
             excludeSlashTmp: true,

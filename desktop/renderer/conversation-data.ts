@@ -18,9 +18,7 @@ export function readLegacyDrafts(storage: Storage): LegacyDraft[] {
           typeof value?.id !== "string" || typeof value?.text !== "string",
       )
     )
-      throw new Error(
-        "Could not import older drafts. Their original local data has been preserved.",
-      );
+      throw new Error("无法导入旧草稿，原始本地数据已保留。");
     for (const value of values)
       if (!result.some((item) => item.id === value.id)) result.push(value);
   }
@@ -35,7 +33,7 @@ export function conversationTitle(item: Conversation, tasks: AgentTask[]) {
       .split("\n")[0]
       .slice(0, 48) ||
     item.text.trim().split("\n")[0].slice(0, 48) ||
-    "New chat"
+    "新聊天"
   );
 }
 export function filterConversations(

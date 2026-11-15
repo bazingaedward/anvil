@@ -1,6 +1,17 @@
 import { contextBridge, ipcRenderer } from "electron";
 import type { DesktopAPI, TerminalEvent, AgentTask } from "../shared/api";
 const api: DesktopAPI = {
+  openExternalLink: (url) => ipcRenderer.invoke("links:open", url),
+  setAutoMemory: (id, enabled) =>
+    ipcRenderer.invoke("context:auto-memory", id, enabled),
+  openMemoryFolder: (id) => ipcRenderer.invoke("context:open-folder", id),
+  contextState: (id) => ipcRenderer.invoke("context:state", id),
+  saveMemory: (id, input) =>
+    ipcRenderer.invoke("context:save-memory", id, input),
+  deleteMemory: (id, noteID, revision) =>
+    ipcRenderer.invoke("context:delete-memory", id, noteID, revision),
+  saveHandoff: (id, input) =>
+    ipcRenderer.invoke("context:save-handoff", id, input),
   accountStatus: (refresh) => ipcRenderer.invoke("account:status", refresh),
   accountLogin: () => ipcRenderer.invoke("account:login"),
   accountPoll: () => ipcRenderer.invoke("account:poll"),

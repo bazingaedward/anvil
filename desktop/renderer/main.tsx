@@ -167,9 +167,7 @@ function TreeNodes({
             <button
               className={`tree-row ${active === entry.path ? "selected" : ""}`}
               style={{ paddingLeft: 12 + depth * 15 }}
-              title={
-                entry.symlink ? `${entry.path} (symbolic link)` : entry.path
-              }
+              title={entry.symlink ? `${entry.path}（符号链接）` : entry.path}
               disabled={entry.symlink}
               onClick={() =>
                 entry.directory
@@ -246,7 +244,7 @@ function TerminalPanel({
     const off = api.onTerminal((event) => {
       if (event.type === "data") term.write(event.data);
       else {
-        term.writeln(`\r\n[Process exited with code ${event.code}]`);
+        term.writeln(`\r\n[进程已退出，退出码 ${event.code}]`);
         setExited(true);
       }
     });
@@ -287,20 +285,20 @@ function TerminalPanel({
   return (
     <section
       className={`terminal-panel ${hidden ? "hidden" : ""}`}
-      aria-label="Terminal"
+      aria-label="终端"
     >
       <div className="terminal-toolbar">
         <span>
-          <TerminalSquare size={14} /> Terminal
+          <TerminalSquare size={14} /> 终端
         </span>
         <span className="terminal-location">{root}</span>
         <button
-          title="Restart terminal (ends running processes)"
-          aria-label="Restart terminal"
+          title="重启终端（结束正在运行的进程）"
+          aria-label="重启终端"
           onClick={() => setGeneration((value) => value + 1)}
         >
           <RefreshCw size={13} />
-          {exited && " Restart"}
+          {exited && " 重启"}
         </button>
       </div>
       <div className="terminal-body" ref={container} />
@@ -478,8 +476,8 @@ function App() {
       <div className="sidebar-heading">
         <span title={repo.root}>{repo.name}</span>
         <button
-          aria-label="Refresh folder"
-          title="Refresh folder"
+          aria-label="刷新文件夹"
+          title="刷新文件夹"
           onClick={() => {
             void refresh();
             setRevision((value) => value + 1);
@@ -493,8 +491,8 @@ function App() {
           <div className="file-filter">
             <Search size={13} />
             <input
-              aria-label="Filter visible files"
-              placeholder="Filter visible files…"
+              aria-label="筛选当前文件"
+              placeholder="筛选当前文件…"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
             />
@@ -522,7 +520,7 @@ function App() {
             return (
               <section key={side}>
                 <h2>
-                  {side === "index" ? "Staged changes" : "Working changes"}
+                  {side === "index" ? "已暂存变更" : "工作区变更"}
                   <span>{items.length}</span>
                 </h2>
                 {items.map((item) => (
@@ -555,13 +553,11 @@ function App() {
           {changes.length === 0 && (
             <div className="clean-state">
               <GitCompareArrows size={24} />
-              <strong>Working tree clean</strong>
-              <p>File changes will appear here.</p>
+              <strong>工作区干净</strong>
+              <p>文件变更会显示在这里。</p>
             </div>
           )}
-          <p className="git-note">
-            Review changes here. Use the terminal to stage, commit, and push.
-          </p>
+          <p className="git-note">在此审查变更，通过终端暂存、提交和推送。</p>
         </div>
       )}
     </div>
@@ -570,8 +566,8 @@ function App() {
     <div className="editor-area">
       <div className="editor-toolbar">
         <button
-          aria-label="Back to file list"
-          title="Back to file list"
+          aria-label="返回文件列表"
+          title="返回文件列表"
           onClick={() => setReviewDetail(false)}
         >
           <ArrowLeft size={15} />
@@ -587,40 +583,38 @@ function App() {
                 <Circle
                   size={8}
                   fill="currentColor"
-                  aria-label="Unsaved changes"
+                  aria-label="未保存的修改"
                 />
               )}
               {diff && (
                 <span className="diff-label">
-                  {diff.side === "index"
-                    ? "HEAD ↔ Index"
-                    : "Index ↔ Working tree"}
+                  {diff.side === "index" ? "HEAD ↔ 暂存区" : "暂存区 ↔ 工作区"}
                 </span>
               )}
             </>
           ) : (
-            <span className="muted">Workspace</span>
+            <span className="muted">工作区</span>
           )}
         </div>
         <div className="editor-actions">
           {document && (
             <>
               <button
-                title="Reload file from disk"
-                aria-label="Reload file"
+                title="从磁盘重新加载文件"
+                aria-label="重新加载文件"
                 disabled={busy}
                 onClick={() => openFile(document.path)}
               >
                 <RefreshCw size={14} />
               </button>
               <button
-                aria-label="Save file"
+                aria-label="保存文件"
                 className="save-button"
                 disabled={!dirty || busy}
                 onClick={() => void save()}
               >
                 <Save size={14} />
-                Save
+                保存
               </button>
             </>
           )}
@@ -643,10 +637,10 @@ function App() {
         <div className="editor-empty">
           <FileCode2 size={30} strokeWidth={1.2} />
           <h1>{repo.name}</h1>
-          <p>Select a file to edit or a change to review.</p>
+          <p>选择文件进行编辑，或选择变更进行审查。</p>
           <div className="shortcut">
             <kbd>{navigator.platform.includes("Mac") ? "⌘" : "Ctrl"} S</kbd>
-            <span>Save the current file</span>
+            <span>保存当前文件</span>
           </div>
         </div>
       )}
@@ -659,7 +653,7 @@ function App() {
           <div
             className="resize-column"
             role="separator"
-            aria-label="Right panel width"
+            aria-label="右侧面板宽度"
             aria-orientation="vertical"
             tabIndex={0}
             onPointerDown={(event) => resize(event)}
@@ -677,7 +671,7 @@ function App() {
           hidden={!reviewOpen}
           id="workspace-panel"
           className="review-panel"
-          aria-label="Workspace panel"
+          aria-label="工作区面板"
           style={{ width: sidebarWidth }}
         >
           <div className="sidebar-tabs">
@@ -690,7 +684,7 @@ function App() {
               }}
             >
               <Folder size={14} />
-              Files
+              文件
             </button>
             <button
               className={terminalHidden && view === "changes" ? "active" : ""}
@@ -702,7 +696,7 @@ function App() {
               }}
             >
               <GitCompareArrows size={14} />
-              Changes<span className="count">{changes.length}</span>
+              变更<span className="count">{changes.length}</span>
             </button>
             <button
               className={!terminalHidden ? "active" : ""}
@@ -712,11 +706,11 @@ function App() {
               }}
             >
               <TerminalSquare size={14} />
-              Terminal
+              终端
             </button>
             <button
               className="close-review"
-              aria-label="Close workspace panel"
+              aria-label="关闭工作区面板"
               onClick={() => {
                 setReviewOpen(false);
               }}
@@ -759,17 +753,17 @@ function App() {
       >
         <button
           className="application-menu-button"
-          aria-label="Application menu"
+          aria-label="应用菜单"
           aria-haspopup="menu"
-          title="File, Edit and View"
+          title="文件、编辑与视图"
           onClick={() => void api.showApplicationMenu().catch(report)}
         >
           <MenuIcon size={20} />
         </button>
         <button
           className="application-menu-button panel-toggle"
-          aria-label={sidebarOpen ? "Collapse left panel" : "Expand left panel"}
-          title={sidebarOpen ? "Collapse left panel" : "Expand left panel"}
+          aria-label={sidebarOpen ? "收起左侧面板" : "展开左侧面板"}
+          title={sidebarOpen ? "收起左侧面板" : "展开左侧面板"}
           aria-expanded={sidebarOpen}
           onClick={() => setSidebarOpen((value) => !value)}
         >
@@ -779,7 +773,7 @@ function App() {
       {error && (
         <div className="error-banner" role="alert">
           <span>{error}</span>
-          <button aria-label="Dismiss error" onClick={() => setError("")}>
+          <button aria-label="关闭错误提示" onClick={() => setError("")}>
             <X size={15} />
           </button>
         </div>
@@ -795,15 +789,13 @@ function App() {
         panelToggle={
           <button
             className="right-panel-toggle"
-            aria-label={
-              reviewOpen ? "Collapse right panel" : "Expand right panel"
-            }
+            aria-label={reviewOpen ? "收起右侧面板" : "展开右侧面板"}
             title={
               !repo
-                ? "Add a folder to use the workspace panel"
+                ? "添加文件夹后使用工作区面板"
                 : reviewOpen
-                  ? "Collapse right panel"
-                  : "Expand right panel"
+                  ? "收起右侧面板"
+                  : "展开右侧面板"
             }
             aria-expanded={reviewOpen}
             aria-controls="workspace-panel"
@@ -818,25 +810,25 @@ function App() {
             <button
               onClick={() => toggleReview("files")}
               disabled={!repo}
-              aria-label="Open files"
+              aria-label="打开文件"
               aria-pressed={reviewOpen && terminalHidden && view === "files"}
             >
               <Folder size={15} />
-              <span>Files</span>
+              <span>文件</span>
             </button>
             <button
               onClick={() => toggleReview("changes")}
               disabled={!repo || repo.git === false}
-              aria-label="Review changes"
+              aria-label="审查变更"
               title={
                 repo?.git === false
-                  ? "Select a Git repository folder to review changes"
-                  : "Review changes"
+                  ? "请选择 Git 仓库文件夹以审查变更"
+                  : "审查变更"
               }
               aria-pressed={reviewOpen && terminalHidden && view === "changes"}
             >
               <GitCompareArrows size={15} />
-              <span>Changes</span>
+              <span>变更</span>
               {changes.length > 0 && (
                 <span className="count">{changes.length}</span>
               )}

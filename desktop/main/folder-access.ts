@@ -60,3 +60,27 @@ export function allowsOperation(
     return false;
   return allowsFolderOperation(action, resources, cwd, folders);
 }
+
+export function allowsMemoryOperation(
+  action: string,
+  resources: string[],
+  cwd: string,
+  folders: string[],
+) {
+  if (!resources.length) return false;
+  if (action === "external_directory")
+    return resources.every((resource) => {
+      const directory = resource.replace(/[\\/]\*$/, "");
+      return (
+        folders.some(
+          (folder) =>
+            path.resolve(directory).toLowerCase() ===
+            path.resolve(folder).toLowerCase(),
+        ) && allowsFolderOperation("read", [directory], cwd, folders)
+      );
+    });
+  return (
+    resources.every((resource) => resource.endsWith(".md")) &&
+    allowsOperation("auto", action, resources, cwd, folders)
+  );
+}

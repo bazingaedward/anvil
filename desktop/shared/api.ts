@@ -1,3 +1,4 @@
+import type { ContextState, MemoryInput, Handoff } from "./memory";
 export type CloudConfig = {
   models: ModelProfile[];
   groups: { id: string; name: string }[];
@@ -85,6 +86,11 @@ export type AgentQuestionGroup = {
   readOnly?: boolean;
 };
 export type AgentTask = {
+  contextUsed?: {
+    memories: { id: string; revision: number }[];
+    handoffRevision: number | null;
+    sourceTaskID: string | null;
+  };
   questions?: AgentQuestionGroup[];
   model?: ModelProfile;
   attachments?: Attachment[];
@@ -173,6 +179,17 @@ export type ReviewOptions = {
   stash?: boolean;
 };
 export interface DesktopAPI {
+  openExternalLink(url: string): Promise<void>;
+  setAutoMemory(id: string, enabled: boolean): Promise<ContextState>;
+  openMemoryFolder(id: string): Promise<void>;
+  contextState(id: string): Promise<ContextState>;
+  saveMemory(id: string, input: MemoryInput): Promise<ContextState>;
+  deleteMemory(
+    id: string,
+    noteID: string,
+    revision: number,
+  ): Promise<ContextState>;
+  saveHandoff(id: string, input: Handoff): Promise<ContextState>;
   accountStatus(refresh?: boolean): Promise<AccountState>;
   accountLogin(): Promise<void>;
   accountPoll(): Promise<AccountState>;

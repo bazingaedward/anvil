@@ -94,22 +94,21 @@ export function ModelPicker({
     <>
       <details className="tools-menu composer-menu model-picker" ref={menu}>
         <summary
-          aria-label="Choose model"
+          aria-label="选择模型"
           aria-disabled={disabled}
           onClick={(e) => {
             if (disabled) e.preventDefault();
           }}
         >
           <span className="model-picker-label" title={current?.name}>
-            {current?.name ||
-              (models.length ? "Choose model" : "Loading models…")}
+            {current?.name || (models.length ? "选择模型" : "正在加载模型…")}
           </span>
           <ChevronDown size={14} />
         </summary>
         <div className="context-popover model-popover">
           <input
-            aria-label="Search models"
-            placeholder="Search models…"
+            aria-label="搜索模型"
+            placeholder="搜索模型…"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
@@ -137,7 +136,7 @@ export function ModelPicker({
                     {model.name}
                     <small>
                       {model.provider}
-                      {model.vision ? " · Images" : " · Text"}
+                      {model.vision ? " · 支持图片" : " · 文本"}
                     </small>
                   </span>
                   {model.id === value && <Check size={15} />}
@@ -145,7 +144,7 @@ export function ModelPicker({
                 {model.id !== codexModel.id && (
                   <button
                     disabled={disabled}
-                    aria-label={`Configure ${model.name}`}
+                    aria-label={`配置 ${model.name}`}
                     onClick={() => edit(model)}
                   >
                     ···
@@ -167,7 +166,7 @@ export function ModelPicker({
               })
             }
           >
-            <Plus size={15} /> Add model…
+            <Plus size={15} /> 添加模型…
           </button>
           {error && !editing && <p role="alert">{error}</p>}
         </div>
@@ -188,10 +187,10 @@ export function ModelPicker({
             }}
           >
             <header>
-              <h2>Model settings</h2>
+              <h2>模型设置</h2>
               <button
                 type="button"
-                aria-label="Close model settings"
+                aria-label="关闭模型设置"
                 disabled={busy}
                 onClick={() => {
                   dialog.current?.close();
@@ -201,12 +200,9 @@ export function ModelPicker({
                 <X size={18} />
               </button>
             </header>
-            <p>
-              Connect through OpenCode’s provider adapters. Credentials stay in
-              Keygrant.
-            </p>
+            <p>通过 OpenCode 供应商适配器连接，密钥保存在 Keygrant 中。</p>
             <label>
-              Provider preset
+              供应商预设
               <select
                 value=""
                 onChange={(e) => {
@@ -228,7 +224,7 @@ export function ModelPicker({
                   }
                 }}
               >
-                <option value="">Choose a provider or configure below…</option>
+                <option value="">选择供应商，或在下方手动配置…</option>
                 {providerPresets.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.name}
@@ -237,7 +233,7 @@ export function ModelPicker({
               </select>
             </label>
             <label>
-              API protocol
+              API 协议
               <select
                 value={editing.protocol || "responses"}
                 onChange={(e) => {
@@ -258,11 +254,11 @@ export function ModelPicker({
             </label>
             {(
               [
-                ["name", "Display name"],
-                ["provider", "Provider name"],
-                ["model", "Model ID"],
-                ["endpoint", "HTTPS API base URL (or matching endpoint)"],
-                ["keyRef", "Keygrant environment variable"],
+                ["name", "显示名称"],
+                ["provider", "供应商名称"],
+                ["model", "模型 ID"],
+                ["endpoint", "HTTPS API 基础地址（或对应接口地址）"],
+                ["keyRef", "Keygrant 环境变量名"],
               ] as const
             ).map(([key, label]) => (
               <label key={key}>
@@ -272,7 +268,7 @@ export function ModelPicker({
                   value={editing[key]}
                   placeholder={
                     key === "endpoint" && editing.id === "ark-default"
-                      ? "Use injected BYTEPLUS_ARK_RESPONSES_URL"
+                      ? "使用已注入的 BYTEPLUS_ARK_RESPONSES_URL"
                       : undefined
                   }
                   onChange={(e) => {
@@ -290,7 +286,7 @@ export function ModelPicker({
                   setEditing({ ...editing, vision: e.target.checked })
                 }
               />{" "}
-              This model supports image input
+              此模型支持图片输入
             </label>
             <label className="model-capability">
               <input
@@ -300,14 +296,14 @@ export function ModelPicker({
                   setEditing({ ...editing, tools: e.target.checked })
                 }
               />
-              This model supports tool calling
+              此模型支持工具调用
             </label>
             <div className="model-limits">
               {(["contextLimit", "outputLimit"] as const).map((field) => (
                 <label key={field}>
                   {field === "contextLimit"
-                    ? "Context tokens"
-                    : "Maximum output tokens"}
+                    ? "上下文 Token 上限"
+                    : "最大输出 Token 数"}
                   <input
                     type="number"
                     min={256}
@@ -327,9 +323,8 @@ export function ModelPicker({
               ))}
             </div>
             <p>
-              Inject the named secret through Keygrant when starting Anvil. New
-              secret names require a restart. Enable images only if supported by
-              the provider.
+              启动 Anvil 时通过 Keygrant
+              注入对应密钥。新增密钥名称后需要重启；仅在供应商支持时启用图片功能。
             </p>
             {error && (
               <p role="alert" className="model-error">
@@ -360,12 +355,12 @@ export function ModelPicker({
                   }
                 }}
               >
-                Remove
+                移除
               </button>
               <button
                 type="button"
                 disabled={busy}
-                title="Saves this configuration and sends a small billable test request"
+                title="保存配置并发送一次少量计费的测试请求"
                 onClick={async () => {
                   setBusy(true);
                   setError("");
@@ -373,7 +368,7 @@ export function ModelPicker({
                   try {
                     accept(await window.anvil.saveModel(editing));
                     await window.anvil.testModel(editing.id);
-                    setStatus("Connection successful");
+                    setStatus("连接成功");
                   } catch (e) {
                     setError(String(e));
                   } finally {
@@ -381,10 +376,10 @@ export function ModelPicker({
                   }
                 }}
               >
-                Save & test connection
+                保存并测试连接
               </button>
               <button disabled={busy} type="submit">
-                {busy ? "Working…" : "Save"}
+                {busy ? "处理中…" : "保存"}
               </button>
             </footer>
           </form>

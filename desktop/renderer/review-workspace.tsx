@@ -190,12 +190,12 @@ export function ReviewWorkspace({
           className="review-sidebar"
           hidden={!sidebarOpen}
         >
-          <h2>Code review</h2>
+          <h2>代码审查</h2>
           <div className="review-sidebar-label">
-            <span>Repositories</span>
+            <span>仓库</span>
             <button
-              aria-label="Open repository"
-              title="Open repository"
+              aria-label="打开仓库"
+              title="打开仓库"
               onClick={() => void add()}
             >
               <Plus size={17} />
@@ -221,8 +221,8 @@ export function ReviewWorkspace({
               </button>
               <button
                 className="review-repository-more"
-                aria-label={`Repository actions for ${name(root)}`}
-                title="Repository actions"
+                aria-label={`仓库操作： ${name(root)}`}
+                title="仓库操作"
                 aria-haspopup="menu"
                 aria-expanded={menu?.root === root}
                 onClick={(event) => {
@@ -247,7 +247,7 @@ export function ReviewWorkspace({
             </div>
           ))}
           {!visible.length && (
-            <button onClick={() => void add()}>Open repository…</button>
+            <button onClick={() => void add()}>打开仓库…</button>
           )}
           {error && <p role="alert">{error}</p>}
         </aside>
@@ -255,9 +255,9 @@ export function ReviewWorkspace({
           {!active && (
             <div className="review-empty">
               <FolderGit2 size={28} />
-              <h2>Review your code</h2>
-              <p>Open a local repository to explore its history and changes.</p>
-              <button onClick={() => void add()}>Open repository…</button>
+              <h2>审查你的代码</h2>
+              <p>打开本地仓库，查看历史和变更。</p>
+              <button onClick={() => void add()}>打开仓库…</button>
             </div>
           )}
           {repositories.map((root) => (
@@ -273,12 +273,9 @@ export function ReviewWorkspace({
       </div>
       {open && removed && (
         <div className="review-remove-notice" role="status">
-          <span>Removed {name(removed.root)} from list.</span>
-          <button onClick={undo}>Undo</button>
-          <button
-            aria-label="Dismiss removal notification"
-            onClick={() => setRemoved(null)}
-          >
+          <span>已移除 {name(removed.root)} （仅从列表移除）。</span>
+          <button onClick={undo}>撤销</button>
+          <button aria-label="关闭移除提示" onClick={() => setRemoved(null)}>
             <X size={15} />
           </button>
         </div>
@@ -290,12 +287,12 @@ export function ReviewWorkspace({
           <div
             ref={menuRef}
             role="menu"
-            aria-label={`Repository actions for ${name(menu.root)}`}
+            aria-label={`仓库操作： ${name(menu.root)}`}
             className="review-repository-menu"
             style={{ left: menu.left, top: menu.top }}
           >
             <button role="menuitem" onClick={() => remove(menu.root)}>
-              Remove from list
+              从列表移除
             </button>
           </div>,
           document.body,
@@ -390,7 +387,7 @@ function RepositoryReview({ root, active }: { root: string; active: boolean }) {
     if (fetchPending.current) return;
     fetchPending.current = true;
     setFetching(true);
-    setFetchNotice({ message: "Fetching from remote(s)…" });
+    setFetchNotice({ message: "正在获取远程更新…" });
     setError("");
     try {
       await window.anvil.fetchRemotes(root);
@@ -453,17 +450,17 @@ function RepositoryReview({ root, active }: { root: string; active: boolean }) {
         <span>
           {selected.length >= 40 && mode === "history"
             ? `${base ? base.slice(0, 8) + " → " : ""}${selected.slice(0, 8)}`
-            : selected || "Select a file to view its changes"}
+            : selected || "选择文件查看变更"}
         </span>
         {selected && (
-          <button aria-label="Close changes" onClick={clear}>
+          <button aria-label="关闭变更" onClick={clear}>
             <X size={16} />
           </button>
         )}
       </header>
       {detailBusy ? (
         <p className="review-muted" role="status">
-          Loading changes…
+          正在加载变更…
         </p>
       ) : diff ? (
         <>
@@ -491,24 +488,24 @@ function RepositoryReview({ root, active }: { root: string; active: boolean }) {
         <div className="review-actions">
           <button
             ref={searchButton}
-            title="Search commits (⌘F / Ctrl+F)"
-            aria-label="Search repository history"
+            title="搜索提交（⌘F / Ctrl+F）"
+            aria-label="搜索仓库历史"
             aria-expanded={searchOpen}
             onClick={() => (searchOpen ? closeSearch() : setSearchOpen(true))}
           >
             <Search size={18} />
           </button>
           <button
-            title="Open repository in Terminal"
-            aria-label="Open repository in Terminal"
+            title="在终端中打开仓库"
+            aria-label="在终端中打开仓库"
             disabled={terminalBusy}
             onClick={() => void openTerminal()}
           >
             <TerminalSquare size={19} />
           </button>
           <button
-            title="Fetch remote updates"
-            aria-label="Fetch remote updates"
+            title="获取远程更新"
+            aria-label="获取远程更新"
             aria-busy={fetching}
             disabled={busy || fetching}
             onClick={() => void fetchRemoteUpdates()}
@@ -516,8 +513,8 @@ function RepositoryReview({ root, active }: { root: string; active: boolean }) {
             <CloudDownload size={19} />
           </button>
           <button
-            title="Refresh repository"
-            aria-label="Refresh repository"
+            title="刷新仓库"
+            aria-label="刷新仓库"
             disabled={busy || fetching}
             onClick={() => {
               clear();
@@ -552,16 +549,13 @@ function RepositoryReview({ root, active }: { root: string; active: boolean }) {
             )}
             <span>{fetchNotice.message}</span>
           </div>
-          <button onClick={() => setFetchNotice(null)}>Dismiss</button>
+          <button onClick={() => setFetchNotice(null)}>关闭</button>
         </div>
       )}
       <nav className="review-views">
         {[
-          ["history", "Commit graph"],
-          [
-            "changes",
-            `Working changes${state ? ` (${state.changes.length})` : ""}`,
-          ],
+          ["history", "提交图"],
+          ["changes", `工作区变更${state ? ` (${state.changes.length})` : ""}`],
         ].map(([value, label]) => (
           <button
             key={value}
@@ -584,7 +578,7 @@ function RepositoryReview({ root, active }: { root: string; active: boolean }) {
         <>
           <div className="graph-controls">
             <select
-              aria-label="Branch"
+              aria-label="分支"
               value={branch}
               onChange={(e) => {
                 clear();
@@ -592,7 +586,7 @@ function RepositoryReview({ root, active }: { root: string; active: boolean }) {
                 setBranch(e.target.value);
               }}
             >
-              <option value="">All branches</option>
+              <option value="">所有分支</option>
               {history.branches
                 .filter((ref) => remotes || !ref.startsWith("refs/remotes/"))
                 .map((ref) => (
@@ -612,7 +606,7 @@ function RepositoryReview({ root, active }: { root: string; active: boolean }) {
                   clear();
                 }}
               />{" "}
-              Remotes
+              远程分支
             </label>
             <label>
               <input
@@ -624,32 +618,32 @@ function RepositoryReview({ root, active }: { root: string; active: boolean }) {
                   clear();
                 }}
               />{" "}
-              Stashes
+              暂存记录
             </label>
           </div>
           {base && (
             <div className="review-comparison">
-              Comparing from {base.slice(0, 8)} · select another commit
+              比较起点 {base.slice(0, 8)} · 选择另一个提交
               <button
                 onClick={() => {
                   setBase("");
                   clear();
                 }}
               >
-                Cancel
+                取消
               </button>
             </div>
           )}
           {historyCommit && (
             <div className="review-comparison">
-              History from {historyCommit.slice(0, 8)}
+              历史起点 {historyCommit.slice(0, 8)}
               <button
                 onClick={() => {
                   setHistoryCommit("");
                   clear();
                 }}
               >
-                Back to latest history
+                返回最新历史
               </button>
             </div>
           )}
@@ -660,11 +654,11 @@ function RepositoryReview({ root, active }: { root: string; active: boolean }) {
             <table className="commit-table">
               <thead>
                 <tr>
-                  <th style={{ width: graphWidth }}>Graph</th>
-                  <th>Description</th>
-                  <th>Date</th>
-                  <th>Author</th>
-                  <th>Commit</th>
+                  <th style={{ width: graphWidth }}>图谱</th>
+                  <th>说明</th>
+                  <th>日期</th>
+                  <th>作者</th>
+                  <th>提交</th>
                 </tr>
               </thead>
               <tbody>
@@ -717,15 +711,15 @@ function RepositoryReview({ root, active }: { root: string; active: boolean }) {
                     <td>
                       <button
                         className="commit-hash"
-                        title="View commit changes"
+                        title="查看提交变更"
                         onClick={() => void inspect(commit.hash)}
                       >
                         {commit.hash.slice(0, 8)}
                       </button>
                       <button
                         className="compare-commit"
-                        title="Compare from this commit"
-                        aria-label={`Compare from ${commit.hash.slice(0, 8)}`}
+                        title="以此提交为比较起点"
+                        aria-label={`从此提交比较 ${commit.hash.slice(0, 8)}`}
                         onClick={() => {
                           clear();
                           setBase(commit.hash);
@@ -740,7 +734,7 @@ function RepositoryReview({ root, active }: { root: string; active: boolean }) {
             </table>
             {!rows.length && (
               <p className="review-muted">
-                {busy ? "Loading history…" : "No commits yet."}
+                {busy ? "正在加载历史…" : "暂无提交。"}
               </p>
             )}
             {history.commits.length >= limit && limit < 1000 && (
@@ -749,13 +743,12 @@ function RepositoryReview({ root, active }: { root: string; active: boolean }) {
                 disabled={busy}
                 onClick={() => setLimit((n) => n + 100)}
               >
-                Load more commits
+                加载更多提交
               </button>
             )}
             {limit === 1000 && history.commits.length >= limit && (
               <p className="review-muted">
-                Showing the first 1,000 commits. Select a branch to narrow the
-                history.
+                显示前 1,000 个提交，可选择分支缩小范围。
               </p>
             )}
           </div>
@@ -766,7 +759,7 @@ function RepositoryReview({ root, active }: { root: string; active: boolean }) {
           <aside>
             {(["worktree", "index"] as const).map((side) => (
               <section key={side}>
-                <h4>{side === "index" ? "Staged" : "Unstaged"}</h4>
+                <h4>{side === "index" ? "已暂存" : "未暂存"}</h4>
                 {state?.changes
                   .filter((c) =>
                     side === "index"
@@ -790,7 +783,7 @@ function RepositoryReview({ root, active }: { root: string; active: boolean }) {
               </section>
             ))}
             {state && !state.changes.length && (
-              <p className="review-muted">No working changes.</p>
+              <p className="review-muted">没有工作区变更。</p>
             )}
           </aside>
           {detail}
@@ -810,7 +803,7 @@ function CommitPatch({ patch }: { patch: string }) {
       {files.length > 0 && (
         <aside>
           <button aria-pressed={file === -1} onClick={() => setFile(-1)}>
-            All changes ({files.length})
+            所有变更（{files.length})
           </button>
           {files.map((part, index) => {
             const header = part.split("\n")[0].replace(/^diff --git /, "");
@@ -847,7 +840,7 @@ function CommitPatch({ patch }: { patch: string }) {
                 {line || " "}
               </div>
             ))
-          : "No changes to display."}
+          : "暂无变更。"}
       </pre>
     </div>
   );

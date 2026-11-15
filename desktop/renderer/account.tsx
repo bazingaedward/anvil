@@ -165,11 +165,11 @@ export function AccountGate({ children }: { children: ReactNode }) {
         <div className="account-titlebar" />
         <section>
           <h1>Anvil</h1>
-          <h2>Your coding workspace, on every computer.</h2>
+          <h2>在每台电脑上继续你的编程工作。</h2>
           <p>
-            Sign in to sync model settings and groups.
+            登录后同步模型设置和分组。
             <br />
-            Chats, files and folder permissions stay on this device.
+            聊天、文件和目录权限保存在本机。
           </p>
           <button
             className="google-sign-in"
@@ -188,9 +188,7 @@ export function AccountGate({ children }: { children: ReactNode }) {
               alt=""
               aria-hidden="true"
             />
-            {state?.pending
-              ? "Waiting for Google sign-in…"
-              : "Continue with Google"}
+            {state?.pending ? "等待 Google 登录…" : "使用 Google 登录"}
           </button>
           {state?.pending && (
             <button
@@ -201,7 +199,7 @@ export function AccountGate({ children }: { children: ReactNode }) {
                 })
               }
             >
-              Open sign-in again
+              重新打开登录页面
             </button>
           )}
           {error && (
@@ -222,8 +220,8 @@ export function AccountGate({ children }: { children: ReactNode }) {
       <button
         ref={triggerRef}
         className="account-trigger"
-        title="Account"
-        aria-label="Account menu"
+        title="账号"
+        aria-label="账号菜单"
         aria-expanded={menuOpen}
         aria-controls="account-menu"
         aria-haspopup="menu"
@@ -237,29 +235,29 @@ export function AccountGate({ children }: { children: ReactNode }) {
           id="account-menu"
           className="account-menu"
           role="menu"
-          aria-label="Account"
+          aria-label="账号"
         >
           <div className="account-menu-identity">
             <span className="account-avatar">{initial}</span>
             <div>
-              <strong>{state.user.name || "Anvil account"}</strong>
+              <strong>{state.user.name || "Anvil 账号"}</strong>
               <span>{state.user.email}</span>
             </div>
           </div>
           <div className="account-menu-divider" />
           <button role="menuitem" onClick={() => showSettings("account")}>
             <UserRound size={19} />
-            <span>My account</span>
+            <span>我的账号</span>
           </button>
           <button role="menuitem" onClick={() => showSettings()}>
             <Settings size={19} />
-            <span>Settings</span>
+            <span>设置</span>
             <kbd>Ctrl+,</kbd>
           </button>
           <div className="account-menu-divider" />
           <button role="menuitem" disabled={busy} onClick={() => void logout()}>
             <LogOut size={19} />
-            <span>{busy ? "Please wait…" : "Sign out"}</span>
+            <span>{busy ? "请稍候…" : "退出登录"}</span>
           </button>
           {error && (
             <p role="alert" className="account-error">
@@ -280,12 +278,12 @@ export function AccountGate({ children }: { children: ReactNode }) {
       >
         <div className="settings-layout">
           <aside className="settings-nav">
-            <h2 id="settings-title">Settings</h2>
-            <nav aria-label="Settings sections">
+            <h2 id="settings-title">设置</h2>
+            <nav aria-label="设置分类">
               {[
-                { id: "general", label: "General", icon: SlidersHorizontal },
-                { id: "account", label: "Account", icon: UserRound },
-                { id: "devices", label: "Devices", icon: Monitor },
+                { id: "general", label: "通用", icon: SlidersHorizontal },
+                { id: "account", label: "账号", icon: UserRound },
+                { id: "devices", label: "设备", icon: Monitor },
               ].map(({ id, label, icon: Icon }) => (
                 <button
                   key={id}
@@ -302,18 +300,18 @@ export function AccountGate({ children }: { children: ReactNode }) {
           <div className="settings-content">
             <button
               className="icon-button account-close"
-              aria-label="Close settings"
+              aria-label="关闭设置"
               onClick={() => setOpen(false)}
             >
               <X size={20} />
             </button>
             {section === "general" && (
               <>
-                <h2>General</h2>
+                <h2>通用</h2>
                 <div className="settings-row">
                   <div>
-                    <label htmlFor="default-model">Default model</label>
-                    <p>Used for new chats.</p>
+                    <label htmlFor="default-model">默认模型</label>
+                    <p>用于新聊天。</p>
                   </div>
                   <select
                     id="default-model"
@@ -336,8 +334,8 @@ export function AccountGate({ children }: { children: ReactNode }) {
                 </div>
                 <div className="settings-row">
                   <div>
-                    <strong>Sync settings</strong>
-                    <p>Your preferences sync across devices.</p>
+                    <strong>同步设置</strong>
+                    <p>在不同设备间同步偏好设置。</p>
                   </div>
                   <button
                     disabled={busy}
@@ -348,18 +346,17 @@ export function AccountGate({ children }: { children: ReactNode }) {
                     }
                   >
                     <RefreshCw size={16} />
-                    {busy ? "Working…" : "Sync now"}
+                    {busy ? "处理中…" : "立即同步"}
                   </button>
                 </div>
                 <p className="settings-note">
-                  Chats, attachments and folder permissions stay on this
-                  computer.
+                  聊天、附件和目录权限保存在本机。
                 </p>
               </>
             )}
             {section === "account" && (
               <>
-                <h2>Account</h2>
+                <h2>账号</h2>
                 <div className="settings-profile">
                   <span className="account-avatar">{initial}</span>
                   <div>
@@ -369,31 +366,29 @@ export function AccountGate({ children }: { children: ReactNode }) {
                 </div>
                 <div className="settings-row">
                   <div>
-                    <strong>Sign-in method</strong>
+                    <strong>登录方式</strong>
                     <p>Google</p>
                   </div>
                   <img src={googleLogo} width={20} height={20} alt="Google" />
                 </div>
                 <div className="settings-row">
                   <div>
-                    <strong>Sign out of Anvil</strong>
-                    <p>Your local chats will be kept.</p>
+                    <strong>退出 Anvil</strong>
+                    <p>本地聊天记录会保留。</p>
                   </div>
                   <button disabled={busy} onClick={() => void logout()}>
                     <LogOut size={16} />
-                    Sign out
+                    退出登录
                   </button>
                 </div>
               </>
             )}
             {section === "devices" && (
               <>
-                <h2>Devices</h2>
-                <p className="settings-note">
-                  Manage where you are signed in to Anvil.
-                </p>
+                <h2>设备</h2>
+                <p className="settings-note">管理已登录 Anvil 的设备。</p>
                 {devices.length === 0 && (
-                  <p>{busy ? "Loading devices…" : "No devices to display."}</p>
+                  <p>{busy ? "正在加载设备…" : "暂无设备。"}</p>
                 )}
                 {devices.map((d) => (
                   <div className="settings-row" key={d.id}>
@@ -403,14 +398,14 @@ export function AccountGate({ children }: { children: ReactNode }) {
                         <strong>{d.device}</strong>
                         <p>
                           {d.current
-                            ? "This device"
-                            : "Signed in " +
+                            ? "本机"
+                            : "登录于 " +
                               new Date(d.created).toLocaleDateString()}
                         </p>
                       </div>
                     </div>
                     {d.current ? (
-                      <span className="device-current">Current</span>
+                      <span className="device-current">当前设备</span>
                     ) : (
                       <button
                         disabled={busy}
@@ -421,7 +416,7 @@ export function AccountGate({ children }: { children: ReactNode }) {
                           })
                         }
                       >
-                        Sign out
+                        退出登录
                       </button>
                     )}
                   </div>

@@ -97,17 +97,17 @@ function stopTerminal() {
   old?.kill();
 }
 function current() {
-  if (!workspace) throw new Error("Add a working directory first.");
+  if (!workspace) throw new Error("请先添加工作目录。");
   return workspace;
 }
 async function discardChanges() {
   if (!dirty) return true;
   const result = await dialog.showMessageBox(window, {
     type: "warning",
-    title: "Unsaved changes",
-    message: "Discard your unsaved edits?",
-    detail: "Your changes have not been saved to disk.",
-    buttons: ["Keep editing", "Discard changes"],
+    title: "未保存的修改",
+    message: "放弃未保存的修改？",
+    detail: "修改尚未保存到磁盘。",
+    buttons: ["继续编辑", "放弃修改"],
     defaultId: 0,
     cancelId: 0,
   });
@@ -178,9 +178,9 @@ async function activateProfile() {
       await access(path.join(app.getPath("userData"), "tasks"));
       const answer = await dialog.showMessageBox(window, {
         type: "question",
-        message: "Keep existing local chats with this account?",
-        detail: `Import this computer’s chats and model profiles into ${user.email}. Chats and folder permissions stay on this computer.`,
-        buttons: ["Start fresh", "Import local data"],
+        message: "将现有本地聊天保留在此账号中？",
+        detail: `将此电脑的聊天和模型配置导入 ${user.email}。聊天和文件夹权限保留在本机。`,
+        buttons: ["全新开始", "导入本地数据"],
         defaultId: 0,
         cancelId: 0,
       });
@@ -269,6 +269,35 @@ function registerIPC() {
       }
     });
   };
+  handle("links:open", async (value) => {
+    if (typeof value !== "string" || value.length > 8192)
+      throw new Error("Invalid link.");
+    const url = new URL(value);
+    if (
+      !["https:", "http:"].includes(url.protocol) ||
+      url.username ||
+      url.password
+    )
+      throw new Error("Unsupported link.");
+    await shell.openExternal(url.href);
+  });
+  handle("context:auto-memory", (id, enabled) =>
+    currentAgent().setAutoMemory(id, enabled),
+  );
+  handle("context:open-folder", async (id) => {
+    const error = await shell.openPath(currentAgent().memoryDirectory(id));
+    if (error) throw Error(error);
+  });
+  handle("context:state", (id) => currentAgent().contextState(id));
+  handle("context:save-memory", (id, input) =>
+    currentAgent().saveMemory(id, input),
+  );
+  handle("context:delete-memory", (id, noteID, revision) =>
+    currentAgent().deleteMemory(id, noteID, revision),
+  );
+  handle("context:save-handoff", (id, input) =>
+    currentAgent().saveHandoff(id, input),
+  );
   handle("account:status", async (refresh = false) => {
     try {
       await activateAccount();
@@ -340,7 +369,7 @@ function registerIPC() {
   };
   handle("review:open", async () => {
     const picked = await dialog.showOpenDialog(window, {
-      title: "Open repository for review",
+      title: "打开仓库以审查",
       properties: ["openDirectory"],
     });
     if (picked.canceled || !picked.filePaths[0]) return null;
@@ -417,7 +446,7 @@ function registerIPC() {
   handle("workspace:open", async () => {
     if (!(await discardChanges())) return null;
     const result = await dialog.showOpenDialog(window, {
-      title: "Add working directories",
+      title: "添加工作目录",
       properties: ["openDirectory", "multiSelections"],
     });
     if (result.canceled || !result.filePaths[0]) return null;
@@ -446,17 +475,17 @@ function registerIPC() {
       const conversation = executor
         .conversations()
         .conversations.find((item) => item.id === id);
-      if (!conversation) throw new Error("Conversation no longer exists.");
+      if (!conversation) throw new Error("聊天已不存在。");
       if (!["ask", "auto", "full"].includes(mode))
-        throw new Error("Invalid permission mode.");
+        throw new Error("权限模式无效。");
       if (mode === "full" && conversation.permissionMode !== "full") {
         const approval = await dialog.showMessageBox(window, {
           type: "warning",
-          title: "Full access",
-          message: "Allow unrestricted tool execution in this conversation?",
+          title: "完全访问",
+          message: "允许此聊天不受限制地执行工具？",
           detail:
-            "Anvil will approve file operations and commands without asking, including outside attached folders. Tools run with your operating system account’s access. This is not a sandbox. The mode is saved for this conversation.",
-          buttons: ["Cancel", "Allow full access"],
+            "Anvil 将自动批准文件操作和命令，包括附加文件夹之外的操作。工具以你的操作系统账号权限运行，不受沙箱限制。此模式将保存在当前聊天中。",
+          buttons: ["取消", "允许完全访问"],
           defaultId: 0,
           cancelId: 0,
         });
@@ -468,10 +497,10 @@ function registerIPC() {
   handle("conversations:add-folders", async (id: string) => {
     const executor = currentAgent();
     if (!executor.conversations().conversations.some((item) => item.id === id))
-      throw new Error("Conversation no longer exists.");
+      throw new Error("聊天已不存在。");
     if (!(await discardChanges())) return null;
     const picked = await dialog.showOpenDialog(window, {
-      title: "Add local folders to this conversation",
+      title: "为此聊天添加本地文件夹",
       properties: ["openDirectory", "multiSelections"],
     });
     if (picked.canceled || !picked.filePaths.length) return null;
@@ -480,12 +509,12 @@ function registerIPC() {
     );
     const approval = await dialog.showMessageBox(window, {
       type: "question",
-      title: "Authorize folder access",
-      message: "Allow this conversation to read and modify these folders?",
+      title: "授权文件夹访问",
+      message: "允许此聊天读取和修改这些文件夹？",
       detail:
         roots.join("\n") +
-        "\n\nReads inside these folders do not require repeated approval. Ask mode confirms edits; Auto also approves scoped edits. Commands and outside access require approval unless Full access is enabled. Access is saved for this conversation and can be revoked.",
-      buttons: ["Cancel", "Allow access"],
+        "\n\nReads inside these folders do not require repeated approval. Ask mode confirms edits; Auto also approves scoped edits. Commands and outside access require approval unless 完全访问 is enabled. Access is saved for this conversation and can be revoked.",
+      buttons: ["取消", "允许访问"],
       defaultId: 0,
       cancelId: 0,
     });
@@ -513,7 +542,7 @@ function registerIPC() {
         .conversations()
         .conversations.some((c) => c.id === conversationID)
     )
-      throw new Error("Chat no longer exists.");
+      throw new Error("聊天已不存在。");
     await changeConfig((c) => {
       c.groups.push({ id, name });
       return c;
@@ -530,7 +559,7 @@ function registerIPC() {
       if (patch.name !== undefined)
         await changeConfig((c) => {
           const g = c.groups.find((g) => g.id === id);
-          if (!g) throw new Error("Group no longer exists.");
+          if (!g) throw new Error("分组已不存在。");
           g.name = patch.name!;
           return c;
         });
@@ -545,13 +574,12 @@ function registerIPC() {
     const group = executor
       .conversations()
       .groups.find((item) => item.id === id);
-    if (!group) throw new Error("Group no longer exists.");
+    if (!group) throw new Error("分组已不存在。");
     const result = await dialog.showMessageBox(window, {
       type: "question",
-      message: `Delete group “${group.name}”?`,
-      detail:
-        "Conversations will be moved to Ungrouped. No conversations will be deleted.",
-      buttons: ["Cancel", "Delete group"],
+      message: `删除分组“${group.name}”？`,
+      detail: "聊天将移至未分组，不会删除聊天。",
+      buttons: ["取消", "删除分组"],
       defaultId: 0,
       cancelId: 0,
     });
@@ -577,20 +605,17 @@ function registerIPC() {
     const conversation = executor
       .conversations()
       .conversations.find((item) => item.id === id);
-    if (!conversation) throw new Error("Conversation no longer exists.");
+    if (!conversation) throw new Error("聊天已不存在。");
     const tasks = executor.list().filter((task) => task.conversationID === id);
     const running = tasks.some((task) => task.status === "running");
     const result = await dialog.showMessageBox(window, {
       type: "warning",
-      title: "Delete conversation",
-      message: `Delete “${conversation.title || tasks[0]?.prompt.slice(0, 48) || "New chat"}”?`,
+      title: "删除聊天",
+      message: `删除“${conversation.title || tasks[0]?.prompt.slice(0, 48) || "新聊天"}”？`,
       detail: running
-        ? "The running task will be stopped, then this conversation and its messages will be removed. Project files will be kept."
-        : "This conversation and its messages will be removed. Project files will be kept.",
-      buttons: [
-        "Keep conversation",
-        running ? "Stop and delete" : "Delete conversation",
-      ],
+        ? "将停止正在运行的任务并删除此聊天及消息，保留项目文件。"
+        : "将删除此聊天及消息，保留项目文件。",
+      buttons: ["保留聊天", running ? "停止并删除" : "删除聊天"],
       defaultId: 0,
       cancelId: 0,
     });
@@ -616,7 +641,7 @@ function registerIPC() {
       throw new Error("The local Codex executor cannot be removed.");
     await changeConfig((c) => {
       c.models = c.models.filter((m) => m.id !== id);
-      if (!c.models.length) throw new Error("Keep at least one model.");
+      if (!c.models.length) throw new Error("请至少保留一个模型。");
       if (c.preferences.defaultModelID === id)
         c.preferences.defaultModelID = c.models[0].id;
       return c;
@@ -631,8 +656,7 @@ function registerIPC() {
       properties: ["openFile", "multiSelections"],
     });
     if (selection.canceled) return [];
-    if (selection.filePaths.length > 8)
-      throw new Error("Select up to eight attachments.");
+    if (selection.filePaths.length > 8) throw new Error("最多选择 8 个附件。");
     const files = await Promise.all(
       selection.filePaths.map(async (file) => {
         const info = await import("node:fs/promises").then((fs) =>
@@ -656,7 +680,7 @@ function registerIPC() {
       );
     const endpoint =
       model.endpoint || providerCredentials.BYTEPLUS_ARK_RESPONSES_URL;
-    if (!endpoint) throw new Error("Model API URL is missing.");
+    if (!endpoint) throw new Error("缺少模型 API 地址。");
     const runtime =
       process.platform === "win32" ? "anvil-runtime.exe" : "anvil-runtime";
     await probeModel(
@@ -876,25 +900,25 @@ app.whenReady().then(() => {
     Menu.buildFromTemplate([
       ...(process.platform === "darwin" ? [{ role: "appMenu" as const }] : []),
       {
-        label: "File",
+        label: "文件",
         submenu: [
           {
-            label: "Save",
+            label: "保存",
             accelerator: "CmdOrCtrl+S",
             click: () => window.webContents.send("editor:save"),
           },
-          { role: "close" },
+          { role: "close", label: "关闭" },
         ],
       },
-      { role: "editMenu" },
+      { role: "editMenu", label: "编辑" },
       {
-        label: "View",
+        label: "视图",
         submenu: [
-          { role: "toggleDevTools" },
-          { role: "resetZoom" },
-          { role: "zoomIn" },
-          { role: "zoomOut" },
-          { role: "togglefullscreen" },
+          { role: "toggleDevTools", label: "开发者工具" },
+          { role: "resetZoom", label: "实际大小" },
+          { role: "zoomIn", label: "放大" },
+          { role: "zoomOut", label: "缩小" },
+          { role: "togglefullscreen", label: "切换全屏" },
         ],
       },
     ]),

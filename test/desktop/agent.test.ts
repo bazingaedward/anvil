@@ -87,7 +87,7 @@ require('node:readline').createInterface({input:process.stdin}).on('line',line=>
   if(m.type==='start'){
     send({type:'session',id:m.sessionID||'folderless-session'});
     send({type:'text',text:JSON.stringify({cwd:process.cwd(),folders:m.directories,previous:m.sessionID||null})});
-    if(m.text==='read') send({type:'permission',permission:{id:'read',action:'read',resources:['file.txt']}});
+    if(m.text.endsWith('read')) send({type:'permission',permission:{id:'read',action:'read',resources:['file.txt']}});
     else {send({type:'done',status:'completed'});process.exit(0);}
   }
   if(m.type==='permission'){send({type:'done',status:'completed'});process.exit(0);}

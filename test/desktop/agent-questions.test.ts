@@ -59,11 +59,11 @@ require('node:readline').createInterface({input:process.stdin}).on('line',line=>
  const m=JSON.parse(line);if(m.type==='cancel')process.exit(0);if(m.type!=='start')return;
  fs.appendFileSync(${JSON.stringify(path.join(root, "requests.jsonl"))},JSON.stringify(m)+'\\n');
  send({type:'session',id:m.sessionID||'native-thread'});
- if(m.text==='demo'||m.text==='waiting'){
+ if(m.text.endsWith('demo')||m.text.endsWith('waiting')){
   const message={type:'questions',group:{id:'ask-1',questions:${JSON.stringify(questions)}}};send(message);send(message);
   send({type:'text',text:'Please answer these questions.'});
  }else send({type:'text',text:'Thanks for the answer.'});
- if(m.text!=='waiting'){send({type:'done',status:'completed'});process.exit(0);}
+ if(!m.text.endsWith('waiting')){send({type:'done',status:'completed'});process.exit(0);}
 });`,
   );
   const make = () =>
