@@ -14,6 +14,11 @@ export type RuntimeResult = {
   error?: string;
 };
 export type RuntimeEvent =
+  | {
+      type: "compaction";
+      status: "started" | "completed" | "failed";
+      reason: "auto" | "manual";
+    }
   | { type: "session"; id: string }
   | { type: "text"; text: string }
   | { type: "activity"; text: string }
@@ -61,6 +66,12 @@ function decode(
 ): RuntimeEvent | ({ type: "done" } & RuntimeResult) {
   const m = JSON.parse(line);
   if (!m || typeof m !== "object") throw new Error("Invalid event");
+  if (
+    m.type === "compaction" &&
+    ["started", "completed", "failed"].includes(m.status) &&
+    ["auto", "manual"].includes(m.reason)
+  )
+    return m;
   if (m.type === "questions")
     return {
       type: "questions",

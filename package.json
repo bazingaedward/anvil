@@ -25,7 +25,8 @@
     "package:win": "npm run build && electron-builder --win",
     "postinstall": "electron-builder install-app-deps",
     "test:packaged": "node scripts/test-packaged.mjs",
-    "eval:coding": "tsx eval/run.mjs"
+    "eval:coding": "tsx eval/run.mjs",
+    "eval:context": "tsx eval/context.mjs"
   },
   "dependencies": {
     "@xterm/addon-fit": "0.11.0",

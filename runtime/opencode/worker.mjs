@@ -67,6 +67,19 @@ async function run(input) {
         case "session.text.delta":
           send({ type: "text", text: d.delta });
           break;
+        case "session.compaction.started":
+        case "session.compaction.ended":
+        case "session.compaction.failed":
+          send({
+            type: "compaction",
+            status: event.type.endsWith("started")
+              ? "started"
+              : event.type.endsWith("ended")
+                ? "completed"
+                : "failed",
+            reason: d.reason,
+          });
+          break;
         case "permission.asked":
           if (input.probe) {
             await host.permission.reply({

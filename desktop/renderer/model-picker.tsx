@@ -298,17 +298,22 @@ export function ModelPicker({
               />
               此模型支持工具调用
             </label>
+            <p>
+              留空时按供应商和模型选择默认值；未知模型使用 64K 上下文、4K
+              输出预算。手动填写会覆盖默认值。当前 OpenCode 单次输出另有约 32K
+              上限。
+            </p>
             <div className="model-limits">
               {(["contextLimit", "outputLimit"] as const).map((field) => (
                 <label key={field}>
                   {field === "contextLimit"
                     ? "上下文 Token 上限"
-                    : "最大输出 Token 数"}
+                    : "输出 Token 预算"}
                   <input
                     type="number"
                     min={256}
                     max={10000000}
-                    placeholder={field === "contextLimit" ? "65536" : "4096"}
+                    placeholder="留空自动选择"
                     value={editing[field] ?? ""}
                     onChange={(e) =>
                       setEditing({

@@ -109,6 +109,35 @@ export function modelBaseURL(
   url.pathname = pathname;
   return url.toString().replace(/\/$/, "");
 }
+// Verified BytePlus deployment defaults; explicit profile overrides always win.
+// Output is the documented service default budget, not a claim about its hard maximum.
+export function modelTokenLimits(
+  model: ModelProfile,
+  endpoint = model.endpoint,
+) {
+  let ark = false;
+  try {
+    ark = new URL(endpoint).hostname === "ark.ap-southeast.bytepluses.com";
+  } catch {}
+  const known =
+    ark &&
+    ["deepseek-v4-1-flash-261017", "deepseek-v4-1-flash-260910"].includes(
+      model.model,
+    );
+  const context = model.contextLimit ?? (known ? 1048576 : 65536);
+  const output = model.outputLimit ?? Math.min(known ? 131072 : 4096, context);
+  if (
+    !Number.isSafeInteger(context) ||
+    !Number.isSafeInteger(output) ||
+    context < 256 ||
+    output < 256 ||
+    output > context
+  )
+    throw new Error(
+      "输出预算不能超过上下文窗口，Token 上限必须为至少 256 的整数。",
+    );
+  return { context, output };
+}
 export function runtimeProvider(
   model: ModelProfile,
   endpoint: string,
@@ -127,10 +156,7 @@ export function runtimeProvider(
           input: model.vision ? ["text", "image"] : ["text"],
           output: ["text"],
         },
-        limit: {
-          context: model.contextLimit || 65536,
-          output: model.outputLimit || 4096,
-        },
+        limit: modelTokenLimits(model, endpoint),
       },
     },
   };

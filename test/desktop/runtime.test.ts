@@ -147,3 +147,23 @@ require('node:readline').createInterface({input:process.stdin}).on('line', line 
     ["questions", "activity"],
   );
 });
+
+test("runtime forwards explicit compaction lifecycle without turning it into answer text", async () => {
+  const { result, events } = await fixture(`
+const send = x => console.log(JSON.stringify(x));
+require('node:readline').createInterface({input:process.stdin}).once('line', () => {
+ send({type:'compaction',status:'started',reason:'auto'});
+ send({type:'compaction',status:'completed',reason:'auto'});
+ send({type:'text',text:'Continued'});
+ send({type:'done',status:'completed'});
+});`);
+  assert.equal(result.status, "completed");
+  assert.deepEqual(
+    events.filter((e) => e.type === "compaction").map((e) => e.status),
+    ["started", "completed"],
+  );
+  assert.deepEqual(
+    events.filter((e) => e.type === "text").map((e) => e.text),
+    ["Continued"],
+  );
+});

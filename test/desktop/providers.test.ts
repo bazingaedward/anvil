@@ -49,3 +49,29 @@ test("protocol adapters preserve legacy Responses profiles and normalize matchin
   );
   assert.equal(text.models[defaultModel.model].capabilities.tools, false);
 });
+
+test("verified Ark model budgets apply to legacy profiles without overriding user limits", () => {
+  const endpoint = "https://ark.ap-southeast.bytepluses.com/api/v3/responses";
+  const limits = (profile = defaultModel, url = endpoint) =>
+    runtimeProvider(profile, url, "test-key").models[profile.model].limit;
+  assert.deepEqual(limits(), { context: 1048576, output: 131072 });
+  assert.deepEqual(
+    limits({ ...defaultModel, contextLimit: 128000, outputLimit: 8192 }),
+    { context: 128000, output: 8192 },
+  );
+  assert.deepEqual(limits({ ...defaultModel, contextLimit: 32000 }), {
+    context: 32000,
+    output: 32000,
+  });
+  assert.deepEqual(limits({ ...defaultModel, model: "unknown-model" }), {
+    context: 65536,
+    output: 4096,
+  });
+  assert.deepEqual(
+    limits(defaultModel, "https://example.invalid/v1/responses"),
+    { context: 65536, output: 4096 },
+  );
+  assert.throws(() =>
+    limits({ ...defaultModel, contextLimit: 1000, outputLimit: 2000 }),
+  );
+});
