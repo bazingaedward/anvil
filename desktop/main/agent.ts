@@ -1,10 +1,9 @@
 import { defaultModel, type StoredAttachment } from "./composer";
 import type { ModelProfile } from "../shared/api";
 import { codexModel } from "../shared/providers";
-import { parseQuestionGroup, validateQuestionAnswers } from "./agent-questions";
+import { validateQuestionAnswers } from "./agent-questions";
 import { allowsOperation } from "./folder-access";
-import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
-import { createInterface } from "node:readline";
+import { startRuntime, type RuntimeRun, type RuntimeResult } from "./runtime";
 import { createHash, randomUUID } from "node:crypto";
 import { existsSync, mkdirSync } from "node:fs";
 import path from "node:path";
@@ -16,12 +15,7 @@ import type {
   LegacyDraft,
 } from "../shared/api";
 import { ConversationStore, type StoredTask } from "./conversations";
-import {
-  executionEnvironment,
-  killProcessTree,
-  runAcceptance,
-  validateAcceptance,
-} from "./acceptance";
+import { runAcceptance, validateAcceptance } from "./acceptance";
 
 type RecordTask = StoredTask;
 type Active = {
@@ -29,14 +23,10 @@ type Active = {
   managedProxy?: string;
   task: RecordTask;
   abort: AbortController;
-  child?: ChildProcessWithoutNullStreams;
+  runtime?: RuntimeRun;
   limit: boolean;
   denied: boolean;
   done?: Promise<void>;
-};
-type RoundResult = {
-  status: "completed" | "cancelled" | "failed";
-  error?: string;
 };
 const TASK_TIMEOUT = 15 * 60 * 1000;
 export class Agent {
@@ -497,217 +487,114 @@ export class Agent {
       if (this.active === active) this.active = undefined;
     }
   }
-  private modelRound(
+  private async modelRound(
     active: Active,
     text: string,
     directories: string[],
-  ): Promise<RoundResult> {
-    return new Promise((resolve) => {
-      const { task, abort } = active;
-      if (abort.signal.aborted) {
-        resolve({ status: "cancelled" });
-        return;
-      }
-      const managed = task.model?.id === codexModel.id;
-      const env = executionEnvironment();
-      for (const name of ["HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "NO_PROXY"])
-        if (process.env[name]) env[name] = process.env[name]!;
-      if (managed) {
-        env.ELECTRON_RUN_AS_NODE = "1";
-        if (process.env.CODEX_HOME) env.CODEX_HOME = process.env.CODEX_HOME;
-        if (active.managedProxy)
-          env.HTTPS_PROXY = env.HTTP_PROXY = active.managedProxy;
-      } else {
-        env.ANVIL_MODEL_API_KEY =
-          this.credentials[task.model?.keyRef || defaultModel.keyRef]!;
-        env.ANVIL_MODEL_ENDPOINT =
-          task.model?.endpoint || this.credentials.BYTEPLUS_ARK_RESPONSES_URL!;
-      }
-      const child = spawn(
-        managed ? this.managedRuntime!.executable : this.executable,
-        managed ? this.managedRuntime!.args : this.args,
-        {
-          cwd: task.directory,
-          env,
-          windowsHide: true,
-          detached: process.platform !== "win32",
-          stdio: "pipe",
-        },
-      );
-      active.child = child;
-      let result: RoundResult | undefined,
-        settled = false,
-        shutdown: NodeJS.Timeout | undefined,
-        hardStop: NodeJS.Timeout | undefined;
-      const finish = () => {
-        if (settled) return;
-        settled = true;
-        if (managed) killProcessTree(child);
-        if (shutdown) clearTimeout(shutdown);
-        if (hardStop) clearTimeout(hardStop);
-        abort.signal.removeEventListener("abort", cancel);
-        if (active.child === child) active.child = undefined;
-        resolve(
-          result || {
-            status: "failed",
-            error: "Agent runtime exited before completing the task.",
-          },
-        );
-      };
-      const terminate = () => {
-        killProcessTree(child);
-        if (!hardStop)
-          hardStop = setTimeout(() => {
-            child.stdout.destroy();
-            child.stderr.destroy();
-            child.stdin.destroy();
-            finish();
-          }, 3000);
-      };
-      const shutdownSoon = () => {
-        if (!shutdown) shutdown = setTimeout(terminate, 2000);
-      };
-      const cancel = () => {
-        result = { status: "cancelled" };
-        child.stdin.write(JSON.stringify({ type: "cancel" }) + "\n");
-        shutdownSoon();
-      };
-      child.stdin.on("error", () => {});
-      child.stderr.resume();
-      child.on("error", () => {
-        result = {
-          status: "failed",
-          error: "Could not start the agent runtime.",
-        };
-        finish();
-      });
-      const lines = createInterface({ input: child.stdout });
-      lines.on("line", (line) => {
-        if (settled || result || abort.signal.aborted) return;
-        try {
-          if (line.length > 1024 * 1024)
-            throw new Error("Oversized runtime event");
-          const message = JSON.parse(line);
-          if (message.type === "session" && typeof message.id === "string")
-            task.sessionID = message.id;
-          else if (
-            message.type === "text" &&
-            typeof message.text === "string"
-          ) {
-            if (task.text.length + message.text.length > 1024 * 1024)
-              throw new Error("Response too long");
-            task.text += this.redact(message.text);
-          } else if (
-            message.type === "questions" &&
-            task.model?.id === codexModel.id
-          ) {
-            const group = parseQuestionGroup(
-              message.group?.id,
-              message.group?.questions,
-            );
-            task.questions ||= [];
-            const previous = task.questions.findIndex(
-              (item) => item.id === group.id,
-            );
-            if (previous >= 0) {
+  ): Promise<RuntimeResult> {
+    const { task, abort } = active;
+    const managed = task.model?.id === codexModel.id;
+    const runtime = startRuntime(
+      {
+        repo: task.directory!,
+        directories,
+        permissionMode: this.store.get(task.conversationID).permissionMode,
+        state: task.runtimeState!,
+        sessionID: task.sessionID,
+        model: task.model,
+        attachments: task.round === 1 ? active.attachments : [],
+        text,
+      },
+      {
+        executable: managed ? this.managedRuntime!.executable : this.executable,
+        args: managed ? this.managedRuntime!.args : this.args,
+        managed,
+        managedProxy: active.managedProxy,
+        key: this.credentials[task.model?.keyRef || defaultModel.keyRef]!,
+        endpoint:
+          task.model?.endpoint || this.credentials.BYTEPLUS_ARK_RESPONSES_URL!,
+        signal: abort.signal,
+        onEvent: (event, reply) => {
+          switch (event.type) {
+            case "session":
+              task.sessionID = event.id;
+              break;
+            case "text":
+              if (task.text.length + event.text.length > 1024 * 1024)
+                throw new Error("Response too long");
+              task.text += this.redact(event.text);
+              break;
+            case "permission": {
+              const permission = event.permission;
+              const conversation = this.store.get(task.conversationID);
               if (
-                JSON.stringify(task.questions[previous]) ===
-                JSON.stringify(group)
-              )
+                allowsOperation(
+                  conversation.permissionMode,
+                  permission.action,
+                  permission.resources,
+                  task.directory!,
+                  conversation.folders || [],
+                )
+              ) {
+                reply(permission.id, true);
                 return;
-              task.questions[previous] = group;
-            } else {
-              if (task.questions.length >= 20)
-                throw new Error("Too many question groups.");
-              task.questions.push(group);
+              }
+              task.permissions.push({
+                id: permission.id,
+                action: this.redact(permission.action),
+                resources: permission.resources.map((value) =>
+                  this.redact(value),
+                ),
+                message: permission.message
+                  ? this.redact(permission.message)
+                  : undefined,
+              });
+              break;
             }
-          } else if (
-            message.type === "activity" &&
-            typeof message.text === "string"
-          ) {
-            task.activity = this.redact(message.text.slice(0, 200));
-          } else if (
-            message.type === "permission" &&
-            typeof message.permission?.id === "string" &&
-            typeof message.permission.action === "string" &&
-            Array.isArray(message.permission.resources)
-          ) {
-            if (
-              allowsOperation(
-                this.store.get(task.conversationID).permissionMode,
-                message.permission.action,
-                message.permission.resources,
-                task.directory!,
-                this.store.get(task.conversationID).folders || [],
-              )
-            ) {
-              child.stdin.write(
-                JSON.stringify({
-                  type: "permission",
-                  id: message.permission.id,
-                  allow: true,
-                }) + "\n",
+            case "permission-resolved":
+              task.permissions = task.permissions.filter(
+                (p) => p.id !== event.id,
               );
-              return;
+              break;
+            case "questions": {
+              if (!managed) throw new Error("Unexpected question event");
+              const group = event.group;
+              task.questions ||= [];
+              const previous = task.questions.findIndex(
+                (item) => item.id === group.id,
+              );
+              if (previous >= 0) {
+                if (
+                  JSON.stringify(task.questions[previous]) ===
+                  JSON.stringify(group)
+                )
+                  return;
+                task.questions[previous] = group;
+              } else {
+                if (task.questions.length >= 20)
+                  throw new Error("Too many question groups.");
+                task.questions.push(group);
+              }
+              break;
             }
-            task.permissions.push({
-              id: message.permission.id,
-              action: this.redact(message.permission.action),
-              resources: message.permission.resources.map((value: unknown) =>
-                this.redact(String(value)),
-              ),
-              message:
-                typeof message.permission.message === "string"
-                  ? this.redact(message.permission.message)
-                  : undefined,
-            });
-          } else if (message.type === "permission-resolved")
-            task.permissions = task.permissions.filter(
-              (permission) => permission.id !== message.id,
-            );
-          else if (
-            message.type === "done" &&
-            ["completed", "cancelled", "failed"].includes(message.status)
-          ) {
-            result = {
-              status: message.status,
-              error:
-                typeof message.error === "string"
-                  ? this.redact(message.error)
-                  : undefined,
-            };
-            shutdownSoon();
-            return;
+            case "activity":
+              task.activity = this.redact(event.text.slice(0, 200));
+              break;
           }
           this.publish(task);
-        } catch {
-          result = {
-            status: "failed",
-            error: "Invalid response from the agent runtime.",
-          };
-          terminate();
-        }
-      });
-      child.on("close", finish);
-      abort.signal.addEventListener("abort", cancel, { once: true });
-      if (abort.signal.aborted) {
-        cancel();
-        return;
-      }
-      child.stdin.write(
-        JSON.stringify({
-          type: "start",
-          repo: task.directory,
-          directories,
-          permissionMode: this.store.get(task.conversationID).permissionMode,
-          state: task.runtimeState,
-          sessionID: task.sessionID,
-          model: task.model,
-          attachments: task.round === 1 ? active.attachments : [],
-          text,
-        }) + "\n",
-      );
-    });
+        },
+      },
+    );
+    active.runtime = runtime;
+    try {
+      const result = await runtime.done;
+      return {
+        ...result,
+        error: result.error ? this.redact(result.error) : undefined,
+      };
+    } finally {
+      if (active.runtime === runtime) active.runtime = undefined;
+    }
   }
   reply(taskID: string, permissionID: string, allow: boolean) {
     const active = this.active;
@@ -721,9 +608,7 @@ export class Agent {
       )
     )
       throw new Error("Permission request is no longer pending.");
-    active.child?.stdin.write(
-      JSON.stringify({ type: "permission", id: permissionID, allow }) + "\n",
-    );
+    active.runtime?.reply(permissionID, allow);
     active.task.permissions = active.task.permissions.filter(
       (permission) => permission.id !== permissionID,
     );
@@ -748,7 +633,7 @@ export class Agent {
     const active = this.active;
     if (!active) return;
     active.abort.abort();
-    if (active.child) killProcessTree(active.child);
+    active.runtime?.stop();
     this.finish(active, "cancelled");
   }
 }

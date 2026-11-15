@@ -2,7 +2,13 @@ import { test, type TestContext } from "node:test";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { createInterface } from "node:readline";
-import { mkdtempSync, writeFileSync, readFileSync, rmSync } from "node:fs";
+import {
+  mkdtempSync,
+  writeFileSync,
+  readFileSync,
+  rmSync,
+  copyFileSync,
+} from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import { Agent } from "../../desktop/main/agent";
@@ -15,9 +21,22 @@ const worker = path.resolve("desktop/main/codex-worker.ts");
 const workerArgs = ["--import", import.meta.resolve("tsx"), worker];
 function fixture(t: TestContext, auth = "chatgpt") {
   const root = mkdtempSync(path.join(os.tmpdir(), "anvil-codex-test-"));
-  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const cleanup: Array<() => void | Promise<void>> = [];
+  t.after(async () => {
+    for (const close of cleanup) await close();
+    rmSync(root, {
+      recursive: true,
+      force: true,
+      maxRetries: 10,
+      retryDelay: 100,
+    });
+  });
+  // Windows cannot execute a shebang script. Node accepts the app-server
+  // argument as a script path, so use a private Node binary as the fake CLI.
+  if (process.platform === "win32")
+    copyFileSync(process.execPath, path.join(root, "codex.exe"));
   writeFileSync(
-    path.join(root, "codex"),
+    path.join(root, process.platform === "win32" ? "app-server" : "codex"),
     `#!${process.execPath}
 const fs=require('node:fs'), path=require('node:path');
 const log=${JSON.stringify(path.join(root, "requests.jsonl"))};
@@ -55,7 +74,7 @@ require('node:readline').createInterface({input:process.stdin}).on('line',line=>
       .trim()
       .split("\n")
       .map((line) => JSON.parse(line));
-  return { root, requests };
+  return { root, requests, cleanup };
 }
 async function run(
   root: string,
@@ -241,7 +260,7 @@ test("managed tasks run without an API runtime/key, persist sessions, isolate ba
     { executable: process.execPath, args: workerArgs },
   );
   let closed = false;
-  t.after(() => (closed ? undefined : agent.close()));
+  f.cleanup.push(() => (closed ? undefined : agent.close()));
   const wait = async (id: string, predicate: (task: AgentTask) => boolean) => {
     for (let i = 0; i < 300; i++) {
       const task = agent.list().find((t) => t.id === id);
@@ -301,7 +320,7 @@ test("managed tasks run without an API runtime/key, persist sessions, isolate ba
     10_000,
     { executable: process.execPath, args: workerArgs },
   );
-  t.after(() => restored.close());
+  f.cleanup.push(() => restored.close());
   assert.throws(() => restored.start("chat", "switch"), /new chat or fork/);
   const pending = restored.start(
     "chat",
