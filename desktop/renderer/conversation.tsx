@@ -802,6 +802,25 @@ export function ConversationWorkspace({
                 >
                   <div className="agent-prompt">
                     {task.prompt}
+                    {!!task.folders?.length && (
+                      <div
+                        className="sent-folders"
+                        role="group"
+                        aria-label="本条消息附带的目录"
+                      >
+                        <small>已附带目录</small>
+                        <div className="sent-attachments">
+                          {task.folders.map((root) => (
+                            <span key={root} title={root} aria-label={root}>
+                              <Folder size={14} aria-hidden="true" />
+                              <span>
+                                {root.split(/[\\/]/).filter(Boolean).pop() || root}
+                              </span>
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                     {!!task.attachments?.length && (
                       <div className="sent-attachments">
                         {task.attachments.map((file) => (

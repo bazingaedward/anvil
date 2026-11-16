@@ -9,6 +9,7 @@ import {
   validateModel,
 } from "../../desktop/main/composer";
 import { Agent } from "../../desktop/main/agent";
+import { ConversationStore } from "../../desktop/main/conversations";
 test("model profiles and attachment snapshots persist; reject unsafe endpoints, paths and unsupported content", (t) => {
   const root = mkdtempSync(path.join(os.tmpdir(), "anvil-composer-"));
   t.after(() => rmSync(root, { recursive: true, force: true }));
@@ -63,7 +64,7 @@ test("agent sends chosen model and snapshots, resumes session, records metadata 
   const script = path.join(root, "worker.cjs");
   writeFileSync(
     script,
-    `require('node:readline').createInterface({input:process.stdin}).on('line', line => { const m=JSON.parse(line); if(m.type==='start') { console.log(JSON.stringify({type:'session',id:m.sessionID||'same-session'})); console.log(JSON.stringify({type:'text',text:JSON.stringify({model:m.model.model,content:m.attachments?.[0]?.content,previous:m.sessionID,leaked:!!process.env.OTHER_KEY})})); console.log(JSON.stringify({type:'done',status:'completed'})); process.exit(0); }});`,
+    `require('node:readline').createInterface({input:process.stdin}).on('line', line => { const m=JSON.parse(line); if(m.type==='start') { console.log(JSON.stringify({type:'session',id:m.sessionID||'same-session'})); console.log(JSON.stringify({type:'text',text:JSON.stringify({folders:m.directories,model:m.model.model,content:m.attachments?.[0]?.content,previous:m.sessionID,leaked:!!process.env.OTHER_KEY})})); console.log(JSON.stringify({type:'done',status:'completed'})); process.exit(0); }});`,
   );
   const agent = new Agent(
     root,
@@ -108,16 +109,29 @@ test("agent sends chosen model and snapshots, resumes session, records metadata 
   await finished();
   assert.deepEqual(JSON.parse(agent.list()[0].text), {
     model: "selected-model",
+    folders: [],
     content: "hello",
     leaked: false,
   });
   assert.equal(agent.list()[0].model?.model, "selected-model");
   assert.equal("content" in agent.list()[0].attachments![0], false);
-  agent.start("chat", "continue", [], root, undefined, {
+  assert.deepEqual(agent.list()[0].folders, []);
+  const folders = [root, path.dirname(root)];
+  agent.grantFolders("chat", folders);
+  agent.start("chat", "continue", folders, root, undefined, {
     model: { ...model, model: "another-model" },
     attachments: [],
   });
+  folders.length = 0;
   await finished();
+  agent.revokeFolder("chat", root);
+  const expectedFolders = [root, path.dirname(root)];
+  assert.deepEqual(JSON.parse(agent.list()[1].text).folders, expectedFolders);
+  assert.deepEqual(agent.list()[1].folders, expectedFolders);
+  assert.deepEqual(agent.list()[0].folders, []);
+  const persisted = new ConversationStore(path.join(root, "state"));
+  try { assert.deepEqual(persisted.tasks()[1].folders, expectedFolders); }
+  finally { persisted.close(); }
   assert.equal(JSON.parse(agent.list()[1].text).previous, "same-session");
   assert.equal(JSON.parse(agent.list()[1].text).model, "another-model");
   assert.ok(!JSON.stringify(agent.list()).includes("secret-test"));

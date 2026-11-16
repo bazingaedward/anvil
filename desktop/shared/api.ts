@@ -102,6 +102,8 @@ export type AgentTool = {
   endedAt?: number;
 };
 export type AgentTask = {
+  /** User-selected directories sent with this message; absent on legacy tasks. */
+  folders?: string[];
   tools?: AgentTool[];
   toolCount?: number;
   startedAt?: number;

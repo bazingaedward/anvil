@@ -2167,6 +2167,31 @@ kbd {
 .sent-attachments {
   padding-top: 10px;
 }
+.sent-folders {
+  margin-top: 12px;
+}
+.sent-folders > small {
+  display: block;
+  font-size: calc(var(--ui-font-size) - 2px);
+  color: #c3d3ee;
+}
+.sent-folders .sent-attachments {
+  padding: 6px 0 0;
+}
+.sent-folders .sent-attachments > span {
+  background: #ffffff12;
+  border-color: #ffffff30;
+  color: inherit;
+  min-width: 0;
+}
+.sent-folders svg {
+  flex-shrink: 0;
+}
+.sent-folders .sent-attachments > span > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .composer .draft-notice {
   margin: 6px 0;
 }

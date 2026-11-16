@@ -435,6 +435,7 @@ export class Agent {
       questionReply: options?.questionReply,
       conversationID,
       prompt: text.trim() || "Please inspect the attached files.",
+      folders: [...directories],
       model: { ...model },
       attachments: options?.attachments.map(
         ({ content, ...metadata }) => metadata,
