@@ -168,6 +168,40 @@ async function start(input: Start) {
         if (
           (message.method === "item/started" ||
             message.method === "item/completed") &&
+          [
+            "commandExecution",
+            "fileChange",
+            "mcpToolCall",
+            "dynamicToolCall",
+            "webSearch",
+          ].includes(p.item?.type)
+        ) {
+          const item = p.item;
+          send({
+            type: "tool",
+            id: item.id,
+            name: item.tool || item.type,
+            status:
+              message.method === "item/started"
+                ? "running"
+                : item.status === "failed" ||
+                    item.error ||
+                    (typeof item.exitCode === "number" && item.exitCode !== 0)
+                  ? "failed"
+                  : "completed",
+            summary: String(
+              item.command ||
+                item.changes
+                  ?.map((change: { path: string }) => change.path)
+                  .join(", ") ||
+                item.query ||
+                "",
+            ).slice(0, 500),
+          });
+        }
+        if (
+          (message.method === "item/started" ||
+            message.method === "item/completed") &&
           p.item?.type === "agentMessage" &&
           p.item.questions?.length
         )

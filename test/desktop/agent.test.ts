@@ -208,3 +208,38 @@ test("an unresponsive runtime is cancelled and cannot overwrite the final state 
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+test("tool events persist summaries, deduplicate IDs and stop pending tools on cancel", async () => {
+  const root = mkdtempSync(path.join(os.tmpdir(), "anvil-tools-"));
+  const script = path.join(root, "worker.cjs");
+  writeFileSync(
+    script,
+    `const send=x=>console.log(JSON.stringify(x));require('node:readline').createInterface({input:process.stdin}).on('line',line=>{const m=JSON.parse(line);if(m.type==='start'){send({type:'session',id:'s'});send({type:'tool',id:'one',name:'shell',summary:'echo test-secret',status:'running'});send({type:'tool',id:'one',name:'shell',status:'completed'});send({type:'tool',id:'two',name:'write',summary:'file.ts',status:'running'});}if(m.type==='cancel')process.exit(0)});`,
+  );
+  const agent = new Agent(
+    root,
+    path.join(root, "state"),
+    process.execPath,
+    () => {},
+    {
+      BYTEPLUS_ARK_API_KEY: "test-secret",
+      BYTEPLUS_ARK_RESPONSES_URL: "https://example.invalid",
+    },
+    [script],
+  );
+  try {
+    const task = agent.start("tools", "test");
+    for (let i = 0; i < 100 && agent.list()[0].tools?.length !== 2; i++)
+      await new Promise((r) => setTimeout(r, 10));
+    assert.equal(agent.list()[0].toolCount, 2);
+    assert.equal(agent.list()[0].tools?.[0].summary, "echo [REDACTED]");
+    assert.equal(agent.list()[0].tools?.[0].status, "completed");
+    agent.cancel(task.id);
+    for (let i = 0; i < 100 && agent.list()[0].status === "running"; i++)
+      await new Promise((r) => setTimeout(r, 10));
+    assert.equal(agent.list()[0].tools?.[1].status, "cancelled");
+  } finally {
+    await agent.close();
+    rmSync(root, { recursive: true, force: true });
+  }
+});

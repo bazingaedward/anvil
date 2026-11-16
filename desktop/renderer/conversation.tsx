@@ -1,3 +1,4 @@
+import { ToolActivity } from "./tool-activity";
 import { AnswerActions } from "./answer-actions";
 import type { MemoryInput } from "../shared/memory";
 import { MarkdownResponse } from "./markdown-response";
@@ -810,6 +811,7 @@ export function ConversationWorkspace({
                     )}
                   </div>
                   {task.text && <MarkdownResponse text={task.text} />}
+                  <ToolActivity task={task} />
                   {task.questions?.map((group) => (
                     <AgentQuestions
                       key={group.id}
@@ -847,7 +849,7 @@ export function ConversationWorkspace({
                             : task.phase === "checking"
                               ? "正在检查…"
                               : task.phase === "repairing"
-                                ? `正在修复 · ${(task.round || 1) - 1}/${task.acceptance?.maxRepairs}`
+                                ? `正在修复 · 第 ${(task.round || 1) - 1} 次`
                                 : task.activity ||
                                   (task.text ? "正在继续…" : "处理中…")}
                       </span>

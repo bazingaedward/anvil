@@ -24,6 +24,13 @@ export type RuntimeEvent =
   | { type: "session"; id: string }
   | { type: "text"; text: string }
   | { type: "activity"; text: string }
+  | {
+      type: "tool";
+      id: string;
+      name: string;
+      summary?: string;
+      status: "running" | "completed" | "failed";
+    }
   | { type: "questions"; group: AgentQuestionGroup }
   | {
       type: "permission";
@@ -76,6 +83,24 @@ function decode(
     ["auto", "manual"].includes(m.reason)
   )
     return m;
+  if (
+    m.type === "tool" &&
+    typeof m.id === "string" &&
+    m.id.length > 0 &&
+    m.id.length <= 200 &&
+    typeof m.name === "string" &&
+    m.name.length <= 100 &&
+    ["running", "completed", "failed"].includes(m.status) &&
+    (m.summary === undefined ||
+      (typeof m.summary === "string" && m.summary.length <= 500))
+  )
+    return {
+      type: "tool",
+      id: m.id,
+      name: m.name,
+      status: m.status,
+      summary: m.summary,
+    };
   if (m.type === "questions")
     return {
       type: "questions",
@@ -262,6 +287,9 @@ export function startRuntime(
               pid: child.pid,
               taskID: options.taskID,
               event: event.type,
+              ...(event.type === "tool"
+                ? { toolID: event.id, tool: event.name, status: event.status }
+                : {}),
               ...(event.type === "questions"
                 ? {
                     questionID: event.group.id,

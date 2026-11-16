@@ -70,6 +70,13 @@ async function run(input) {
         continue;
       const d = event.data;
       switch (event.type) {
+        case "session.step.started":
+        case "session.reasoning.started":
+          send({ type: "activity", text: "模型思考中…" });
+          break;
+        case "session.retry.scheduled":
+          send({ type: "activity", text: "模型请求暂时失败，正在重试…" });
+          break;
         case "form.created": {
           const form = d.form;
           if (
@@ -102,6 +109,12 @@ async function run(input) {
           break;
         case "session.tool.success":
         case "session.tool.failed":
+          send({
+            type: "tool",
+            id: d.id,
+            name: tools.get(d.id) || "tool",
+            status: event.type.endsWith("failed") ? "failed" : "completed",
+          });
           send({
             type: "activity",
             text: event.type.endsWith("failed")
@@ -153,6 +166,19 @@ async function run(input) {
           send({ type: "permission-resolved", id: d.requestID });
           break;
         case "session.tool.called":
+          send({
+            type: "tool",
+            id: d.id,
+            name: tools.get(d.id) || "tool",
+            status: "running",
+            summary: String(
+              d.input?.command ||
+                d.input?.filePath ||
+                d.input?.path ||
+                d.input?.url ||
+                "",
+            ).slice(0, 500),
+          });
           send({
             type: "activity",
             text: `正在执行工具：${tools.get(d.id) || "tool"}`,

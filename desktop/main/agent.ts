@@ -30,7 +30,7 @@ type Active = {
   denied: boolean;
   done?: Promise<void>;
 };
-const TASK_TIMEOUT = 15 * 60 * 1000;
+const TASK_TIMEOUT = 0; // Unlimited by default; explicit budgets are opt-in.
 export class Agent {
   private tasks: RecordTask[] = [];
   private active?: Active;
@@ -62,6 +62,12 @@ export class Agent {
   private recover(task: RecordTask): RecordTask {
     if (task.status === "running") {
       task.status = "cancelled";
+      for (const tool of task.tools || []) {
+        if (tool.status === "running") {
+          tool.status = "cancelled";
+          tool.endedAt = task.updated;
+        }
+      }
       task.error = "Execution stopped when Anvil closed.";
       task.permissions = [];
       task.phase = undefined;
@@ -437,6 +443,7 @@ export class Agent {
       status: "running",
       phase: "working",
       round: 1,
+      startedAt: Date.now(),
       permissions: [],
       updated: Date.now(),
       sessionID: previous?.sessionID,
@@ -533,6 +540,12 @@ export class Agent {
     active.task.error = error;
     active.task.phase = undefined;
     active.task.activity = undefined;
+    for (const tool of active.task.tools || []) {
+      if (tool.status === "running") {
+        tool.status = "cancelled";
+        tool.endedAt = Date.now();
+      }
+    }
     active.task.permissions = [];
     if (this.active === active) this.active = undefined;
     this.publish(active.task);
@@ -541,22 +554,25 @@ export class Agent {
     const { task, abort } = active;
     let remaining = this.taskTimeoutMs;
     let checked = Date.now();
-    const timer = setInterval(
-      () => {
-        const now = Date.now();
-        const waiting = task.questions?.some(
-          (group) => group.blocking && !group.answer,
-        );
-        if (!waiting) remaining -= now - checked;
-        checked = now;
-        if (remaining > 0 || waiting) return;
-        active.limit = true;
-        task.phase = "stopping";
-        this.publish(task);
-        abort.abort();
-      },
-      Math.min(1000, this.taskTimeoutMs),
-    );
+    const timer =
+      this.taskTimeoutMs > 0
+        ? setInterval(
+            () => {
+              const now = Date.now();
+              const waiting = task.questions?.some(
+                (group) => group.blocking && !group.answer,
+              );
+              if (!waiting) remaining -= now - checked;
+              checked = now;
+              if (remaining > 0 || waiting) return;
+              active.limit = true;
+              task.phase = "stopping";
+              this.publish(task);
+              abort.abort();
+            },
+            Math.min(1000, this.taskTimeoutMs),
+          )
+        : undefined;
     try {
       let prompt = task.prompt;
       if (task.questionReply)
@@ -588,7 +604,9 @@ export class Agent {
         prompt += `\n\nAnvil will run the user-authorized acceptance command after your response: ${JSON.stringify(task.acceptance.command)} in ${JSON.stringify(task.acceptance.directory)}. Preserve that command and do not weaken tests merely to pass. Do not claim the check passed unless it actually ran.`;
       for (
         let round = 1;
-        round <= 1 + (task.acceptance?.maxRepairs || 0);
+        !task.acceptance ||
+        (task.acceptance.maxRepairs ?? -1) === -1 ||
+        round <= 1 + (task.acceptance.maxRepairs ?? -1);
         round++
       ) {
         if (abort.signal.aborted) break;
@@ -619,7 +637,10 @@ export class Agent {
           this.finish(active, "completed");
           return;
         }
-        if (round > task.acceptance.maxRepairs) {
+        if (
+          (task.acceptance.maxRepairs ?? -1) >= 0 &&
+          round > task.acceptance.maxRepairs!
+        ) {
           this.finish(
             active,
             "limit",
@@ -765,6 +786,39 @@ export class Agent {
                 if (task.questions.length >= 20)
                   throw new Error("Too many question groups.");
                 task.questions.push(group);
+              }
+              break;
+            }
+            case "tool": {
+              task.tools ||= [];
+              const id = `${task.round}:${event.id}`;
+              const existing = task.tools.find((tool) => tool.id === id);
+              if (existing) {
+                if (existing.status !== "running" && event.status === "running")
+                  break;
+                existing.status = event.status;
+                if (event.summary)
+                  existing.summary = this.redact(event.summary);
+                if (event.status !== "running") existing.endedAt = Date.now();
+              } else {
+                task.toolCount = (task.toolCount || 0) + 1;
+                task.tools.push({
+                  id,
+                  name: this.redact(event.name),
+                  summary: event.summary
+                    ? this.redact(event.summary)
+                    : undefined,
+                  status: event.status,
+                  startedAt: Date.now(),
+                  endedAt: event.status === "running" ? undefined : Date.now(),
+                });
+                // Bound retained display history, never the number of executions.
+                if (task.tools.length > 200) {
+                  const old = task.tools.findIndex(
+                    (tool) => tool.status !== "running",
+                  );
+                  if (old >= 0) task.tools.splice(old, 1);
+                }
               }
               break;
             }

@@ -124,7 +124,7 @@ test("a task without a check is unverified and invalid checks never start", asyn
   );
   assert.throws(
     () =>
-      agent.start("chat", "Task", [root], root, { ...options, maxRepairs: 6 }),
+      agent.start("chat", "Task", [root], root, { ...options, maxRepairs: -2 }),
     /Invalid acceptance/,
   );
   assert.equal(agent.list().length, 0);
@@ -235,4 +235,31 @@ test("check timeout is recorded and the command is terminated", async (t) => {
   );
   assert.equal(result.timedOut, true);
   assert.equal(result.cancelled, false);
+});
+
+test("default execution has no deadline and remains manually cancellable", async (t) => {
+  const { agent } = fixture(t, "hang");
+  const task = agent.start("unlimited", "Wait");
+  await new Promise((resolve) => setTimeout(resolve, 300));
+  assert.equal(agent.list()[0].status, "running");
+  agent.cancel(task.id);
+  await waitFor(() => agent.list()[0].status !== "running");
+  assert.equal(agent.list()[0].status, "cancelled");
+});
+
+test("default acceptance has no timer or repair cap and can pass after six repairs", async (t) => {
+  const { root, agent, options } = fixture(t, "no-repair");
+  writeFileSync(
+    path.join(root, "check.cjs"),
+    `const fs=require('node:fs');const n=fs.readFileSync('inputs.jsonl','utf8').trim().split('\\n').length;process.exit(n>=7?0:1);`,
+  );
+  agent.start("unlimited-repair", "Keep fixing", [root], root, {
+    command: options.command,
+    directory: root,
+  });
+  await waitFor(() => agent.list()[0].status !== "running");
+  assert.equal(agent.list()[0].status, "completed");
+  assert.equal(agent.list()[0].checks?.length, 7);
+  assert.equal(agent.list()[0].acceptance?.maxRepairs, -1);
+  assert.equal(agent.list()[0].acceptance?.timeoutMs, 0);
 });

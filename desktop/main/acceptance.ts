@@ -63,21 +63,20 @@ export function validateAcceptance(
     value.command.includes("\0") ||
     typeof value.directory !== "string" ||
     !directories.includes(value.directory) ||
-    !Number.isInteger(value.maxRepairs) ||
-    value.maxRepairs < 0 ||
-    value.maxRepairs > 5 ||
-    !Number.isInteger(value.timeoutMs) ||
-    value.timeoutMs < 1000 ||
-    value.timeoutMs > 600000
+    !Number.isSafeInteger(value.maxRepairs ?? -1) ||
+    (value.maxRepairs ?? -1) < -1 ||
+    !Number.isSafeInteger(value.timeoutMs ?? 0) ||
+    (value.timeoutMs ?? 0) < 0 ||
+    (value.timeoutMs ?? 0) > 2147483647
   )
     throw new Error(
-      "Invalid acceptance check. Choose an added directory, 0–5 repairs, and a 1–600 second timeout.",
+      "Invalid acceptance check. Choose an added directory, repairs >= -1 (-1 means unlimited), and timeout >= 0 (0 means unlimited).",
     );
   return {
     command: value.command.trim(),
     directory: value.directory,
-    maxRepairs: value.maxRepairs,
-    timeoutMs: value.timeoutMs,
+    maxRepairs: value.maxRepairs ?? -1,
+    timeoutMs: value.timeoutMs ?? 0,
   };
 }
 
@@ -149,10 +148,13 @@ export function runAcceptance(
       result.cancelled = true;
       terminate();
     };
-    const timer = setTimeout(() => {
-      result.timedOut = true;
-      terminate();
-    }, options.timeoutMs);
+    const timer =
+      (options.timeoutMs ?? 0) > 0
+        ? setTimeout(() => {
+            result.timedOut = true;
+            terminate();
+          }, options.timeoutMs)
+        : undefined;
     signal.addEventListener("abort", cancel, { once: true });
     if (signal.aborted) cancel();
     child.stdout?.on("data", capture);

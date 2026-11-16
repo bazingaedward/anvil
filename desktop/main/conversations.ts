@@ -78,12 +78,11 @@ function validatePatch(patch: ConversationPatch) {
       a.command.includes("\0") ||
       typeof a.directory !== "string" ||
       a.directory.length > 32768 ||
-      !Number.isInteger(a.maxRepairs) ||
-      a.maxRepairs < 0 ||
-      a.maxRepairs > 5 ||
-      !Number.isInteger(a.timeoutMs) ||
-      a.timeoutMs < 1000 ||
-      a.timeoutMs > 600000)
+      !Number.isSafeInteger(a.maxRepairs ?? -1) ||
+      (a.maxRepairs ?? -1) < -1 ||
+      !Number.isSafeInteger(a.timeoutMs ?? 0) ||
+      (a.timeoutMs ?? 0) < 0 ||
+      (a.timeoutMs ?? 0) > 2147483647)
   )
     throw new Error("Invalid acceptance settings.");
 }

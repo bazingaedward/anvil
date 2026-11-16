@@ -92,7 +92,18 @@ export type AgentQuestionGroup = {
   answer?: { values: QuestionAnswer[]; taskID: string };
   readOnly?: boolean;
 };
+export type AgentTool = {
+  id: string;
+  name: string;
+  summary?: string;
+  status: "running" | "completed" | "failed" | "cancelled";
+  startedAt: number;
+  endedAt?: number;
+};
 export type AgentTask = {
+  tools?: AgentTool[];
+  toolCount?: number;
+  startedAt?: number;
   contextUsed?: {
     memories: { id: string; revision: number }[];
     handoffRevision: number | null;
@@ -119,8 +130,8 @@ export type AgentTask = {
 export type AcceptanceOptions = {
   command: string;
   directory: string;
-  maxRepairs: number;
-  timeoutMs: number;
+  maxRepairs?: number;
+  timeoutMs?: number;
 };
 export type AcceptanceRun = {
   round: number;
