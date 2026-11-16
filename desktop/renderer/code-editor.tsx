@@ -1,9 +1,9 @@
+import { getAppearance, subscribeAppearance } from "./appearance";
 import { useEffect, useRef } from "react";
 import * as monaco from "monaco-editor";
 
 const options: monaco.editor.IStandaloneEditorConstructionOptions = {
   theme: "anvil",
-  fontSize: 13,
   fontFamily: "Menlo, Consolas, monospace",
   minimap: { enabled: false },
   padding: { top: 18 },
@@ -32,13 +32,18 @@ export function CodeEditor({
     const model = monaco.editor.createModel(value, language);
     const instance = monaco.editor.create(container.current!, {
       ...options,
+      fontSize: getAppearance().codeFontSize,
       model,
     });
+    const unsubscribe = subscribeAppearance(() =>
+      instance.updateOptions({ fontSize: getAppearance().codeFontSize }),
+    );
     editor.current = instance;
     const listener = model.onDidChangeContent(() =>
       change.current(model.getValue()),
     );
     return () => {
+      unsubscribe();
       listener.dispose();
       instance.setModel(null);
       instance.dispose();
@@ -68,12 +73,17 @@ export function CodeDiff({
     const after = monaco.editor.createModel(modified, language);
     const instance = monaco.editor.createDiffEditor(container.current!, {
       ...options,
+      fontSize: getAppearance().codeFontSize,
       readOnly: true,
       originalEditable: false,
       renderSideBySide: false,
     });
     instance.setModel({ original: before, modified: after });
+    const unsubscribe = subscribeAppearance(() =>
+      instance.updateOptions({ fontSize: getAppearance().codeFontSize }),
+    );
     return () => {
+      unsubscribe();
       // Detach before disposing models; Monaco can still have a pending diff calculation.
       instance.setModel(null);
       instance.dispose();

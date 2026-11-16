@@ -1,3 +1,4 @@
+import { getAppearance, subscribeAppearance } from "./appearance";
 import { AccountGate } from "./account";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
@@ -227,7 +228,7 @@ function TerminalPanel({
   useEffect(() => {
     setExited(false);
     const term = new Terminal({
-      fontSize: 12,
+      fontSize: getAppearance().terminalFontSize,
       fontFamily: "Menlo, Consolas, monospace",
       cursorBlink: true,
       scrollback: 4000,
@@ -256,6 +257,10 @@ function TerminalPanel({
       if (container.current?.clientHeight && container.current?.clientWidth)
         fit.fit();
     };
+    const unsubscribeAppearance = subscribeAppearance(() => {
+      term.options.fontSize = getAppearance().terminalFontSize;
+      resize();
+    });
     const observer = new ResizeObserver(resize);
     observer.observe(container.current!);
     let alive = true;
@@ -276,6 +281,7 @@ function TerminalPanel({
     return () => {
       alive = false;
       off();
+      unsubscribeAppearance();
       observer.disconnect();
       input.dispose();
       size.dispose();

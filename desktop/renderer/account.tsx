@@ -1,3 +1,4 @@
+import { AppearanceSettings } from "./appearance";
 import googleLogo from "./google-logo.png";
 import { useEffect, useState, useRef, type ReactNode } from "react";
 import {
@@ -282,6 +283,7 @@ export function AccountGate({ children }: { children: ReactNode }) {
             <nav aria-label="设置分类">
               {[
                 { id: "general", label: "通用", icon: SlidersHorizontal },
+                { id: "appearance", label: "外观", icon: SlidersHorizontal },
                 { id: "account", label: "账号", icon: UserRound },
                 { id: "devices", label: "设备", icon: Monitor },
               ].map(({ id, label, icon: Icon }) => (
@@ -354,6 +356,7 @@ export function AccountGate({ children }: { children: ReactNode }) {
                 </p>
               </>
             )}
+            {section === "appearance" && <AppearanceSettings />}
             {section === "account" && (
               <>
                 <h2>账号</h2>
