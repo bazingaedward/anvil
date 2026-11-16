@@ -37,7 +37,6 @@ test("tool activity keeps active work visible and renders summaries as text", ()
   assert.ok(html.includes("已完成"));
   assert.ok(html.includes("2s"));
   assert.ok(!html.includes("<script>"));
-  assert.ok(html.includes("可随时停止"));
   const stopped = renderToStaticMarkup(
     createElement(ToolActivity, { task: { ...task, status: "cancelled" } }),
   );

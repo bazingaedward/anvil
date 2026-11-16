@@ -537,6 +537,7 @@ export class Agent {
   private finish(active: Active, status: AgentTask["status"], error?: string) {
     if (active.task.status !== "running") return;
     active.task.status = status;
+    active.task.endedAt = Date.now();
     active.task.error = error;
     active.task.phase = undefined;
     active.task.activity = undefined;

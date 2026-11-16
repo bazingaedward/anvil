@@ -2,6 +2,7 @@ import { diagnostic, diagnosticState } from "./diagnostics";
 import { spawn } from "node:child_process";
 import { executionEnvironment, killProcessTree } from "./acceptance";
 import { parseQuestionGroup } from "./agent-questions";
+import type { RequestTiming } from "../../runtime/opencode/request-timing";
 import type {
   AgentQuestionGroup,
   QuestionAnswer,
@@ -74,9 +75,33 @@ type Options = {
 
 function decode(
   line: string,
-): RuntimeEvent | ({ type: "done" } & RuntimeResult) {
+): RuntimeEvent | RequestTiming | ({ type: "done" } & RuntimeResult) {
   const m = JSON.parse(line);
   if (!m || typeof m !== "object") throw new Error("Invalid event");
+  if (
+    m.type === "model-timing" &&
+    typeof m.id === "string" &&
+    /^\d{1,10}$/.test(m.id) &&
+    [
+      "started",
+      "headers",
+      "first-byte",
+      "completed",
+      "failed",
+      "cancelled",
+    ].includes(m.phase) &&
+    Number.isSafeInteger(m.elapsedMs) &&
+    m.elapsedMs >= 0 &&
+    (m.status === undefined ||
+      (Number.isInteger(m.status) && m.status >= 100 && m.status <= 599))
+  )
+    return {
+      type: "model-timing",
+      id: m.id,
+      phase: m.phase,
+      elapsedMs: m.elapsedMs,
+      status: m.status,
+    };
   if (
     m.type === "compaction" &&
     ["started", "completed", "failed"].includes(m.status) &&
@@ -274,6 +299,19 @@ export function startRuntime(
         if (newline > 1024 * 1024) throw new Error("Oversized runtime event");
         const event = decode(pending.slice(0, newline));
         pending = pending.slice(newline + 1);
+        if (event.type === "model-timing") {
+          const fields = {
+            pid: child.pid,
+            taskID: options.taskID,
+            requestID: event.id,
+            phase: event.phase,
+            elapsedMs: event.elapsedMs,
+            httpStatus: event.status,
+          };
+          diagnostic("model.request", fields);
+          diagnosticState("modelRequest", fields);
+          continue;
+        }
         if (event.type !== "text" || Date.now() - lastTextReport > 2000) {
           diagnosticState("runtime", {
             pid: child.pid,

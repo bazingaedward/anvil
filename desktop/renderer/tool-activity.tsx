@@ -48,7 +48,7 @@ export function ToolActivity({ task }: { task: AgentTask }) {
       </li>
     );
   }
-  if (!tools.length && task.status !== "running") return null;
+  if (!tools.length) return null;
   return (
     <section className="tool-activity" aria-label="工具执行记录">
       {!!running.length && <ul>{running.map(row)}</ul>}
@@ -67,16 +67,6 @@ export function ToolActivity({ task }: { task: AgentTask }) {
           </button>
           <ul>{(expanded ? completed : completed.slice(-3)).map(row)}</ul>
         </>
-      )}
-      {task.status === "running" && (
-        <p className="tool-elapsed">
-          已运行{" "}
-          {Math.max(
-            0,
-            Math.floor((now - (task.startedAt || task.updated)) / 1000),
-          )}
-          s · 可随时停止
-        </p>
       )}
     </section>
   );

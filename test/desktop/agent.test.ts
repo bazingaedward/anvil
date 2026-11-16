@@ -46,6 +46,8 @@ test("agent owns task state, validates permission replies, and persists only pub
     assert.equal(agent.list()[0].text, "hello");
     assert.equal("sessionID" in agent.list()[0], false);
     assert.equal(agent.list()[0].permissions.length, 0);
+    const endedAt = agent.list()[0].endedAt;
+    assert.ok(endedAt! >= agent.list()[0].startedAt!);
     const restored = new Agent(
       path.join(root, "another-directory"),
       path.join(root, "state"),
@@ -55,6 +57,7 @@ test("agent owns task state, validates permission replies, and persists only pub
       [script],
     );
     assert.equal(restored.list()[0].status, "unverified");
+    assert.equal(restored.list()[0].endedAt, endedAt);
     assert.ok(!JSON.stringify(restored.list()).includes("test-secret"));
     await restored.close();
   } finally {
@@ -238,6 +241,7 @@ test("tool events persist summaries, deduplicate IDs and stop pending tools on c
     for (let i = 0; i < 100 && agent.list()[0].status === "running"; i++)
       await new Promise((r) => setTimeout(r, 10));
     assert.equal(agent.list()[0].tools?.[1].status, "cancelled");
+    assert.ok(agent.list()[0].endedAt! >= agent.list()[0].startedAt!);
   } finally {
     await agent.close();
     rmSync(root, { recursive: true, force: true });

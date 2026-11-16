@@ -1,4 +1,5 @@
 import { ToolActivity } from "./tool-activity";
+import { TaskDuration } from "./task-duration";
 import { AnswerActions } from "./answer-actions";
 import type { MemoryInput } from "../shared/memory";
 import { MarkdownResponse } from "./markdown-response";
@@ -853,6 +854,7 @@ export function ConversationWorkspace({
                                 : task.activity ||
                                   (task.text ? "正在继续…" : "处理中…")}
                       </span>
+                      <TaskDuration task={task} />
                     </div>
                   ) : (
                     <small
@@ -872,6 +874,7 @@ export function ConversationWorkspace({
                           : task.status === "limit"
                             ? "已达到限制"
                             : task.status}
+                      <TaskDuration task={task} />
                     </small>
                   )}
                   {task.text && task.status !== "running" && (

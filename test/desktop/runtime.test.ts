@@ -94,6 +94,18 @@ test("runtime fails on malformed permission resources instead of approving coerc
   assert.deepEqual(events, []);
 });
 
+test("model timing stays in diagnostics and malformed timing fails validation", async () => {
+  const good = await fixture(
+    `console.log(JSON.stringify({type:'model-timing',id:'1',phase:'headers',elapsedMs:25,status:200,body:'private'})); console.log(JSON.stringify({type:'done',status:'completed'}));`,
+  );
+  assert.equal(good.result.status, "completed");
+  assert.deepEqual(good.events, []);
+  const bad = await fixture(
+    `console.log(JSON.stringify({type:'model-timing',id:'1',phase:'headers',elapsedMs:-1})); process.stdin.resume();`,
+  );
+  assert.equal(bad.result.status, "failed");
+});
+
 test("runtime bounds unterminated output and detects exit without a terminal event", async () => {
   const oversized = await fixture(
     `process.stdout.write('x'.repeat(1024*1024+1));process.stdin.resume();`,

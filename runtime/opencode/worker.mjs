@@ -1,4 +1,5 @@
-import { runtimeProvider } from "../../desktop/shared/providers.ts";
+import { modelBaseURL, runtimeProvider } from "../../desktop/shared/providers.ts";
+import { timedModelFetch } from "./request-timing.ts";
 import path from "node:path";
 import { createInterface } from "node:readline";
 import { mkdir } from "node:fs/promises";
@@ -35,6 +36,11 @@ async function close() {
 }
 async function run(input) {
   if (!key || !endpoint) throw new Error("Provider credentials are missing.");
+  globalThis.fetch = timedModelFetch(
+    globalThis.fetch.bind(globalThis),
+    modelBaseURL(endpoint, input.model?.protocol || "responses"),
+    send,
+  );
   await mkdir(input.state, { recursive: true });
   for (const kind of ["DATA", "CONFIG", "CACHE", "STATE"])
     process.env[`XDG_${kind}_HOME`] = path.join(

@@ -104,6 +104,7 @@ export type AgentTask = {
   tools?: AgentTool[];
   toolCount?: number;
   startedAt?: number;
+  endedAt?: number;
   contextUsed?: {
     memories: { id: string; revision: number }[];
     handoffRevision: number | null;

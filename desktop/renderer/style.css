@@ -2970,7 +2970,7 @@ kbd {
 .tool-activity code { display: block; white-space: pre-wrap; overflow-wrap: anywhere; font-size: var(--code-font-size); margin-top: 4px; }
 .tool-activity small { flex: none; font-variant-numeric: tabular-nums; }
 .tool-activity button { background: none; border: 0; padding: 4px 0; color: inherit; gap: 4px; }
-.tool-elapsed { font-size: calc(var(--ui-font-size) - 2px); color: #999; font-variant-numeric: tabular-nums; }
+.task-duration { margin-left: 0.5em; color: #999; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .tool-spinner { animation: tool-spin 1s linear infinite; transform-origin: center; }
 @keyframes tool-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .tool-spinner { animation: none; } }
