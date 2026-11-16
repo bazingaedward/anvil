@@ -1,3 +1,4 @@
+import { ErrorToast } from "./error-toast";
 import { ToolActivity } from "./tool-activity";
 import { TaskDuration } from "./task-duration";
 import { AnswerActions } from "./answer-actions";
@@ -532,6 +533,7 @@ export function ConversationWorkspace({
   const [reviewOpen, setReviewOpen] = useState(false);
   return (
     <div className="workspace-shell">
+      <ErrorToast message={agentError} onDismiss={() => setAgentError("")} />
       <nav className="activity-rail" aria-label="主导航">
         <button
           title="聊天"
@@ -1203,19 +1205,15 @@ export function ConversationWorkspace({
                   </button>
                 </div>
               </div>
-              {(storageError ||
-                composerDraft.storageError ||
-                agentError ||
-                attaching) && (
+              {(storageError || composerDraft.storageError || attaching) && (
                 <p className="draft-notice" role="status">
                   {storageError || composerDraft.storageError
                     ? "无法在本地保存草稿，请保持此窗口打开。"
                     : attaching
                       ? "正在添加附件…"
-                      : agentError ||
-                        (imageMismatch
-                          ? "此模型不支持图片，请更换支持图片的模型或移除图片。"
-                          : "")}
+                      : imageMismatch
+                        ? "此模型不支持图片，请更换支持图片的模型或移除图片。"
+                        : ""}
                 </p>
               )}
             </div>

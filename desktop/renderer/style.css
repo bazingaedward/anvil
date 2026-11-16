@@ -492,22 +492,57 @@ kbd {
   width: 1px;
   margin: 0 5px;
 }
-.error-banner {
+/* Operation errors float above the workspace without shifting its layout. */
+.error-toast {
+  position: fixed;
+  z-index: 1000;
+  top: 52px;
+  right: 20px;
+  width: min(480px, calc(100vw - 40px));
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 9px 16px;
-  background: #422d35;
-  color: #f0c4cb;
-  border-bottom: 1px solid #69434d;
-  font-size: calc(var(--ui-font-size) - 1px);
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid #d46c74;
+  border-radius: 12px;
+  background: #382429;
+  color: #fff0f1;
+  box-shadow: 0 10px 32px #0006;
+  font-size: var(--ui-font-size);
   line-height: 1.5;
-  flex-shrink: 0;
+  -webkit-app-region: no-drag;
 }
-.error-banner span {
+.error-toast > svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: #ff929c;
+}
+.error-toast-content {
+  flex: 1;
+  min-width: 0;
+}
+.error-toast-content p {
+  margin: 6px 0 0;
+  max-height: min(320px, 50vh);
+  overflow: auto;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+.error-toast button {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  color: inherit;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+}
+.error-toast button:hover,
+.error-toast button:focus-visible {
+  background: #ffffff18;
 }
 .welcome {
   flex: 1;

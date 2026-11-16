@@ -1,3 +1,4 @@
+import { ErrorToast } from "./error-toast";
 import { getAppearance, subscribeAppearance } from "./appearance";
 import { AccountGate } from "./account";
 import React, { useCallback, useEffect, useRef, useState } from "react";
@@ -776,14 +777,7 @@ function App() {
           <PanelLeft size={19} />
         </button>
       </div>
-      {error && (
-        <div className="error-banner" role="alert">
-          <span>{error}</span>
-          <button aria-label="关闭错误提示" onClick={() => setError("")}>
-            <X size={15} />
-          </button>
-        </div>
-      )}
+      <ErrorToast message={error} onDismiss={() => setError("")} />
       <ConversationWorkspace
         sidebarOpen={sidebarOpen}
         repo={repo}

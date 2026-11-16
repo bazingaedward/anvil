@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="UTF-8"><link rel="stylesheet" href="/desktop/renderer/style.css"></head>
+<body>
+<textarea aria-label="草稿">未发送的内容</textarea><div id="toast-test"></div>
+<script type="module">
+import React from 'react';
+import { createRoot } from 'react-dom/client';
+import { ErrorToast } from '/desktop/renderer/error-toast.tsx';
+const root = createRoot(document.getElementById('toast-test'));
+window.showTestToast = () => root.render(React.createElement(ErrorToast, {
+  message: "Error: Error invoking remote method 'agent:start': Error: 模型连接失败，请重试。",
+  onDismiss: () => root.render(null)
+}));
+</script>
+</body>
+</html>
