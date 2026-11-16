@@ -9,6 +9,20 @@ import type {
   AccountDevice,
 } from "../shared/api";
 export const CLOUD_URL = "https://anvil.keygrant.app";
+// The cloud profile schema predates native connections. Only the exact reserved
+// Copilot credential/endpoint pair is restored as a native connection locally.
+function restoreConnections(config: CloudConfig): CloudConfig {
+  return {
+    ...config,
+    models: config.models.map((model) =>
+      model.keyRef === "ANVIL_COPILOT_OAUTH" &&
+      model.endpoint === "https://api.githubcopilot.com"
+        ? { ...model, connection: "copilot" as const }
+        : model,
+    ),
+  };
+}
+
 export class Account {
   user: AccountUser | null = null;
   snapshot?: { revision: number; config: CloudConfig };
@@ -128,6 +142,7 @@ export class Account {
   async refresh() {
     await this.require();
     this.snapshot = await this.request("/config");
+    this.snapshot!.config = restoreConnections(this.snapshot!.config);
     return this.state();
   }
   async mutate(change: (config: CloudConfig) => CloudConfig) {
@@ -140,8 +155,12 @@ export class Account {
         const config = change(structuredClone(base.config));
         this.snapshot = await this.request("/config", "PUT", {
           revision: base.revision,
-          config,
+          config: {
+            ...config,
+            models: config.models.map(({ connection, ...model }) => model),
+          },
         });
+        this.snapshot!.config = restoreConnections(this.snapshot!.config);
         return this.state();
       });
     this.queue = action;

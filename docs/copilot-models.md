@@ -46,3 +46,7 @@
 可通过 Keygrant 注入凭据运行 `node_modules/.bin/tsx scripts/copilot-smoke.mjs <model-id>...` 重复上述检查。脚本每个探测设 120 秒期限，只影响探测，不影响应用任务；不打印模型正文或凭据。
 
 本地回归：`npm run typecheck`、`TMPDIR=/private/tmp npm run test:desktop`（88 项）、使用 runtime 的 Bun 执行 `bun test runtime/opencode/copilot.test.mjs`（3 项）、`npm run runtime:build`、`npm run build`。
+
+## 保存为默认模型
+
+Copilot profile 可持久化到账号配置并作为默认模型。现有云端 schema 尚无 `connection` 字段：传输时省略这个本地字段，读取时仅对 `ANVIL_COPILOT_OAUTH` 与 `https://api.githubcopilot.com` 的精确组合恢复原生 Copilot 连接；OAuth 值仍只在 Keygrant。其他地址不会推断为 Copilot。已保存模型与新获取目录按 ID 合并，避免重复显示。删除旧模型不删除历史任务。

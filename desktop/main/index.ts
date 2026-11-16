@@ -649,9 +649,12 @@ function registerIPC() {
   });
   let copilotModels: import("../shared/api").ModelProfile[] = [];
   const availableModels = () => [
-    ...composerStore.models(),
-    ...copilotModels,
-    codexModel,
+    ...new Map(
+      [...composerStore.models(), ...copilotModels, codexModel].map((model) => [
+        model.id,
+        model,
+      ]),
+    ).values(),
   ];
   const findModel = (id?: string) =>
     copilotModels.find((model) => model.id === id) || composerStore.model(id);

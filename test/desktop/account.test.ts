@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync, existsSync } from "node:fs";
+import { mkdtempSync, rmSync, existsSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { Account, CLOUD_URL } from "../../desktop/main/account";
@@ -19,7 +19,9 @@ test("account login keeps token out of renderer state, serializes revisions, pre
   };
   const puts: number[] = [];
   globalThis.fetch = async () => {
-    throw new Error("Node fetch must not bypass the injected account transport");
+    throw new Error(
+      "Node fetch must not bypass the injected account transport",
+    );
   };
   const fetchAccount: typeof fetch = async (input, options) => {
     const url = String(input);
@@ -90,6 +92,55 @@ test("account login keeps token out of renderer state, serializes revisions, pre
     assert.equal(existsSync(path.join(root, "account.session")), false);
   } finally {
     globalThis.fetch = original;
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("Copilot defaults round-trip through the legacy cloud schema without exposing credentials", async () => {
+  const root = mkdtempSync(path.join(os.tmpdir(), "anvil-copilot-config-"));
+  writeFileSync(path.join(root, "account.session"), "fixture-session");
+  let config = {
+    models: [
+      {
+        ...defaultModel,
+        id: "copilot-gpt-6-luna",
+        model: "gpt-6-luna",
+        keyRef: "ANVIL_COPILOT_OAUTH",
+        endpoint: "https://api.githubcopilot.com",
+      },
+    ],
+    groups: [],
+    preferences: { defaultModelID: "copilot-gpt-6-luna" },
+  };
+  const account = new Account(
+    root,
+    (v) => Buffer.from(v),
+    (b) => b.toString(),
+    async (url, options) => {
+      if (url.endsWith("/me")) return Response.json({ id: "fixture" });
+      if (options.method === "PUT") {
+        const body = JSON.parse(String(options.body));
+        assert.equal("connection" in body.config.models[0], false);
+        config = body.config;
+      }
+      return Response.json({ revision: 1, config });
+    },
+  );
+  try {
+    const first = await account.refresh();
+    assert.equal(first.config!.models[0].connection, "copilot");
+    const saved = await account.mutate((c) => c);
+    assert.equal(saved.config!.models[0].connection, "copilot");
+    assert.equal(
+      saved.config!.preferences.defaultModelID,
+      "copilot-gpt-6-luna",
+    );
+    config.models[0].endpoint = "https://example.invalid";
+    assert.equal(
+      (await account.refresh()).config!.models[0].connection,
+      undefined,
+    );
+  } finally {
     rmSync(root, { recursive: true, force: true });
   }
 });
