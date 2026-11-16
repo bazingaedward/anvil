@@ -1067,9 +1067,13 @@ export function ConversationWorkspace({
                   onChange={(event) => update(event.target.value)}
                   onKeyDown={(event) => {
                     if (
-                      event.key === "Enter" &&
-                      (event.ctrlKey || event.metaKey) &&
-                      !event.nativeEvent.isComposing &&
+                      event.key !== "Enter" ||
+                      event.shiftKey ||
+                      event.nativeEvent.isComposing ||
+                      event.nativeEvent.keyCode === 229
+                    ) return;
+                    event.preventDefault();
+                    if (
                       !readOnly &&
                       (draft.text.trim() ||
                         composerDraft.attachments.length > 0) &&
@@ -1080,7 +1084,6 @@ export function ConversationWorkspace({
                       !sending &&
                       !managing
                     ) {
-                      event.preventDefault();
                       void send();
                     }
                   }}
@@ -1167,7 +1170,7 @@ export function ConversationWorkspace({
                         ? "停止任务"
                         : imageMismatch
                           ? "请选择支持图片的模型后发送此附件"
-                          : "发送 · Ctrl / ⌘ + Enter"
+                          : "Enter 发送，Shift+Enter 换行"
                     }
                     onClick={() =>
                       running
