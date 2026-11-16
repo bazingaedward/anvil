@@ -133,3 +133,12 @@ questionReply?: { taskID: string; questionID: string; answers: string[] };
 2026-11-11，本机 Codex 的真实测试成功生成结构化问题；选择 `COBALT-7319` 后，Anvil 恢复原线程，Codex 正确回复该标记，回答关联保存成功。自动化测试覆盖结构校验、重复事件、完成后保留、重启、重复回答、错误 ID、归档/删除/执行中拦截和 fork 只读。
 
 协议以本机 `codex-cli 0.167.0-alpha.3.2` 生成的 schema 和真实 `thread/read` 返回为依据。此版本的 questions 字段需要在升级 CLI 后继续做兼容测试。生命周期参考 [OpenAI app-server 文档](https://learn.chatgpt.com/docs/app-server#lifecycle-overview)，整体接入见 [Managed Agent 设计](managed-agents.md)。
+
+
+## OpenCode 2.0 阻塞式 question（2026-11-16）
+
+API 模型的 question 工具通过 `form.created`（`data.form.metadata.kind = question`）产生问题。worker 将字段键、问题、选项说明和多选标记映射到同一套卡片；`blocking: true` 的回答通过运行时 `answer` 消息调用 `host.form.reply`，继续原任务，不创建 Codex 式的新 turn。
+
+等待回答期间暂停任务执行超时预算。提交后保留已回答摘要，运行结束或重启后的未回答卡片只读，拒绝使用过期进程中的 form ID。支持单选、多选和自定义答案，不自动选中或提交。非 question 的通用表单暂不支持，会明确失败，避免静默挂起。
+
+调试入口见 [本地调试说明](local-debug.md)。

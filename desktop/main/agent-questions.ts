@@ -1,4 +1,4 @@
-import type { AgentQuestionGroup } from "../shared/api";
+import type { AgentQuestionGroup, QuestionAnswer } from "../shared/api";
 
 // Both the native event stream and the Anvil worker stream are untrusted input.
 export function parseQuestionGroup(
@@ -38,6 +38,14 @@ export function parseQuestionGroup(
         throw new Error("Invalid agent question options.");
       return {
         title: q.title,
+        ...(q.multiple === true ? { multiple: true } : {}),
+        ...(Array.isArray(q.descriptions) &&
+        q.descriptions.length === q.options?.length &&
+        q.descriptions.every(
+          (d: unknown) => typeof d === "string" && d.length <= 2000,
+        )
+          ? { descriptions: [...q.descriptions] }
+          : {}),
         ...(q.options?.length ? { options: [...q.options] } : {}),
       };
     }),
@@ -46,12 +54,23 @@ export function parseQuestionGroup(
 export function validateQuestionAnswers(
   group: AgentQuestionGroup,
   answers: unknown,
-): string[] {
+): QuestionAnswer[] {
   if (
     !Array.isArray(answers) ||
     answers.length !== group.questions.length ||
-    answers.some((a) => typeof a !== "string" || !a.trim() || a.length > 4000)
+    answers.some((a, i) => {
+      const values = Array.isArray(a) && group.questions[i]?.multiple ? a : [a];
+      return (
+        !values.length ||
+        values.length > 21 ||
+        values.some(
+          (v) => typeof v !== "string" || !v.trim() || v.length > 4000,
+        )
+      );
+    })
   )
     throw new Error("Answer every question with 1–4000 characters.");
-  return answers.map((a) => a.trim());
+  return answers.map((a) =>
+    Array.isArray(a) ? [...new Set(a.map((v: string) => v.trim()))] : a.trim(),
+  );
 }

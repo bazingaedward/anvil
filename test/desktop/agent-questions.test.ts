@@ -89,7 +89,11 @@ require('node:readline').createInterface({input:process.stdin}).on('line',line=>
     });
   const first = start("chat", "demo");
   await wait(agent);
-  assert.equal(agent.list()[0].questions?.length, 1);
+  assert.equal(
+    agent.list()[0].questions?.length,
+    1,
+    agent.list()[0].error || "Expected question event",
+  );
   assert.equal(agent.list()[0].questions?.[0].answer, undefined);
   await agent.close();
   agent = make();
@@ -156,4 +160,73 @@ require('node:readline').createInterface({input:process.stdin}).on('line',line=>
     () => agent.answerQuestions(pending.id, "ask-1", ["Review", "Details"]),
     /no longer available/,
   );
+});
+
+test("blocking questions resume the same task, pause timeout, and reject stale or duplicate answers", async () => {
+  const root = mkdtempSync(path.join(os.tmpdir(), "anvil-blocking-"));
+  const script = path.join(root, "worker.cjs");
+  writeFileSync(
+    script,
+    `const send=m=>console.log(JSON.stringify(m));
+require('node:readline').createInterface({input:process.stdin}).on('line',line=>{
+const m=JSON.parse(line);
+if(m.type==='start'){send({type:'session',id:'native'});send({type:'questions',group:{id:'form-1',blocking:true,questions:[{title:'Pick',options:['A','B'],multiple:true},{title:'Explain'}]}});}
+if(m.type==='answer'){if(JSON.stringify(m.values)!==JSON.stringify([['A','B'],'custom']))process.exit(3);send({type:'text',text:'Resumed'});send({type:'done',status:'completed'});process.exit(0);}
+if(m.type==='cancel')process.exit(0);
+});`,
+  );
+  const agent = new Agent(
+    root,
+    path.join(root, "state"),
+    process.execPath,
+    () => {},
+    {
+      BYTEPLUS_ARK_API_KEY: "test",
+      BYTEPLUS_ARK_RESPONSES_URL: "https://example.invalid",
+    },
+    [script],
+    250,
+  );
+  try {
+    const task = agent.start("blocking-chat", "ask", [], root);
+    for (let i = 0; i < 100 && !agent.list()[0]?.questions?.length; i++)
+      await new Promise((r) => setTimeout(r, 10));
+    assert.ok(
+      agent.list()[0].questions?.[0].blocking,
+      agent.list()[0].error || "Expected question event",
+    );
+    await new Promise((r) => setTimeout(r, 400));
+    assert.equal(agent.list()[0].status, "running");
+    assert.throws(
+      () => agent.answerQuestions(task.id, "form-1", [[], "custom"]),
+      /Answer every/,
+    );
+    const reply = agent.answerQuestions(task.id, "form-1", [
+      ["A", "B"],
+      "custom",
+    ]);
+    assert.equal(reply.id, task.id);
+    assert.throws(
+      () => agent.answerQuestions(task.id, "form-1", [["A"], "custom"]),
+      /already been answered/,
+    );
+    const done = await wait(agent);
+    assert.equal(done.status, "unverified");
+    assert.equal(done.text, "Resumed");
+    assert.deepEqual(done.questions?.[0].answer?.values, [
+      ["A", "B"],
+      "custom",
+    ]);
+    const second = agent.start("blocking-chat", "ask again", [], root);
+    for (let i = 0; i < 100 && !agent.list().at(-1)?.questions?.length; i++)
+      await new Promise((r) => setTimeout(r, 10));
+    await agent.cancel(second.id);
+    assert.throws(
+      () => agent.answerQuestions(second.id, "form-1", [["A"], "custom"]),
+      /no longer pending/,
+    );
+  } finally {
+    await agent.close();
+    rmSync(root, { recursive: true, force: true });
+  }
 });

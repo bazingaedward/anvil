@@ -79,10 +79,17 @@ export type AgentPermission = {
   resources: string[];
   message?: string;
 };
+export type QuestionAnswer = string | string[];
 export type AgentQuestionGroup = {
+  blocking?: boolean;
   id: string;
-  questions: { title: string; options?: string[] }[];
-  answer?: { values: string[]; taskID: string };
+  questions: {
+    title: string;
+    options?: string[];
+    descriptions?: string[];
+    multiple?: boolean;
+  }[];
+  answer?: { values: QuestionAnswer[]; taskID: string };
   readOnly?: boolean;
 };
 export type AgentTask = {
@@ -255,7 +262,7 @@ export interface DesktopAPI {
   answerQuestions(
     taskID: string,
     questionID: string,
-    answers: string[],
+    answers: QuestionAnswer[],
   ): Promise<AgentTask>;
   startTask(
     conversationID: string,

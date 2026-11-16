@@ -5,6 +5,7 @@ import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import type {
   AgentTask,
+  QuestionAnswer,
   ConversationGroup,
   PermissionMode,
   Conversation,
@@ -13,7 +14,7 @@ import type {
 } from "../shared/api";
 
 export type StoredTask = AgentTask & {
-  questionReply?: { taskID: string; questionID: string; answers: string[] };
+  questionReply?: { taskID: string; questionID: string; answers: QuestionAnswer[] };
   forkedFrom?: string;
   sessionID?: string;
   directory?: string;

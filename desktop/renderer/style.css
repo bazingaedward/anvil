@@ -2958,3 +2958,5 @@ kbd {
   .settings-content { padding: 28px 16px; }
   .settings-row { flex-wrap: wrap; gap: 10px; }
 }
+
+.question-option-description { display: block; margin-top: 4px; font-size: .85em; color: #aaa; line-height: 1.5; }

@@ -1,3 +1,4 @@
+import { diagnostic } from "./diagnostics";
 import type { ContextState, MemoryInput, Handoff } from "../shared/memory";
 import { defaultModel, type StoredAttachment } from "./composer";
 import type { ModelProfile } from "../shared/api";
@@ -320,10 +321,12 @@ export class Agent {
         );
         return {
           ...group,
-          readOnly: !!forkedFrom,
+          readOnly:
+            !!forkedFrom ||
+            !!(group.blocking && task.status !== "running" && !group.answer),
           answer: reply?.questionReply
             ? { values: [...reply.questionReply.answers], taskID: reply.id }
-            : undefined,
+            : group.answer,
         };
       });
     return view;
@@ -469,9 +472,29 @@ export class Agent {
       !group ||
       !source.sessionID ||
       source.forkedFrom ||
-      source.model?.id !== codexModel.id
+      (!group.blocking && source.model?.id !== codexModel.id)
     )
       throw new Error("This question is no longer available in this chat.");
+    if (group.blocking) {
+      if (group.answer)
+        throw new Error("This question has already been answered.");
+      if (
+        this.active?.task.id !== source.id ||
+        source.status !== "running" ||
+        !this.active.runtime ||
+        this.active.abort.signal.aborted ||
+        this.store.get(source.conversationID).archived
+      )
+        throw new Error(
+          "This question is no longer pending. Start a new message.",
+        );
+      const values = validateQuestionAnswers(group, answers);
+      this.active.runtime.answer(group.id, values);
+      group.answer = { values, taskID: source.id };
+      source.activity = "已提交回答，继续执行…";
+      this.publish(source);
+      return this.view(source);
+    }
     if (
       this.tasks.some(
         (task) =>
@@ -516,12 +539,24 @@ export class Agent {
   }
   private async execute(active: Active, directories: string[]) {
     const { task, abort } = active;
-    const timer = setTimeout(() => {
-      active.limit = true;
-      task.phase = "stopping";
-      this.publish(task);
-      abort.abort();
-    }, this.taskTimeoutMs);
+    let remaining = this.taskTimeoutMs;
+    let checked = Date.now();
+    const timer = setInterval(
+      () => {
+        const now = Date.now();
+        const waiting = task.questions?.some(
+          (group) => group.blocking && !group.answer,
+        );
+        if (!waiting) remaining -= now - checked;
+        checked = now;
+        if (remaining > 0 || waiting) return;
+        active.limit = true;
+        task.phase = "stopping";
+        this.publish(task);
+        abort.abort();
+      },
+      Math.min(1000, this.taskTimeoutMs),
+    );
     try {
       let prompt = task.prompt;
       if (task.questionReply)
@@ -603,7 +638,11 @@ export class Agent {
             ? "A tool was denied. Execution stopped without retrying."
             : undefined,
       );
-    } catch {
+    } catch (error) {
+      diagnostic("task.error", {
+        taskID: task.id,
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
       this.finish(
         active,
         abort.signal.aborted
@@ -616,7 +655,7 @@ export class Agent {
         active.limit ? "Task time limit reached." : "Task execution failed.",
       );
     } finally {
-      clearTimeout(timer);
+      clearInterval(timer);
       if (this.active === active) this.active = undefined;
     }
   }
@@ -644,6 +683,7 @@ export class Agent {
         text,
       },
       {
+        taskID: task.id,
         executable: managed ? this.managedRuntime!.executable : this.executable,
         args: managed ? this.managedRuntime!.args : this.args,
         managed,
@@ -704,7 +744,11 @@ export class Agent {
               );
               break;
             case "questions": {
-              if (!managed) throw new Error("Unexpected question event");
+              if (!managed && !event.group.blocking)
+                throw new Error("Unexpected question event");
+              task.activity = event.group.blocking
+                ? "等待你回答问题"
+                : task.activity;
               const group = event.group;
               task.questions ||= [];
               const previous = task.questions.findIndex(
@@ -725,7 +769,11 @@ export class Agent {
               break;
             }
             case "activity":
-              task.activity = this.redact(event.text.slice(0, 200));
+              task.activity = task.questions?.some(
+                (group) => group.blocking && !group.answer,
+              )
+                ? "等待你回答问题"
+                : this.redact(event.text.slice(0, 200));
               break;
           }
           this.publish(task);

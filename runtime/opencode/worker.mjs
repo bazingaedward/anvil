@@ -24,6 +24,8 @@ let host,
   closing = false,
   started = false;
 const abort = new AbortController();
+const forms = new Map();
+const tools = new Map();
 async function close() {
   if (closing) return;
   closing = true;
@@ -61,9 +63,52 @@ async function run(input) {
   const stream = host.events.subscribe({ signal: abort.signal });
   const consume = (async () => {
     for await (const event of stream) {
-      if (!sessionID || event.data?.sessionID !== sessionID) continue;
+      if (
+        !sessionID ||
+        (event.data?.sessionID ?? event.data?.form?.sessionID) !== sessionID
+      )
+        continue;
       const d = event.data;
       switch (event.type) {
+        case "form.created": {
+          const form = d.form;
+          if (
+            form.metadata?.kind !== "question" ||
+            form.fields.some((f) => !["string", "multiselect"].includes(f.type))
+          )
+            throw new Error(
+              "Unsupported interactive form. This task needs a supported question form.",
+            );
+          forms.set(form.id, form);
+          send({
+            type: "questions",
+            group: {
+              id: form.id,
+              blocking: true,
+              questions: form.fields.map((field) => ({
+                title: field.description || field.title,
+                options: field.options?.map((option) => option.value),
+                descriptions: field.options?.map(
+                  (option) => option.description || "",
+                ),
+                multiple: field.type === "multiselect",
+              })),
+            },
+          });
+          break;
+        }
+        case "session.tool.input.started":
+          tools.set(d.id, d.name);
+          break;
+        case "session.tool.success":
+        case "session.tool.failed":
+          send({
+            type: "activity",
+            text: event.type.endsWith("failed")
+              ? "工具执行失败，模型正在处理…"
+              : "工具已完成，模型处理中…",
+          });
+          break;
         case "session.text.delta":
           send({ type: "text", text: d.delta });
           break;
@@ -108,7 +153,10 @@ async function run(input) {
           send({ type: "permission-resolved", id: d.requestID });
           break;
         case "session.tool.called":
-          send({ type: "activity", text: "Running an approved tool" });
+          send({
+            type: "activity",
+            text: `正在执行工具：${tools.get(d.id) || "tool"}`,
+          });
           break;
         case "session.execution.succeeded":
           send({ type: "done", status: "completed" });
@@ -127,6 +175,7 @@ async function run(input) {
       }
     }
   })();
+  consume.catch(() => {});
   if (input.sessionID) {
     const session = await host.sessions.get({ sessionID: input.sessionID });
     if (path.resolve(session.location.directory) !== path.resolve(input.repo))
@@ -160,16 +209,18 @@ async function run(input) {
     )
     .join("");
   input.text += fileText;
-  await host.sessions.prompt({
-    sessionID,
-    files: attachments
-      .filter((file) => file.mime.startsWith("image/"))
-      .map((file) => ({ uri: file.content, name: file.name })),
-    text: folders.length
-      ? `Working directories selected by the user (JSON paths): ${JSON.stringify(folders)}\nThis conversation may span multiple directories and repositories. Use absolute paths when crossing directories. Ask before accessing other directories.\n\n${input.text}`
-      : `No project folders are attached to this conversation. Answer directly when no local files are needed. Your working directory is an internal conversation workspace, not a user-selected project. Ask the user to attach a folder when a task needs project files.\n\n${input.text}`,
-  });
-  await consume;
+  await Promise.all([
+    host.sessions.prompt({
+      sessionID,
+      files: attachments
+        .filter((file) => file.mime.startsWith("image/"))
+        .map((file) => ({ uri: file.content, name: file.name })),
+      text: folders.length
+        ? `Working directories selected by the user (JSON paths): ${JSON.stringify(folders)}\nThis conversation may span multiple directories and repositories. Use absolute paths when crossing directories. Ask before accessing other directories.\n\n${input.text}`
+        : `No project folders are attached to this conversation. Answer directly when no local files are needed. Your working directory is an internal conversation workspace, not a user-selected project. Ask the user to attach a folder when a task needs project files.\n\n${input.text}`,
+    }),
+    consume,
+  ]);
   await close();
 }
 lines.on("line", (line) => {
@@ -181,6 +232,22 @@ lines.on("line", (line) => {
     } else if (input.type === "cancel") {
       if (host && sessionID) await host.sessions.interrupt({ sessionID });
       else await close();
+    } else if (input.type === "answer" && host && sessionID) {
+      const form = forms.get(input.id);
+      if (
+        !form ||
+        !Array.isArray(input.values) ||
+        input.values.length !== form.fields.length
+      )
+        throw new Error("Invalid question reply.");
+      await host.form.reply({
+        sessionID,
+        formID: form.id,
+        answer: Object.fromEntries(
+          form.fields.map((field, i) => [field.key, input.values[i]]),
+        ),
+      });
+      forms.delete(form.id);
     } else if (input.type === "permission" && host && sessionID) {
       await host.permission.reply({
         sessionID,

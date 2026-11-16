@@ -814,7 +814,7 @@ export function ConversationWorkspace({
                     <AgentQuestions
                       key={group.id}
                       group={group}
-                      disabled={readOnly || sending || !!running || managing}
+                      disabled={readOnly || sending || (group.blocking ? task.status !== "running" : !!running) || managing}
                       onAnswer={async (values) => {
                         setSending(true);
                         try {

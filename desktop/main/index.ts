@@ -1,3 +1,4 @@
+import { initDiagnostics, diagnostic, diagnosticState } from "./diagnostics";
 import { codexModel } from "../shared/providers";
 import { probeModel } from "./model-probe";
 import { Account } from "./account";
@@ -72,6 +73,18 @@ function currentAgent() {
       ? path.join(process.resourcesPath, "runtime", runtime)
       : path.resolve(here, "../../runtime/opencode/dist", runtime),
     (task) => {
+      diagnosticState("task", {
+        id: task.id,
+        conversationID: task.conversationID,
+        status: task.status,
+        phase: task.phase,
+        activity: task.activity,
+        updated: task.updated,
+        pendingQuestions: task.questions?.filter((q) => !q.answer).length || 0,
+        pendingPermissions: task.permissions.length,
+        model: task.model?.model,
+        error: task.error,
+      });
       if (!window.isDestroyed()) window.webContents.send("agent:task", task);
     },
     providerCredentials,
@@ -261,6 +274,10 @@ function registerIPC() {
           await activateAccount();
         return await fn(...args);
       } catch (error) {
+        diagnostic("ipc.error", {
+          channel,
+          error: error instanceof Error ? error.message : "Unknown error",
+        });
         if (!account.user && activeUser) {
           await deactivate();
           announceAccount();
@@ -269,6 +286,11 @@ function registerIPC() {
       }
     });
   };
+  ipcMain.on("diagnostics:renderer", (event, kind) => {
+    trusted(event);
+    if (kind === "error" || kind === "unhandledrejection")
+      diagnostic("renderer." + kind);
+  });
   handle("links:open", async (value) => {
     if (typeof value !== "string" || value.length > 8192)
       throw new Error("Invalid link.");
@@ -836,6 +858,12 @@ function registerIPC() {
 if (process.env.ANVIL_TEST_USER_DATA)
   app.setPath("userData", process.env.ANVIL_TEST_USER_DATA);
 app.whenReady().then(() => {
+  initDiagnostics(
+    app.getPath("userData"),
+    Object.values(providerCredentials).filter(
+      (value): value is string => !!value,
+    ),
+  );
   account = new Account(
     app.getPath("userData"),
     (value) => {
@@ -865,6 +893,14 @@ app.whenReady().then(() => {
       nodeIntegration: false,
     },
   });
+  window.on("unresponsive", () => diagnostic("window.unresponsive"));
+  window.on("responsive", () => diagnostic("window.responsive"));
+  window.webContents.on("render-process-gone", (_event, details) =>
+    diagnostic("renderer.exited", {
+      reason: details.reason,
+      exitCode: details.exitCode,
+    }),
+  );
   window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
   window.webContents.on("will-navigate", (event) => event.preventDefault());
   window.webContents.session.setPermissionRequestHandler(

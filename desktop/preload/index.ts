@@ -111,3 +111,5 @@ const api: DesktopAPI = {
   },
 };
 contextBridge.exposeInMainWorld("anvil", api);
+
+for (const kind of ["error", "unhandledrejection"]) window.addEventListener(kind, () => ipcRenderer.send("diagnostics:renderer", kind));

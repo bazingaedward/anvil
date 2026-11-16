@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { Check, MessageCircleQuestion } from "lucide-react";
-import type { AgentQuestionGroup } from "../shared/api";
+import type { AgentQuestionGroup, QuestionAnswer } from "../shared/api";
 
 export function AgentQuestions({
   group,
@@ -9,17 +9,23 @@ export function AgentQuestions({
 }: {
   group: AgentQuestionGroup;
   disabled: boolean;
-  onAnswer(values: string[]): Promise<void>;
+  onAnswer(values: QuestionAnswer[]): Promise<void>;
 }) {
-  const [choices, setChoices] = useState<Record<number, number>>({});
+  const [choices, setChoices] = useState<Record<number, number[]>>({});
   const [custom, setCustom] = useState<Record<number, string>>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const submitting = useRef(false);
-  const values = group.questions.map((question, index) =>
-    choices[index] >= 0
-      ? question.options?.[choices[index]] || ""
-      : custom[index] || "",
+  const values = group.questions.map((question, index) => {
+    const selected = (choices[index] || []).map(
+      (choice) => question.options?.[choice] || "",
+    );
+    return question.multiple
+      ? [...selected, ...(custom[index]?.trim() ? [custom[index]] : [])]
+      : selected[0] || custom[index] || "";
+  });
+  const incomplete = values.some((value) =>
+    Array.isArray(value) ? !value.length : !value.trim(),
   );
   const locked = disabled || busy || group.readOnly;
   return (
@@ -37,7 +43,9 @@ export function AgentQuestions({
               <strong>{question.title}</strong>
               <p>
                 <Check size={15} />
-                {group.answer!.values[index]}
+                {Array.isArray(group.answer!.values[index])
+                  ? (group.answer!.values[index] as string[]).join("、")
+                  : group.answer!.values[index]}
               </p>
             </div>
           ))}
@@ -46,12 +54,7 @@ export function AgentQuestions({
         <form
           onSubmit={async (event) => {
             event.preventDefault();
-            if (
-              locked ||
-              submitting.current ||
-              values.some((value) => !value.trim())
-            )
-              return;
+            if (locked || submitting.current || incomplete) return;
             submitting.current = true;
             setBusy(true);
             setError("");
@@ -74,21 +77,34 @@ export function AgentQuestions({
                     <label
                       key={optionIndex}
                       className={
-                        choices[index] === optionIndex ? "selected" : ""
+                        choices[index]?.includes(optionIndex) ? "selected" : ""
                       }
                     >
                       <input
-                        type="radio"
+                        type={question.multiple ? "checkbox" : "radio"}
                         name={`${group.id}-${index}`}
-                        checked={choices[index] === optionIndex}
+                        checked={!!choices[index]?.includes(optionIndex)}
                         onChange={() =>
                           setChoices((current) => ({
                             ...current,
-                            [index]: optionIndex,
+                            [index]: question.multiple
+                              ? current[index]?.includes(optionIndex)
+                                ? current[index].filter(
+                                    (v) => v !== optionIndex,
+                                  )
+                                : [...(current[index] || []), optionIndex]
+                              : [optionIndex],
                           }))
                         }
                       />
-                      <span>{option}</span>
+                      <span>
+                        {option}
+                        {question.descriptions?.[optionIndex] && (
+                          <small className="question-option-description">
+                            {question.descriptions[optionIndex]}
+                          </small>
+                        )}
+                      </span>
                     </label>
                   ))}
                 </div>
@@ -106,7 +122,8 @@ export function AgentQuestions({
                     ...current,
                     [index]: event.target.value,
                   }));
-                  setChoices((current) => ({ ...current, [index]: -1 }));
+                  if (!question.multiple)
+                    setChoices((current) => ({ ...current, [index]: [] }));
                 }}
               />
             </fieldset>
@@ -116,12 +133,9 @@ export function AgentQuestions({
               <span>
                 {disabled
                   ? "结束当前任务或恢复此聊天后即可回答。"
-                  : "选择一个选项，或输入自己的答案。"}
+                  : "选择选项或输入答案；多选题可以同时选择多项。"}
               </span>
-              <button
-                type="submit"
-                disabled={locked || values.some((value) => !value.trim())}
-              >
+              <button type="submit" disabled={locked || incomplete}>
                 {busy ? "正在发送…" : "提交回答"}
               </button>
             </footer>
