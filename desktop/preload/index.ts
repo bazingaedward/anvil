@@ -74,6 +74,8 @@ const api: DesktopAPI = {
     ipcRenderer.invoke("agent:answer-questions", task, question, answers),
   startTask: (id, text, acceptance, options) =>
     ipcRenderer.invoke("agent:start", id, text, acceptance, options),
+  steerTask: (id, text, attachmentIDs) =>
+    ipcRenderer.invoke("agent:steer", id, text, attachmentIDs),
   cancelTask: (id) => ipcRenderer.invoke("agent:cancel", id),
   replyPermission: (task, id, allow) =>
     ipcRenderer.invoke("agent:permission", task, id, allow),

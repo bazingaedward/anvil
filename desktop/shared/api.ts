@@ -43,7 +43,11 @@ export type Attachment = {
   mime: string;
   size: number;
 };
-export type MessageOptions = { modelID?: string; attachmentIDs?: string[] };
+export type MessageOptions = {
+  modelID?: string;
+  attachmentIDs?: string[];
+  delivery?: "queue";
+};
 export type Entry = {
   name: string;
   path: string;
@@ -102,6 +106,15 @@ export type AgentTool = {
   endedAt?: number;
 };
 export type AgentTask = {
+  steering?: {
+    id: string;
+    text: string;
+    offset: number;
+    status: "pending" | "accepted" | "delivered" | "failed";
+    attachments?: Attachment[];
+    folders?: string[];
+    error?: string;
+  }[];
   /** User-selected directories sent with this message; absent on legacy tasks. */
   folders?: string[];
   tools?: AgentTool[];
@@ -121,7 +134,13 @@ export type AgentTask = {
   prompt: string;
   text: string;
   status:
-    "running" | "completed" | "unverified" | "cancelled" | "failed" | "limit";
+    | "queued"
+    | "running"
+    | "completed"
+    | "unverified"
+    | "cancelled"
+    | "failed"
+    | "limit";
   activity?: string;
   phase?: "working" | "checking" | "repairing" | "stopping";
   round?: number;
@@ -287,6 +306,7 @@ export interface DesktopAPI {
     options?: MessageOptions,
   ): Promise<AgentTask>;
   cancelTask(id: string): Promise<void>;
+  steerTask(id: string, text: string, attachmentIDs?: string[]): Promise<void>;
   replyPermission(
     taskID: string,
     permissionID: string,

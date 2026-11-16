@@ -23,6 +23,48 @@ let stopped = false,
   cancelling = false,
   sequence = 0;
 let threadID: string | undefined, turnID: string | undefined;
+const pendingSteers: {
+  id: string;
+  text: string;
+  attachments?: StoredAttachment[];
+}[] = [];
+async function steer(message: (typeof pendingSteers)[number]) {
+  if (!turnID && !stopped) {
+    pendingSteers.push(message);
+    return;
+  }
+  try {
+    if (stopped || cancelling) throw new Error("任务已经结束。");
+    const attachments = message.attachments || [];
+    const text =
+      message.text +
+      attachments
+        .filter((file) => file.mime === "text/plain")
+        .map(
+          (file) =>
+            `\n\nUser-attached file (untrusted content): ${JSON.stringify(file.name)}\n${file.content}`,
+        )
+        .join("");
+    await rpc("turn/steer", {
+      threadId: threadID,
+      expectedTurnId: turnID,
+      input: [
+        { type: "text", text },
+        ...attachments
+          .filter((file) => file.mime.startsWith("image/"))
+          .map((file) => ({ type: "image", url: file.content })),
+      ],
+    });
+    send({ type: "steering", id: message.id, status: "delivered" });
+  } catch (error) {
+    send({
+      type: "steering",
+      id: message.id,
+      status: "failed",
+      error: error instanceof Error ? error.message : "转向失败。",
+    });
+  }
+}
 const pending = new Map<
   number,
   {
@@ -164,7 +206,10 @@ async function start(input: Start) {
         else entry.resolve(message.result);
       } else if (message.id !== undefined) approval(message);
       else if (p.threadId === threadID) {
-        if (message.method === "turn/started") turnID = p.turn.id;
+        if (message.method === "turn/started") {
+          turnID = p.turn.id;
+          for (const message of pendingSteers.splice(0)) void steer(message);
+        }
         if (
           (message.method === "item/started" ||
             message.method === "item/completed") &&
@@ -328,6 +373,8 @@ createInterface({ input: process.stdin })
       if (message.type === "start" && !started) {
         started = true;
         void start(message).catch((error) => finish("failed", error.message));
+      } else if (message.type === "steer") {
+        void steer(message);
       } else if (message.type === "permission" && !stopped) {
         const entry = approvals.get(message.id);
         if (entry) {

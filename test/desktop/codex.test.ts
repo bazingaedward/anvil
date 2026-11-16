@@ -65,6 +65,7 @@ require('node:readline').createInterface({input:process.stdin}).on('line',line=>
  }
  if(m.id==='approval-1' && m.result) {note('serverRequest/resolved',{requestId:m.id});finish('completed');}
  if(m.method==='turn/interrupt') {reply({});finish('interrupted');}
+ if(m.method==='turn/steer') {reply({turnId:'turn-1'});setTimeout(()=>finish('completed'),30);}
 });
 `,
     { mode: 0o755 },
@@ -84,6 +85,7 @@ async function run(
     sessionID?: string;
     allow?: boolean;
     cancel?: boolean;
+    steer?: boolean;
     attachments?: unknown[];
   } = {},
 ) {
@@ -115,6 +117,17 @@ async function run(
         allow: options.allow === true,
       });
     if (m.type === "activity" && options.cancel) write({ type: "cancel" });
+    if (m.type === "activity" && options.steer) {
+      options.steer = false;
+      write({
+        type: "steer",
+        id: "msg-steer",
+        text: "Change direction",
+        attachments: [
+          { name: "note.txt", mime: "text/plain", content: "new evidence" },
+        ],
+      });
+    }
   });
   write({
     type: "start",
@@ -145,6 +158,23 @@ async function run(
     lines.close();
   }
 }
+
+test("Codex steering targets the active turn and acknowledges delivery", async (t) => {
+  const f = fixture(t);
+  const events = await run(f.root, "WAIT", { steer: true });
+  const request = f.requests().find((m) => m.method === "turn/steer");
+  assert.equal(request.params.expectedTurnId, "turn-1");
+  assert.equal(request.params.threadId, "thread-1");
+  assert.match(request.params.input[0].text, /Change direction.*new evidence/s);
+  assert.ok(
+    events.some(
+      (event) =>
+        event.type === "steering" &&
+        event.id === "msg-steer" &&
+        event.status === "delivered",
+    ),
+  );
+});
 
 test("Codex adapter streams, resumes, carries attachments and never forwards API credentials", async (t) => {
   const f = fixture(t);

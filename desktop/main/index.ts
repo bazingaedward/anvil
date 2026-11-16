@@ -75,17 +75,18 @@ function currentAgent() {
       ? path.join(process.resourcesPath, "runtime", runtime)
       : path.resolve(here, "../../runtime/opencode/dist", runtime),
     (task) => {
+      const current = task.status === "running" ? task : agent?.list().find((item) => item.status === "running") || task;
       diagnosticState("task", {
-        id: task.id,
-        conversationID: task.conversationID,
-        status: task.status,
-        phase: task.phase,
-        activity: task.activity,
-        updated: task.updated,
-        pendingQuestions: task.questions?.filter((q) => !q.answer).length || 0,
-        pendingPermissions: task.permissions.length,
-        model: task.model?.model,
-        error: task.error,
+        id: current.id,
+        conversationID: current.conversationID,
+        status: current.status,
+        phase: current.phase,
+        activity: current.activity,
+        updated: current.updated,
+        pendingQuestions: current.questions?.filter((q) => !q.answer).length || 0,
+        pendingPermissions: current.permissions.length,
+        model: current.model?.model,
+        error: current.error,
       });
       if (!window.isDestroyed()) window.webContents.send("agent:task", task);
     },
@@ -772,6 +773,7 @@ function registerIPC() {
           model,
           managedProxy,
           attachments: composerStore.attachments(options?.attachmentIDs),
+          delivery: options?.delivery,
         },
       );
     },
@@ -787,6 +789,9 @@ function registerIPC() {
     },
   );
   handle("agent:cancel", (id: string) => currentAgent().cancel(id));
+  handle("agent:steer", (id: string, text: string, attachmentIDs?: string[]) =>
+    currentAgent().steer(id, text, composerStore.attachments(attachmentIDs)),
+  );
   handle("agent:permission", (task: string, id: string, allow: boolean) =>
     currentAgent().reply(task, id, allow),
   );

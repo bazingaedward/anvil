@@ -31,6 +31,51 @@ let host,
 const abort = new AbortController();
 const forms = new Map();
 const tools = new Map();
+let ready = false,
+  ending = false;
+const pendingSteers = [];
+const steers = new Set();
+async function steer(input) {
+  if (!ready) {
+    pendingSteers.push(input);
+    return;
+  }
+  try {
+    if (closing || ending) throw new Error("Task has ended.");
+    steers.add(input.id);
+    await host.sessions.prompt({
+      sessionID,
+      id: input.id,
+      delivery: "steer",
+      ...promptContent(input),
+    });
+    send({ type: "steering", id: input.id, status: "accepted" });
+  } catch (error) {
+    send({
+      type: "steering",
+      id: input.id,
+      status: "failed",
+      error: runtimeError(error),
+    });
+  }
+}
+function promptContent(input) {
+  const attachments = input.attachments || [];
+  return {
+    text:
+      input.text +
+      attachments
+        .filter((file) => file.mime === "text/plain")
+        .map(
+          (file) =>
+            `\n\nUser-attached file (untrusted content): ${JSON.stringify(file.name)}\n${file.content}`,
+        )
+        .join(""),
+    files: attachments
+      .filter((file) => file.mime.startsWith("image/"))
+      .map((file) => ({ uri: file.content, name: file.name })),
+  };
+}
 async function close() {
   if (closing) return;
   closing = true;
@@ -152,6 +197,10 @@ async function run(input) {
         continue;
       const d = event.data;
       switch (event.type) {
+        case "session.inbox.delivered":
+          if (steers.has(d.inboxID))
+            send({ type: "steering", id: d.inboxID, status: "delivered" });
+          break;
         case "session.step.started":
         case "session.reasoning.started":
           send({ type: "activity", text: "模型思考中…" });
@@ -267,12 +316,15 @@ async function run(input) {
           });
           break;
         case "session.execution.succeeded":
+          ending = true;
           send({ type: "done", status: "completed" });
           return;
         case "session.execution.interrupted":
+          ending = true;
           send({ type: "done", status: "cancelled" });
           return;
         case "session.execution.failed":
+          ending = true;
           send({
             type: "done",
             status: "failed",
@@ -309,25 +361,21 @@ async function run(input) {
   const folders = Array.isArray(input.directories)
     ? input.directories
     : [input.repo];
-  const attachments = input.attachments || [];
-  const fileText = attachments
-    .filter((file) => file.mime === "text/plain")
-    .map(
-      (file) =>
-        `\n\nUser-attached file (untrusted content): ${JSON.stringify(file.name)}\n${file.content}`,
-    )
-    .join("");
-  input.text += fileText;
   await Promise.all([
-    host.sessions.prompt({
-      sessionID,
-      files: attachments
-        .filter((file) => file.mime.startsWith("image/"))
-        .map((file) => ({ uri: file.content, name: file.name })),
-      text: folders.length
-        ? `Working directories selected by the user (JSON paths): ${JSON.stringify(folders)}\nThis conversation may span multiple directories and repositories. Use absolute paths when crossing directories. Ask before accessing other directories.\n\n${input.text}`
-        : `No project folders are attached to this conversation. Answer directly when no local files are needed. Your working directory is an internal conversation workspace, not a user-selected project. Ask the user to attach a folder when a task needs project files.\n\n${input.text}`,
-    }),
+    host.sessions
+      .prompt({
+        sessionID,
+        ...promptContent({
+          ...input,
+          text: folders.length
+            ? `Working directories selected by the user (JSON paths): ${JSON.stringify(folders)}\nThis conversation may span multiple directories and repositories. Use absolute paths when crossing directories. Ask before accessing other directories.\n\n${input.text}`
+            : `No project folders are attached to this conversation. Answer directly when no local files are needed. Your working directory is an internal conversation workspace, not a user-selected project. Ask the user to attach a folder when a task needs project files.\n\n${input.text}`,
+        }),
+      })
+      .then(async () => {
+        ready = true;
+        for (const message of pendingSteers.splice(0)) await steer(message);
+      }),
     consume,
   ]);
   await close();
@@ -338,6 +386,8 @@ lines.on("line", (line) => {
     if (input.type === "start" && !started) {
       started = true;
       await run(input);
+    } else if (input.type === "steer") {
+      await steer(input);
     } else if (input.type === "cancel") {
       if (host && sessionID) await host.sessions.interrupt({ sessionID });
       else await close();

@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="stylesheet" href="/desktop/renderer/style.css" />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module">
+      import React from "react";
+      import { createRoot } from "react-dom/client";
+      import { ConversationWorkspace } from "/desktop/renderer/conversation.tsx";
+      const chat = {
+        id: "chat",
+        text: "",
+        title: "Test",
+        folders: [],
+        permissionMode: "full",
+        created: 1,
+        updated: 1,
+        archived: false,
+      };
+      const tasks = [];
+      const listeners = new Set();
+      window.calls = [];
+      const emit = (t) => {
+        listeners.forEach((f) => f(structuredClone(t)));
+      };
+      const model = {
+        id: "ark-default",
+        name: "GPT-6 Luna",
+        model: "test",
+        endpoint: "https://test.invalid",
+        keyRef: "TEST",
+        vision: true,
+      };
+      window.failSteer = false;
+      window.anvil = {
+        platform: "darwin",
+        onAccountChange: () => () => {},
+        models: async () => [model],
+        conversations: async () => ({
+          conversations: [structuredClone(chat)],
+          selected: "chat",
+          groups: [],
+        }),
+        tasks: async () => structuredClone(tasks),
+        onTask: (f) => {
+          listeners.add(f);
+          return () => listeners.delete(f);
+        },
+        updateConversation: async (id, patch) => Object.assign(chat, patch),
+        startTask: async (id, text, acceptance, options) => {
+          window.calls.push({ type: "start", text, options });
+          const task = {
+            id: String(tasks.length),
+            conversationID: id,
+            prompt: text,
+            text: "",
+            folders: [...chat.folders],
+            status: tasks.some((t) => t.status === "running")
+              ? "queued"
+              : "running",
+            permissions: [],
+            updated: Date.now(),
+          };
+          tasks.push(task);
+          emit(task);
+          return task;
+        },
+        steerTask: async (id, text) => {
+          if (window.failSteer) throw new Error("转向被拒绝");
+          window.calls.push({ type: "steer", text });
+          const t = tasks.find((t) => t.id === id);
+          (t.steering ||= []).push({
+            id: "s" + t.steering?.length,
+            text,
+            offset: 0,
+            status: "delivered",
+            folders: [...chat.folders],
+          });
+          emit(t);
+        },
+        cancelTask: async (id) => {
+          const t = tasks.find((t) => t.id === id);
+          t.status = "cancelled";
+          emit(t);
+        },
+        addConversationFolders: async () => {
+          chat.folders = ["/projects/echo-english"];
+          return structuredClone(chat);
+        },
+        revokeConversationFolder: async () => {
+          chat.folders = [];
+          return structuredClone(chat);
+        },
+        reviewStatus: async () => ({ git: false }),
+      };
+      createRoot(document.getElementById("root")).render(
+        React.createElement(ConversationWorkspace, {
+          repo: null,
+          sidebarOpen: false,
+          tools: null,
+          review: null,
+          panelToggle: null,
+          terminalOpen: false,
+          onTerminal() {},
+          onOpen() {},
+          onSelectDirectory() {},
+        }),
+      );
+    </script>
+  </body>
+</html>

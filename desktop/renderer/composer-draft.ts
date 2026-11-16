@@ -1,7 +1,11 @@
 import { accountScope, defaultModelID } from "./account";
 import { useEffect, useState } from "react";
 import type { Attachment } from "../shared/api";
-type Draft = { modelID: string; attachments: Attachment[] };
+type Draft = {
+  modelID: string;
+  attachments: Attachment[];
+  sentFolders?: string[];
+};
 
 export function useComposerDraft(id: string) {
   const empty: Draft = { modelID: defaultModelID, attachments: [] };
@@ -17,6 +21,9 @@ export function useComposerDraft(id: string) {
           return (
             !!draft &&
             typeof draft.modelID === "string" &&
+            (draft.sentFolders === undefined ||
+              (Array.isArray(draft.sentFolders) &&
+                draft.sentFolders.every((root) => typeof root === "string"))) &&
             Array.isArray(draft.attachments) &&
             draft.attachments.length <= 8 &&
             draft.attachments.every(

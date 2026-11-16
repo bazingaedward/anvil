@@ -18,6 +18,12 @@ export type RuntimeResult = {
   error?: string;
 };
 export type RuntimeEvent =
+  | {
+      type: "steering";
+      id: string;
+      status: "accepted" | "delivered" | "failed";
+      error?: string;
+    }
   | { type: "models"; models: ModelProfile[] }
   | {
       type: "compaction";
@@ -62,6 +68,11 @@ export type RuntimeRun = {
   done: Promise<RuntimeResult>;
   reply(id: string, allow: boolean): void;
   answer(id: string, values: QuestionAnswer[]): void;
+  steer(
+    id: string,
+    text: string,
+    attachments: StoredAttachment[],
+  ): Promise<void>;
   stop(): void;
 };
 type Options = {
@@ -81,6 +92,14 @@ function decode(
 ): RuntimeEvent | RequestTiming | ({ type: "done" } & RuntimeResult) {
   const m = JSON.parse(line);
   if (!m || typeof m !== "object") throw new Error("Invalid event");
+  if (
+    m.type === "steering" &&
+    typeof m.id === "string" &&
+    m.id.length < 100 &&
+    ["accepted", "delivered", "failed"].includes(m.status) &&
+    (m.error === undefined || typeof m.error === "string")
+  )
+    return { type: "steering", id: m.id, status: m.status, error: m.error };
   if (
     m.type === "models" &&
     Array.isArray(m.models) &&
@@ -190,6 +209,9 @@ export function startRuntime(
       answer() {
         throw new Error("Runtime is not running.");
       },
+      async steer() {
+        throw new Error("Runtime is not running.");
+      },
       stop() {},
     };
   const env = executionEnvironment();
@@ -230,6 +252,10 @@ export function startRuntime(
   let lastTextReport = 0;
   const permissions = new Set<string>();
   const questions = new Set<string>();
+  const steering = new Map<
+    string,
+    { resolve(): void; reject(error: Error): void }
+  >();
   let resolve!: (result: RuntimeResult) => void;
   const done = new Promise<RuntimeResult>((r) => {
     resolve = r;
@@ -254,6 +280,11 @@ export function startRuntime(
     clearTimeout(hardStop);
     options.signal.removeEventListener("abort", cancel);
     permissions.clear();
+    for (const entry of steering.values())
+      entry.reject(
+        new Error("任务已结束，无法确认补充消息送达。请检查后重新发送。"),
+      );
+    steering.clear();
     resolve(
       result || {
         status: "failed",
@@ -366,6 +397,15 @@ export function startRuntime(
         if (event.type === "permission") permissions.add(event.permission.id);
         if (event.type === "permission-resolved") permissions.delete(event.id);
         options.onEvent(event, reply);
+        if (event.type === "steering") {
+          const entry = steering.get(event.id);
+          if (entry) {
+            steering.delete(event.id);
+            if (event.status === "failed")
+              entry.reject(new Error(redact(event.error || "转向失败。")));
+            else entry.resolve();
+          }
+        }
         if (result || settled || options.signal.aborted) return;
       }
       if (pending.length > 1024 * 1024)
@@ -397,6 +437,16 @@ export function startRuntime(
       if (settled || result || !questions.delete(id))
         throw new Error("Question is no longer pending.");
       child.stdin.write(JSON.stringify({ type: "answer", id, values }) + "\n");
+    },
+    steer(id, text, attachments) {
+      if (settled || result || options.signal.aborted)
+        return Promise.reject(new Error("任务已结束，请重新发送。"));
+      return new Promise<void>((resolve, reject) => {
+        steering.set(id, { resolve, reject });
+        child.stdin.write(
+          JSON.stringify({ type: "steer", id, text, attachments }) + "\n",
+        );
+      });
     },
     stop() {
       if (settled) return;

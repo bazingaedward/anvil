@@ -12,9 +12,16 @@ import { useComposerDraft } from "./composer-draft";
 import type { ModelProfile, Attachment } from "../shared/api";
 import { ReviewWorkspace } from "./review-workspace";
 import { ConversationRow } from "./conversation-row";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import {
   ArrowUp,
+  ListPlus,
   Square,
   Shield,
   Paperclip,
@@ -248,23 +255,35 @@ export function ConversationWorkspace({
       unsubscribe();
     };
   }, [repo?.root, loaded]);
-  async function send() {
+  const submitting = useRef(false);
+  async function send(delivery: "steer" | "queue" = "steer") {
+    if (submitting.current) return;
+    submitting.current = true;
+    const target = selected;
+    const text = draft.text;
+    const folders = [...(draft.folders || [])];
+    const attachmentIDs = composerDraft.attachments.map((item) => item.id);
     setSending(true);
     setAgentError("");
     try {
       await pending.current;
-      await window.anvil.updateConversation(selected, {
-        text: draft.text,
+      await window.anvil.updateConversation(target, {
+        text,
       });
-      await window.anvil.startTask(selected, draft.text, undefined, {
-        modelID: composerDraft.modelID,
-        attachmentIDs: composerDraft.attachments.map((item) => item.id),
-      });
-      composerDraft.update({ attachments: [] });
-      await patchDraft(selected, { text: "" });
+      if (running?.conversationID === target && delivery === "steer")
+        await window.anvil.steerTask(running.id, text, attachmentIDs);
+      else
+        await window.anvil.startTask(target, text, undefined, {
+          modelID: composerDraft.modelID,
+          attachmentIDs,
+          delivery: delivery === "queue" ? "queue" : undefined,
+        });
+      composerDraft.update({ attachments: [], sentFolders: folders }, target);
+      await patchDraft(target, { text: "" });
     } catch (error) {
       setAgentError(String(error));
     } finally {
+      submitting.current = false;
       setSending(false);
     }
   }
@@ -288,12 +307,42 @@ export function ConversationWorkspace({
       created: 0,
       updated: 0,
     } as Conversation);
-  useEffect(() => {
-    if (input.current) {
-      input.current.style.height = "auto";
-      input.current.style.height = `${Math.min(input.current.scrollHeight, 240)}px`;
-    }
-  }, [draft.text, selected]);
+  const [expandedText, setExpandedText] = useState(false);
+  const expansionChat = useRef(selected);
+  const sentFolders =
+    composerDraft.sentFolders ??
+    conversationTasks.flatMap((task) => task.folders || []);
+  const pendingFolders = (draft.folders || []).filter(
+    (root) => !sentFolders.includes(root),
+  );
+  const expanded =
+    expandedText ||
+    draft.text.includes("\n") ||
+    pendingFolders.length > 0 ||
+    composerDraft.attachments.length > 0;
+  useLayoutEffect(() => {
+    const element = input.current;
+    if (!element) return;
+    if (!draft.text || expansionChat.current !== selected)
+      setExpandedText(false);
+    expansionChat.current = selected;
+    const resize = () => {
+      element.style.height = "auto";
+      const height = element.scrollHeight;
+      element.style.height = `${Math.min(height, 240)}px`;
+      const style = getComputedStyle(element);
+      const singleLine =
+        parseFloat(style.lineHeight) +
+        parseFloat(style.paddingTop) +
+        parseFloat(style.paddingBottom);
+      if (!expanded && draft.text && height > singleLine + 2)
+        setExpandedText(true);
+    };
+    resize();
+    const observer = new ResizeObserver(resize);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [draft.text, selected, expanded]);
   const visible = filterConversations(drafts, tasks, "", archived).filter(
     (item) => !onlyPinned || item.pinned,
   );
@@ -392,6 +441,18 @@ export function ConversationWorkspace({
     );
   }
   const readOnly = !loaded || !draft.id || draft.archived;
+  const cannotSend =
+    readOnly ||
+    (!draft.text.trim() && !composerDraft.attachments.length) ||
+    sending ||
+    managing ||
+    attaching ||
+    imageMismatch ||
+    !selectedModel ||
+    !!(
+      running &&
+      (running.conversationID !== selected || running.phase === "stopping")
+    );
   function patchDraft(id: string, patch: ConversationPatch) {
     setDrafts((items) =>
       items.map((item) =>
@@ -431,6 +492,7 @@ export function ConversationWorkspace({
     await action(async () => {
       const result = await window.anvil.addConversationFolders(selected);
       if (!result) return;
+      composerDraft.update({ sentFolders: [] }, result.id);
       setDrafts((items) =>
         items.map((item) =>
           item.id === result.id ? { ...item, folders: result.folders } : item,
@@ -814,7 +876,8 @@ export function ConversationWorkspace({
                             <span key={root} title={root} aria-label={root}>
                               <Folder size={14} aria-hidden="true" />
                               <span>
-                                {root.split(/[\\/]/).filter(Boolean).pop() || root}
+                                {root.split(/[\\/]/).filter(Boolean).pop() ||
+                                  root}
                               </span>
                             </span>
                           ))}
@@ -832,13 +895,70 @@ export function ConversationWorkspace({
                       </div>
                     )}
                   </div>
-                  {task.text && <MarkdownResponse text={task.text} />}
+                  {(task.steering || []).map((message, index, messages) => (
+                    <div key={message.id} className="steering-message">
+                      <MarkdownResponse
+                        text={task.text.slice(
+                          index ? messages[index - 1].offset : 0,
+                          message.offset,
+                        )}
+                      />
+                      <div className="agent-prompt">
+                        {message.text}
+                        {!!message.folders?.length && (
+                          <div className="sent-attachments">
+                            {message.folders.map((root) => (
+                              <span key={root} title={root}>
+                                <Folder size={14} />
+                                {root.split(/[\\/]/).pop()}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                        {!!message.attachments?.length && (
+                          <div className="sent-attachments">
+                            {message.attachments.map((file) => (
+                              <span key={file.id}>
+                                <Paperclip size={13} />
+                                {file.name}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <small
+                        className={`task-state ${message.status}`}
+                        role="status"
+                      >
+                        Steering ·{" "}
+                        {message.status === "delivered"
+                          ? "已接收"
+                          : message.status === "accepted"
+                            ? "已交给内核，等待接收"
+                            : message.status === "failed"
+                              ? message.error || "转向失败"
+                              : "等待接收…"}
+                      </small>
+                    </div>
+                  ))}
+                  {task.text && (
+                    <MarkdownResponse
+                      text={task.text.slice(task.steering?.at(-1)?.offset || 0)}
+                    />
+                  )}
                   <ToolActivity task={task} />
                   {task.questions?.map((group) => (
                     <AgentQuestions
                       key={group.id}
                       group={group}
-                      disabled={readOnly || sending || (group.blocking ? task.status !== "running" : !!running) || managing}
+                      disabled={
+                        readOnly ||
+                        sending ||
+                        (group.blocking
+                          ? task.status !== "running"
+                          : !!running) ||
+                        managing
+                      }
                       onAnswer={async (values) => {
                         setSending(true);
                         try {
@@ -853,7 +973,18 @@ export function ConversationWorkspace({
                       }}
                     />
                   ))}
-                  {task.status === "running" ? (
+                  {task.status === "queued" ? (
+                    <div className="agent-progress" role="status">
+                      <span>Queueing · 等待当前任务结束</span>
+                      <button
+                        onClick={() =>
+                          void action(() => window.anvil.cancelTask(task.id))
+                        }
+                      >
+                        取消排队
+                      </button>
+                    </div>
+                  ) : task.status === "running" ? (
                     <div
                       className="agent-progress"
                       role="status"
@@ -1002,33 +1133,27 @@ export function ConversationWorkspace({
                 </button>
               )}
               <div
-                className="composer"
+                className={`composer ${expanded ? "is-expanded" : "is-compact"}`}
                 onDragOver={(event) => {
                   event.preventDefault();
                 }}
                 onDrop={(event) => {
                   event.preventDefault();
-                  if (!readOnly && !sending && !attaching && !running)
+                  if (!readOnly && !sending && !attaching)
                     void attach(Array.from(event.dataTransfer.files));
                 }}
                 onPaste={(event) => {
                   const files = Array.from(event.clipboardData.files);
-                  if (
-                    files.length &&
-                    !readOnly &&
-                    !sending &&
-                    !attaching &&
-                    !running
-                  ) {
+                  if (files.length && !readOnly && !sending && !attaching) {
                     event.preventDefault();
                     void attach(files);
                   }
                 }}
               >
-                {(!!draft.folders?.length ||
+                {(!!pendingFolders.length ||
                   !!composerDraft.attachments.length) && (
                   <div className="composer-attachments">
-                    {(draft.folders || []).map((root) => (
+                    {pendingFolders.map((root) => (
                       <span className="attachment-chip" key={root}>
                         <button
                           title={root}
@@ -1097,24 +1222,15 @@ export function ConversationWorkspace({
                       event.shiftKey ||
                       event.nativeEvent.isComposing ||
                       event.nativeEvent.keyCode === 229
-                    ) return;
+                    )
+                      return;
                     event.preventDefault();
-                    if (
-                      !readOnly &&
-                      (draft.text.trim() ||
-                        composerDraft.attachments.length > 0) &&
-                      !attaching &&
-                      !imageMismatch &&
-                      !!selectedModel &&
-                      !running &&
-                      !sending &&
-                      !managing
-                    ) {
+                    if (!cannotSend) {
                       void send();
                     }
                   }}
                   disabled={readOnly || sending}
-                  rows={2}
+                  rows={1}
                 />
                 <div className="composer-footer">
                   <details
@@ -1126,13 +1242,7 @@ export function ConversationWorkspace({
                     </summary>
                     <div className="context-popover">
                       <button
-                        disabled={
-                          readOnly ||
-                          sending ||
-                          managing ||
-                          attaching ||
-                          !!running
-                        }
+                        disabled={readOnly || sending || managing || attaching}
                         onClick={(event) => {
                           event.currentTarget
                             .closest("details")
@@ -1188,39 +1298,48 @@ export function ConversationWorkspace({
                     disabled={readOnly || sending || !!running || managing}
                   />
 
+                  {running?.conversationID === selected && (
+                    <>
+                      <button
+                        className="queue-button"
+                        aria-label="Queueing（排队）"
+                        title="Queueing（排队）：当前任务结束后处理"
+                        disabled={cannotSend}
+                        onClick={() => void send("queue")}
+                      >
+                        <ListPlus size={19} />
+                      </button>
+                      <button
+                        className="send-button is-running stop-button"
+                        aria-label="停止任务"
+                        title="停止当前任务并取消排队"
+                        disabled={running.phase === "stopping"}
+                        onClick={() =>
+                          void action(() => window.anvil.cancelTask(running.id))
+                        }
+                      >
+                        <Square size={15} fill="currentColor" />
+                      </button>
+                    </>
+                  )}
                   <button
-                    className={`send-button ${running ? "is-running" : ""}`}
-                    aria-label={running ? "停止任务" : "发送消息"}
+                    className="send-button submit-button"
+                    aria-label={
+                      running?.conversationID === selected
+                        ? "Steering（转向）"
+                        : "发送消息"
+                    }
                     title={
-                      running
-                        ? "停止任务"
-                        : imageMismatch
-                          ? "请选择支持图片的模型后发送此附件"
+                      imageMismatch
+                        ? "请选择支持图片的模型后发送此附件"
+                        : running?.conversationID === selected
+                          ? "Steering（转向）：将补充指令交给当前任务；Enter 发送，Shift+Enter 换行"
                           : "Enter 发送，Shift+Enter 换行"
                     }
-                    onClick={() =>
-                      running
-                        ? void action(() => window.anvil.cancelTask(running.id))
-                        : void send()
-                    }
-                    disabled={
-                      running
-                        ? running.phase === "stopping"
-                        : readOnly ||
-                          (!draft.text.trim() &&
-                            !composerDraft.attachments.length) ||
-                          sending ||
-                          managing ||
-                          attaching ||
-                          imageMismatch ||
-                          !selectedModel
-                    }
+                    onClick={() => void send()}
+                    disabled={cannotSend}
                   >
-                    {running ? (
-                      <Square size={15} fill="currentColor" />
-                    ) : (
-                      <ArrowUp size={19} />
-                    )}
+                    <ArrowUp size={19} />
                   </button>
                 </div>
               </div>

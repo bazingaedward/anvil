@@ -34,6 +34,7 @@ const TASK_TIMEOUT = 0; // Unlimited by default; explicit budgets are opt-in.
 export class Agent {
   private tasks: RecordTask[] = [];
   private active?: Active;
+  private queue: { active: Active; directories: string[] }[] = [];
   private store: ConversationStore;
   private deleting = new Set<string>();
   private state: string;
@@ -60,7 +61,7 @@ export class Agent {
     }
   }
   private recover(task: RecordTask): RecordTask {
-    if (task.status === "running") {
+    if (task.status === "running" || task.status === "queued") {
       task.status = "cancelled";
       for (const tool of task.tools || []) {
         if (tool.status === "running") {
@@ -71,6 +72,12 @@ export class Agent {
       task.error = "Execution stopped when Anvil closed.";
       task.permissions = [];
       task.phase = undefined;
+      for (const message of task.steering || []) {
+        if (message.status === "pending" || message.status === "accepted") {
+          message.status = "failed";
+          message.error = "应用已关闭，无法确认转向是否送达。";
+        }
+      }
     }
     // Earlier previews called a model-only finish "completed". It is not a verified success.
     if (
@@ -125,7 +132,12 @@ export class Agent {
     );
     const task = [...this.tasks]
       .reverse()
-      .find((task) => task.conversationID === id && task.status !== "running");
+      .find(
+        (task) =>
+          task.conversationID === id &&
+          task.status !== "running" &&
+          task.status !== "queued",
+      );
     return {
       enabled: this.store.memory.files.enabled(),
       directories: this.store.memory.files.directories(folders),
@@ -361,6 +373,7 @@ export class Agent {
       attachments: StoredAttachment[];
       managedProxy?: string;
       questionReply?: RecordTask["questionReply"];
+      delivery?: "queue";
     },
   ) {
     if (
@@ -372,8 +385,14 @@ export class Agent {
       text.length > 100000
     )
       throw new Error("Invalid task.");
-    if (this.active)
+    if (
+      this.active &&
+      (options?.delivery !== "queue" ||
+        this.active.task.conversationID !== conversationID)
+    )
       throw new Error("Wait for the current task to finish or cancel it.");
+    if (this.active?.abort.signal.aborted)
+      throw new Error("任务正在停止，请稍后重新发送。");
     const model = options?.model || defaultModel;
     if (model.id === codexModel.id) {
       if (!this.managedRuntime || !existsSync(this.managedRuntime.executable))
@@ -412,7 +431,7 @@ export class Agent {
       );
     const previous = [...this.tasks]
       .reverse()
-      .find((task) => task.conversationID === conversationID && task.sessionID);
+      .find((task) => task.conversationID === conversationID);
     if (
       previous &&
       (previous.model?.id === codexModel.id) !== (model.id === codexModel.id)
@@ -441,10 +460,10 @@ export class Agent {
         ({ content, ...metadata }) => metadata,
       ),
       text: "",
-      status: "running",
-      phase: "working",
+      status: this.active ? "queued" : "running",
+      phase: this.active ? undefined : "working",
       round: 1,
-      startedAt: Date.now(),
+      startedAt: this.active ? undefined : Date.now(),
       permissions: [],
       updated: Date.now(),
       sessionID: previous?.sessionID,
@@ -462,10 +481,99 @@ export class Agent {
       denied: false,
     };
     this.tasks.push(task);
+    if (this.active) {
+      this.queue.push({ active, directories: [...directories] });
+      this.publish(task);
+      return this.view(task);
+    }
+    this.launch(active, directories);
+    return this.view(task);
+  }
+  private launch(active: Active, directories: string[]) {
+    const task = active.task;
+    const previous = [...this.tasks]
+      .reverse()
+      .find(
+        (item) =>
+          item.id !== task.id &&
+          item.conversationID === task.conversationID &&
+          item.sessionID &&
+          item.status !== "queued",
+      );
+    task.sessionID = previous?.sessionID;
+    task.runtimeState = previous?.runtimeState || task.runtimeState;
+    task.status = "running";
+    task.phase = "working";
+    task.startedAt = Date.now();
     this.active = active;
     this.publish(task);
     active.done = this.execute(active, [...directories]);
-    return this.view(task);
+  }
+  async steer(
+    taskID: string,
+    text: string,
+    attachments: StoredAttachment[] = [],
+  ) {
+    const active = this.active;
+    if (
+      !active ||
+      active.task.id !== taskID ||
+      !active.runtime ||
+      active.abort.signal.aborted ||
+      active.task.status !== "running" ||
+      active.task.phase === "checking"
+    )
+      throw new Error("当前任务无法接收转向，请使用排队或等待任务结束后发送。");
+    if (
+      typeof text !== "string" ||
+      (!text.trim() && !attachments.length) ||
+      text.length > 100000
+    )
+      throw new Error("Invalid message.");
+    if (
+      !active.task.model?.vision &&
+      attachments.some((file) => file.mime.startsWith("image/"))
+    )
+      throw new Error("This model does not support images.");
+    const folders = this.store.get(active.task.conversationID).folders || [];
+    if (
+      active.task.model?.id === codexModel.id &&
+      folders.some((folder) => !active.task.folders?.includes(folder))
+    )
+      throw new Error(
+        "Codex 当前任务的目录范围已经固定；新增目录请使用排队，在下一轮生效。",
+      );
+    const message: NonNullable<AgentTask["steering"]>[number] = {
+      id: `msg_${randomUUID()}`,
+      text: text.trim() || "Please inspect the attached files.",
+      offset: active.task.text.length,
+      status: "pending",
+      attachments: attachments.map(({ content, ...metadata }) => metadata),
+      folders: [...folders],
+    };
+    (active.task.steering ||= []).push(message);
+    this.publish(active.task);
+    try {
+      await active.runtime.steer(
+        message.id,
+        `Current user-selected working directories (JSON paths): ${JSON.stringify(folders)}\n\n${message.text}`,
+        attachments,
+      );
+    } catch (error) {
+      message.status = "failed";
+      message.error = this.redact(
+        error instanceof Error ? error.message : "转向失败，请重试。",
+      );
+      this.publish(active.task);
+      throw new Error(message.error);
+    }
+  }
+  private cancelQueued(error = "排队已取消。") {
+    for (const { active } of this.queue.splice(0)) {
+      active.task.status = "cancelled";
+      active.task.error = error;
+      this.publish(active.task);
+    }
   }
   answerQuestions(
     taskID: string,
@@ -549,7 +657,12 @@ export class Agent {
       }
     }
     active.task.permissions = [];
-    if (this.active === active) this.active = undefined;
+    for (const message of active.task.steering || []) {
+      if (message.status === "pending" || message.status === "accepted") {
+        message.status = "failed";
+        message.error = "任务已结束，未确认转向送达。";
+      }
+    }
     this.publish(active.task);
   }
   private async execute(active: Active, directories: string[]) {
@@ -589,6 +702,9 @@ export class Agent {
             history.map((item) => ({
               user: item.prompt,
               assistant: item.text,
+              steering: item.steering
+                ?.filter((message) => message.status === "delivered")
+                .map((message) => message.text),
               attachments: item.attachments?.map((file) => file.name),
               questions: item.questions?.map((group) => group.questions),
             })),
@@ -680,6 +796,13 @@ export class Agent {
     } finally {
       clearInterval(timer);
       if (this.active === active) this.active = undefined;
+      if (task.status === "completed" || task.status === "unverified") {
+        const next = this.queue.shift();
+        if (next) this.launch(next.active, next.directories);
+      } else
+        this.cancelQueued(
+          "上一项任务已停止或失败，排队已取消。请检查后重新发送。",
+        );
     }
   }
   private async modelRound(
@@ -717,6 +840,17 @@ export class Agent {
         signal: abort.signal,
         onEvent: (event, reply) => {
           switch (event.type) {
+            case "steering": {
+              const message = task.steering?.find(
+                (item) => item.id === event.id,
+              );
+              if (!message) break;
+              if (message.status !== "delivered") message.status = event.status;
+              message.error = event.error
+                ? this.redact(event.error)
+                : undefined;
+              break;
+            }
             case "session":
               task.sessionID = event.id;
               break;
@@ -872,15 +1006,26 @@ export class Agent {
     }
   }
   cancel(taskID: string) {
+    const queued = this.queue.findIndex(
+      (item) => item.active.task.id === taskID,
+    );
+    if (queued >= 0) {
+      const [{ active }] = this.queue.splice(queued, 1);
+      active.task.status = "cancelled";
+      this.publish(active.task);
+      return;
+    }
     const active = this.active;
     if (!active || active.task.id !== taskID)
       throw new Error("Task is not running.");
+    this.cancelQueued();
     active.task.phase = "stopping";
     active.task.permissions = [];
     active.abort.abort();
     this.publish(active.task);
   }
   stop() {
+    this.cancelQueued();
     const active = this.active;
     if (!active) return;
     active.abort.abort();
