@@ -7,6 +7,7 @@
 - `npm run eval:coding -- --list`：列出任务，不访问模型。
 - 通过 Keygrant 注入 BYTEPLUS_ARK_API_KEY 和 BYTEPLUS_ARK_RESPONSES_URL 后执行 `npm run eval:coding`。
 - `--task=resume` 等参数只运行一个任务。
+- `--copilot=claude-sonnet-5` 使用 Keygrant 注入的 `ANVIL_COPILOT_OAUTH` 和账号实时模型目录；精确匹配模型 ID，不替换为其他型号。省略该参数时继续使用原有 BytePlus 配置。
 - `node --test test/eval.test.mjs` 验证每个任务的初始实现失败、参考实现通过，不访问模型。
 
 运行复用桌面 startRuntime → 编译后的 OpenCode worker，不使用独立自研 agent loop。每个任务独立工作目录与会话，单任务总超时 180 秒；续聊任务复用原生 session。首版直接测 runtime，不包含桌面 Agent 的自动验收修复轮次。
@@ -20,6 +21,12 @@
 报告位于 `.anvil/evaluations/<timestamp>/summary.json`，保存模型 ID、协议、Git revision、任务集 hash、runtime 二进制 hash、平台、权限策略、超时、每题通过情况、耗时和工具活动事件数量。实现文件副本与临时工作区保留供排查。密钥、API URL、回答正文不写入报告。
 
 用量与成本目前为 null：底层 worker 尚未转发真实用量，不用字符数冒充 token。工具活动数是 worker 观测事件数，不代表完整工具追踪。运行次数首版为每题一次，不计算置信区间，也不自动重试失败任务。预算只限制时间，不提供硬性费用上限。
+
+## Copilot 同题对照
+
+为比较 Sonnet 与 GPT，需要让同一评测器支持账号模型选择，同时保留原有任务、提示词和独立验证器。新增 `--copilot=<精确模型 ID>`，先确认账号可用性，再复用相同 runtime。报告将协议记为 `copilot-native`，具体请求协议由 OpenCode 原生 Copilot provider 选择，不误标为固定 Responses。
+
+例如分别执行 `npm run eval:coding -- --suite=repository --copilot=claude-sonnet-5` 和 `npm run eval:coding -- --suite=repository --copilot=gpt-6-luna`。比较前核对平台、runtimeHash、suiteHash、evaluatorHash 与单题预算一致。报告补充首段文本时间、首工具时间和工具状态/执行区间；并行工具区间需取并集，不能简单相加后把剩余时间全解释成模型推理。它还包含初始化、网络和编排开销。
 
 ## 下一轮怎么改
 
@@ -61,3 +68,27 @@ Windows / DeepSeek `deepseek-v4-1-flash-261017` / Responses，Runtime 基于 `e0
 结论：本轮证据首先指向环境感知、测试选择和命令时间预算问题，不能据此断言 DeepSeek 无法理解修复。建议下一次对照只增加明确的可用定向测试命令，保持模型、故障、验证器和总预算不变；分开报告提示策略优化与模型能力。再考虑运行时命令预算，而不是直接扩大总时间刷分。
 
 完整本地报告：`.anvil/evaluations/2026-11-15T11-16-50-178Z/summary.json`，state=completed。Keygrant 的外层调用等待超时，但后台进程完成了全部任务；没有重跑样本。
+
+## Sonnet 5 / GPT-6 Luna 同题初测（2026-11-16）
+
+使用 `kaixiang-qiu` 的 GitHub Copilot 账号实时目录确认 `claude-sonnet-5` 可用；未替换成同时可见的 `claude-sonnet-5.5`。两个模型都使用 macOS、同一 OpenCode 2.0 runtime、同一 repository 题集与提示词，每题 180 秒，每模型每题一次。无自动重跑，也不把独立验收失败反馈给模型继续修复。独立检查确认 suiteHash、runtimeHash、evaluatorHash、runnerHash、平台、预算、Git revision 均一致。
+
+| 任务 | Claude Sonnet 5 | GPT-6 Luna |
+| --- | --- | --- |
+| 文件编辑保护 | 通过 · 28.8 秒 | 通过 · 40.6 秒 |
+| 任务终态传播 | 未通过 · 24.6 秒 | 通过 · 40.7 秒 |
+| 响应历史连续性 | 通过 · 25.4 秒 | 未通过 · 48.8 秒 |
+| 独立验收通过数 | **2/3** | **2/3** |
+| 累计任务耗时（含独立验收） | **78.8 秒** | **130.1 秒** |
+| 观测工具调用数 | 24 | 31 |
+
+六次运行全部正常结束，无超时，无工具调用失败。正常结束与工具成功都不等于修复完整。
+
+- Sonnet 在终态题修复了 `commandPassed` 的异常标记判断，但把被破坏的工具取消判断改成了 `signal?.aborted`。这漏掉了工具自身返回 `cancelled: true`、而全局 signal 没有取消的情况。独立最小复现预期第一次工具调用后终止，实际调用了 4 次工具，最终状态为 `limit`，而非 `cancelled`。
+- GPT 在历史题恢复了 assistant 的原生 state，但没有恢复 `data.status !== "completed"` 检查。独立 mock fetch 复现确认 `status: "incomplete"` 的响应仍被正常接收。
+- Sonnet 本轮累计耗时比 GPT 少约 39%，但工具调用更少，且第一题没有运行 shell 测试。不能仅用短耗时判断效率或质量更优；也不能把首段文本时间当作模型开始工作的时间，因为读取工具可能更早执行。
+- 两者本轮都漏掉了多要求任务中的一个分支，且失败点不同。当前证据支持继续采用独立验收和失败反馈，不支持给任一模型下整体强弱结论。与前一天 Windows / BytePlus DeepSeek 的结果不同平台、不同 provider、不同 runtime，不合并排名。
+
+可审计摘要（含配置 hash、工具区间和失败复现结果）：[JSON 记录](evaluations/2026-11-16-sonnet5-gpt6.json)。凭据、API URL、回答正文和本机工作区路径未进入这份提交。
+
+完整本地报告分别为 `.anvil/evaluations/2026-11-16T11-22-06-052Z/summary.json` 与 `.anvil/evaluations/2026-11-16T11-23-29-006Z/summary.json`。生成的实现文件保留在各自报告目录，便于复核。

@@ -14,6 +14,7 @@ import path from "node:path";
 import os from "node:os";
 import { startRuntime } from "../desktop/main/runtime.ts";
 import { defaultModel } from "../desktop/main/composer.ts";
+import { discoverCopilotModels } from "../desktop/main/model-probe.ts";
 const args = process.argv.slice(2);
 const suite =
   args.find((x) => x.startsWith("--suite="))?.slice(8) || "calibration";
@@ -21,22 +22,39 @@ if (!["calibration", "repository"].includes(suite))
   throw Error("Unknown suite");
 const tasks = suite === "repository" ? repoTasks : calibrationTasks;
 const selected = args.find((x) => x.startsWith("--task="))?.slice(7);
+const copilotID = args.find((x) => x.startsWith("--copilot="))?.slice(10);
 if (args.includes("--list")) {
   console.log(tasks.map((t) => `${t.id}\t${t.category}`).join("\n"));
   process.exit(0);
 }
 const chosen = selected ? tasks.filter((t) => t.id === selected) : tasks;
 if (!chosen.length) throw Error("Unknown task");
-const key = process.env.BYTEPLUS_ARK_API_KEY,
-  endpoint = process.env.BYTEPLUS_ARK_RESPONSES_URL;
+const key = copilotID
+  ? process.env.ANVIL_COPILOT_OAUTH
+  : process.env.BYTEPLUS_ARK_API_KEY;
+let endpoint = copilotID
+  ? "https://api.githubcopilot.com"
+  : process.env.BYTEPLUS_ARK_RESPONSES_URL;
 if (!key || !endpoint)
-  throw Error("Run through Keygrant with the BytePlus key and URL.");
+  throw Error(
+    copilotID
+      ? "Run through Keygrant with ANVIL_COPILOT_OAUTH."
+      : "Run through Keygrant with the BytePlus key and URL.",
+  );
 delete process.env.BYTEPLUS_ARK_API_KEY;
 delete process.env.BYTEPLUS_ARK_RESPONSES_URL;
+delete process.env.ANVIL_COPILOT_OAUTH;
 const executable = path.resolve(
   "runtime/opencode/dist",
   process.platform === "win32" ? "anvil-runtime.exe" : "anvil-runtime",
 );
+const model = copilotID
+  ? (await discoverCopilotModels(executable, key)).find(
+      (item) => item.model === copilotID,
+    )
+  : defaultModel;
+if (!model) throw Error(`Requested Copilot model is unavailable: ${copilotID}`);
+if (copilotID) endpoint = model.endpoint;
 const root = await mkdtemp(path.join(os.tmpdir(), "anvil-eval-"));
 const output = path.resolve(
   ".anvil/evaluations",
@@ -50,9 +68,12 @@ const summary = {
   evaluatorHash: createHash("sha256")
     .update(await readFile(new URL("./verify.mjs", import.meta.url)))
     .digest("hex"),
+  runnerHash: createHash("sha256")
+    .update(await readFile(new URL("./run.mjs", import.meta.url)))
+    .digest("hex"),
   startedAt: new Date().toISOString(),
-  model: defaultModel.model,
-  protocol: "responses",
+  model: model.model,
+  protocol: copilotID ? "copilot-native" : "responses",
   revision: execFileSync(
     "git",
     [
@@ -95,6 +116,8 @@ for (const task of chosen) {
     textChars = 0,
     status = "completed",
     timedOut = false;
+  let firstTextMs, firstToolMs, runtimeError;
+  const toolCalls = new Map();
   const start = Date.now(),
     abort = new AbortController();
   const timer = setTimeout(() => {
@@ -113,7 +136,7 @@ for (const task of chosen) {
               : [repo],
           text,
           sessionID,
-          model: defaultModel,
+          model,
         },
         {
           executable,
@@ -123,7 +146,19 @@ for (const task of chosen) {
           onEvent(event, reply) {
             if (event.type === "session") sessionID = event.id;
             if (event.type === "activity") toolActivities++;
-            if (event.type === "text") textChars += event.text.length;
+            if (event.type === "text") {
+              firstTextMs ??= Date.now() - start;
+              textChars += event.text.length;
+            }
+            if (event.type === "tool") {
+              firstToolMs ??= Date.now() - start;
+              const tool = toolCalls.get(event.id) || { name: event.name };
+              tool.status = event.status;
+              if (event.status === "running")
+                tool.startedMs ??= Date.now() - start;
+              else tool.endedMs = Date.now() - start;
+              toolCalls.set(event.id, tool);
+            }
             if (event.type === "permission") {
               permissionRequests++;
               reply(event.permission.id, true);
@@ -133,6 +168,7 @@ for (const task of chosen) {
       );
       const result = await run.done;
       status = result.status;
+      runtimeError = result.error;
       if (status !== "completed") break;
       if (task.prompts.length > 1 && !sessionID) {
         status = "failed";
@@ -156,6 +192,10 @@ for (const task of chosen) {
     permissionRequests,
     textChars,
     turns: task.prompts.length,
+    firstTextMs,
+    firstToolMs,
+    toolCalls: [...toolCalls.values()],
+    error: runtimeError,
     tokens: null,
     cost: null,
   };

@@ -1,0 +1,539 @@
+{
+  "schemaVersion": 1,
+  "description": "Copilot Claude Sonnet 5 versus GPT-6 Luna, same-task single-run evaluation; no feedback repair or retries",
+  "sameConfiguration": {
+    "suiteHash": true,
+    "runtimeHash": true,
+    "evaluatorHash": true,
+    "runnerHash": true,
+    "platform": true,
+    "timeoutMs": true,
+    "revision": true
+  },
+  "runs": [
+    {
+      "schemaVersion": 1,
+      "suite": "repository",
+      "state": "completed",
+      "evaluatorHash": "b7b8f76d03e510aa6b02f0ba6ac93a8f9e8021033e18a6345c720117f7333c3d",
+      "runnerHash": "d95e8f7406aa26c1b995313ed478b4fb0fa6103232fb0b203a643e2760e2c70f",
+      "startedAt": "2026-11-16T11:22:06.054Z",
+      "model": "claude-sonnet-5",
+      "protocol": "copilot-native",
+      "revision": "e08ada9dc5e99fbd7e8a523f095e9191f7bb1ef0",
+      "suiteHash": "462bb1312de9af3b30d959d52b5fb4b94967e4cf11c69a77662f4b4cc7c0bb5d",
+      "runtimeHash": "28b96eb46023bc6295058e00938f7794618073ea85984041736d412f9a1b8b41",
+      "platform": "darwin",
+      "timeoutMs": 180000,
+      "permissions": "allow-all; trusted evaluation fixtures only; not sandboxed",
+      "tokens": null,
+      "cost": null,
+      "results": [
+        {
+          "id": "repo-edit-integrity",
+          "category": "repository-regression",
+          "status": "completed",
+          "passed": true,
+          "verification": {
+            "passed": true
+          },
+          "elapsedMs": 28817,
+          "toolActivities": 23,
+          "permissionRequests": 6,
+          "textChars": 844,
+          "turns": 1,
+          "firstTextMs": 25900,
+          "firstToolMs": 5867,
+          "toolCalls": [
+            {
+              "name": "grep",
+              "status": "completed",
+              "startedMs": 5867,
+              "endedMs": 5905
+            },
+            {
+              "name": "glob",
+              "status": "completed",
+              "startedMs": 7576,
+              "endedMs": 7612
+            },
+            {
+              "name": "read",
+              "status": "completed",
+              "startedMs": 9528,
+              "endedMs": 9552
+            },
+            {
+              "name": "read",
+              "status": "completed",
+              "startedMs": 10856,
+              "endedMs": 10876
+            },
+            {
+              "name": "read",
+              "status": "completed",
+              "startedMs": 12262,
+              "endedMs": 12285
+            },
+            {
+              "name": "edit",
+              "status": "completed",
+              "startedMs": 24852,
+              "endedMs": 24875
+            }
+          ],
+          "tokens": null,
+          "cost": null,
+          "toolBusyMs": 164
+        },
+        {
+          "id": "repo-task-outcomes",
+          "category": "repository-regression",
+          "status": "completed",
+          "passed": false,
+          "verification": {
+            "passed": false,
+            "reason": "assertions-failed"
+          },
+          "elapsedMs": 24610,
+          "toolActivities": 28,
+          "permissionRequests": 9,
+          "textChars": 751,
+          "turns": 1,
+          "firstTextMs": 20144,
+          "firstToolMs": 6660,
+          "toolCalls": [
+            {
+              "name": "grep",
+              "status": "completed",
+              "startedMs": 6660,
+              "endedMs": 6683
+            },
+            {
+              "name": "read",
+              "status": "completed",
+              "startedMs": 7079,
+              "endedMs": 7102
+            },
+            {
+              "name": "read",
+              "status": "completed",
+              "startedMs": 9579,
+              "endedMs": 9584
+            },
+            {
+              "name": "read",
+              "status": "completed",
+              "startedMs": 9582,
+              "endedMs": 9597
+            },
+            {
+              "name": "read",
+              "status": "completed",
+              "startedMs": 11405,
+              "endedMs": 11411
+            },
+            {
+              "name": "read",
+              "status": "completed",
+              "startedMs": 11903,
+              "endedMs": 11926
+            },
+            {
+              "name": "edit",
+              "status": "completed",
+              "startedMs": 17568,
+              "endedMs": 17575
+            },
+            {
+              "name": "edit",
+              "status": "completed",
+              "startedMs": 19059,
+              "endedMs": 19086
+            },
+            {
+              "name": "shell",
+              "status": "completed",
+              "startedMs": 21110,
+              "endedMs": 21508
+            }
+          ],
+          "tokens": null,
+          "cost": null,
+          "toolBusyMs": 525
+        },
+        {
+          "id": "repo-provider-history",
+          "category": "repository-regression",
+          "status": "completed",
+          "passed": true,
+          "verification": {
+            "passed": true
+          },
+          "elapsedMs": 25404,
+          "toolActivities": 29,
+          "permissionRequests": 9,
+          "textChars": 726,
+          "turns": 1,
+          "firstTextMs": 21087,
+          "firstToolMs": 4729,
+          "toolCalls": [
+            {
+              "name": "read",
+              "status": "completed",
+              "startedMs": 4729,
+              "endedMs": 4758
+            },
+            {
+              "name": "read",
+              "status": "completed",
+              "startedMs": 6252,
+              "endedMs": 6255
+            },
+            {
+              "name": "read",
+              "status": "completed",
+              "startedMs": 7079,
+              "endedMs": 7084
+            },
+            {
+              "name": "read",
+              "status": "completed",
+              "startedMs": 7215,
+              "endedMs": 7239
+            },
+            {
+              "name": "read",
+              "status": "completed",
+              "startedMs": 9150,
+              "endedMs": 9154
+            },
+            {
+              "name": "read",
+              "status": "completed",
+              "startedMs": 9602,
+              "endedMs": 9623
+            },
+            {
+              "name": "edit",
+              "status": "completed",
+              "startedMs": 17562,
+              "endedMs": 17584
+            },
+            {
+              "name": "edit",
+              "status": "completed",
+              "startedMs": 19994,
+              "endedMs": 20015
+            },
+            {
+              "name": "shell",
+              "status": "completed",
+              "startedMs": 21740,
+              "endedMs": 22139
+            }
+          ],
+          "tokens": null,
+          "cost": null,
+          "toolBusyMs": 528
+        }
+      ],
+      "finishedAt": "2026-11-16T11:23:24.967Z"
+    },
+    {
+      "schemaVersion": 1,
+      "suite": "repository",
+      "state": "completed",
+      "evaluatorHash": "b7b8f76d03e510aa6b02f0ba6ac93a8f9e8021033e18a6345c720117f7333c3d",
+      "runnerHash": "d95e8f7406aa26c1b995313ed478b4fb0fa6103232fb0b203a643e2760e2c70f",
+      "startedAt": "2026-11-16T11:23:29.008Z",
+      "model": "gpt-6-luna",
+      "protocol": "copilot-native",
+      "revision": "e08ada9dc5e99fbd7e8a523f095e9191f7bb1ef0",
+      "suiteHash": "462bb1312de9af3b30d959d52b5fb4b94967e4cf11c69a77662f4b4cc7c0bb5d",
+      "runtimeHash": "28b96eb46023bc6295058e00938f7794618073ea85984041736d412f9a1b8b41",
+      "platform": "darwin",
+      "timeoutMs": 180000,
+      "permissions": "allow-all; trusted evaluation fixtures only; not sandboxed",
+      "tokens": null,
+      "cost": null,
+      "results": [
+        {
+          "id": "repo-edit-integrity",
+          "category": "repository-regression",
+          "status": "completed",
+          "passed": true,
+          "verification": {
+            "passed": true
+          },
+          "elapsedMs": 40581,
+          "toolActivities": 37,
+          "permissionRequests": 10,
+          "textChars": 534,
+          "turns": 1,
+          "firstTextMs": 6037,
+          "firstToolMs": 6192,
+          "toolCalls": [
+            {
+              "name": "glob",
+              "status": "completed",
+              "startedMs": 6192,
+              "endedMs": 6215
+            },
+            {
+              "name": "grep",
+              "status": "completed",
+              "startedMs": 9372,
+              "endedMs": 9405
+            },
+            {
+              "name": "read",
+              "status": "completed",
+              "startedMs": 9373,
+              "endedMs": 9388
+            },
+            {
+              "name": "read",
+              "status": "completed",
+              "startedMs": 9373,
+              "endedMs": 9388
+            },
+            {
+              "name": "read",
+              "status": "completed",
+              "startedMs": 9373,
+              "endedMs": 9385
+            },
+            {
+              "name": "patch",
+              "status": "completed",
+              "startedMs": 20930,
+              "endedMs": 20941
+            },
+            {
+              "name": "patch",
+              "status": "completed",
+              "startedMs": 26330,
+              "endedMs": 26353
+            },
+            {
+              "name": "shell",
+              "status": "completed",
+              "startedMs": 28426,
+              "endedMs": 28901
+            },
+            {
+              "name": "patch",
+              "status": "completed",
+              "startedMs": 32655,
+              "endedMs": 32679
+            },
+            {
+              "name": "shell",
+              "status": "completed",
+              "startedMs": 35444,
+              "endedMs": 35885
+            }
+          ],
+          "tokens": null,
+          "cost": null,
+          "toolBusyMs": 1030
+        },
+        {
+          "id": "repo-task-outcomes",
+          "category": "repository-regression",
+          "status": "completed",
+          "passed": true,
+          "verification": {
+            "passed": true
+          },
+          "elapsedMs": 40671,
+          "toolActivities": 34,
+          "permissionRequests": 10,
+          "textChars": 686,
+          "turns": 1,
+          "firstTextMs": 17534,
+          "firstToolMs": 5389,
+          "toolCalls": [
+            {
+              "name": "glob",
+              "status": "completed",
+              "startedMs": 5389,
+              "endedMs": 5409
+            },
+            {
+              "name": "read",
+              "status": "completed",
+              "startedMs": 9016,
+              "endedMs": 9047
+            },
+            {
+              "name": "read",
+              "status": "completed",
+              "startedMs": 9016,
+              "endedMs": 9047
+            },
+            {
+              "name": "read",
+              "status": "completed",
+              "startedMs": 9016,
+              "endedMs": 9047
+            },
+            {
+              "name": "read",
+              "status": "completed",
+              "startedMs": 9016,
+              "endedMs": 9047
+            },
+            {
+              "name": "read",
+              "status": "completed",
+              "startedMs": 9016,
+              "endedMs": 9047
+            },
+            {
+              "name": "patch",
+              "status": "completed",
+              "startedMs": 22699,
+              "endedMs": 22712
+            },
+            {
+              "name": "shell",
+              "status": "completed",
+              "startedMs": 24896,
+              "endedMs": 25354
+            },
+            {
+              "name": "patch",
+              "status": "completed",
+              "startedMs": 35458,
+              "endedMs": 35475
+            },
+            {
+              "name": "shell",
+              "status": "completed",
+              "startedMs": 37255,
+              "endedMs": 37689
+            }
+          ],
+          "tokens": null,
+          "cost": null,
+          "toolBusyMs": 973
+        },
+        {
+          "id": "repo-provider-history",
+          "category": "repository-regression",
+          "status": "completed",
+          "passed": false,
+          "verification": {
+            "passed": false,
+            "reason": "assertions-failed"
+          },
+          "elapsedMs": 48831,
+          "toolActivities": 41,
+          "permissionRequests": 11,
+          "textChars": 636,
+          "turns": 1,
+          "firstTextMs": 26578,
+          "firstToolMs": 6287,
+          "toolCalls": [
+            {
+              "name": "glob",
+              "status": "completed",
+              "startedMs": 6287,
+              "endedMs": 6326
+            },
+            {
+              "name": "read",
+              "status": "completed",
+              "startedMs": 9530,
+              "endedMs": 9542
+            },
+            {
+              "name": "read",
+              "status": "completed",
+              "startedMs": 9530,
+              "endedMs": 9542
+            },
+            {
+              "name": "read",
+              "status": "completed",
+              "startedMs": 9530,
+              "endedMs": 9542
+            },
+            {
+              "name": "read",
+              "status": "completed",
+              "startedMs": 9530,
+              "endedMs": 9542
+            },
+            {
+              "name": "read",
+              "status": "completed",
+              "startedMs": 9530,
+              "endedMs": 9542
+            },
+            {
+              "name": "shell",
+              "status": "completed",
+              "startedMs": 17165,
+              "endedMs": 17277
+            },
+            {
+              "name": "patch",
+              "status": "completed",
+              "startedMs": 28885,
+              "endedMs": 28895
+            },
+            {
+              "name": "shell",
+              "status": "completed",
+              "startedMs": 32922,
+              "endedMs": 33012
+            },
+            {
+              "name": "patch",
+              "status": "completed",
+              "startedMs": 38569,
+              "endedMs": 38573
+            },
+            {
+              "name": "shell",
+              "status": "completed",
+              "startedMs": 44515,
+              "endedMs": 44960
+            }
+          ],
+          "tokens": null,
+          "cost": null,
+          "toolBusyMs": 712
+        }
+      ],
+      "finishedAt": "2026-11-16T11:25:39.164Z"
+    }
+  ],
+  "failureAnalysis": {
+    "claude-sonnet-5": {
+      "task": "repo-task-outcomes",
+      "cause": "Replaced tool result.cancelled handling with signal.aborted, missing cancellation reported by the tool itself.",
+      "expected": {
+        "status": "cancelled",
+        "toolCalls": 1
+      },
+      "observed": {
+        "status": "limit",
+        "toolCalls": 4
+      }
+    },
+    "gpt-6-luna": {
+      "task": "repo-provider-history",
+      "cause": "Restored assistant state but left incomplete-response rejection unfixed.",
+      "expected": {
+        "rejectIncomplete": true
+      },
+      "observed": {
+        "rejectIncomplete": false
+      }
+    }
+  }
+}
