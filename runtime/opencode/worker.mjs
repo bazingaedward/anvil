@@ -47,8 +47,13 @@ async function run(input) {
       kind.toLowerCase(),
     );
   process.env.OPENCODE_TEST_HOME = input.state;
-  const { copilotCredential, copilotCredentials, copilotModels } =
-    await import("./copilot.mjs");
+  const {
+    copilotCredential,
+    copilotCredentials,
+    copilotModels,
+    loadCopilotCatalog,
+    withCopilotCatalog,
+  } = await import("./copilot.mjs");
   const copilot =
     input.model?.connection === "copilot" ? copilotCredential(key) : undefined;
   if (copilot) sensitive.push(copilot.value.access, copilot.value.refresh);
@@ -58,6 +63,27 @@ async function run(input) {
     send({ type: "done", status: "completed" });
     await close();
     return;
+  }
+  if (copilot) {
+    send({
+      type: "activity",
+      text: "正在加载 Copilot 模型（网络异常时自动重试）…",
+    });
+    const catalog = await loadCopilotCatalog(copilot, abort.signal);
+    const selected = catalog.data.find((item) => item.id === input.model.model);
+    if (
+      !selected ||
+      selected.policy?.state === "disabled" ||
+      !selected.capabilities?.supports?.tool_calls
+    )
+      throw new Error(
+        "当前 Copilot 账号未返回所选模型或该模型已被禁用，请选择其他模型。",
+      );
+    globalThis.fetch = withCopilotCatalog(
+      globalThis.fetch.bind(globalThis),
+      copilot.endpoint,
+      catalog,
+    );
   }
   const providerID = copilot ? "github-copilot" : "ark";
   globalThis.fetch = timedModelFetch(
@@ -111,7 +137,7 @@ async function run(input) {
         break;
       if (Date.now() >= deadline)
         throw new Error(
-          "Copilot model is unavailable after catalog refresh. Check subscription, organization access and network.",
+          "Copilot 已返回模型目录，但 OpenCode 未能启用所选模型。请尝试其他模型。",
         );
       await new Promise((resolve) => setTimeout(resolve, 200));
     }

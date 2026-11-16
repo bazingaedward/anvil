@@ -30,7 +30,7 @@ export async function discoverCopilotModels(executable: string, key: string) {
         executable,
         key,
         endpoint: "https://api.githubcopilot.com",
-        signal: AbortSignal.timeout(30000),
+        signal: AbortSignal.timeout(45000),
         onEvent(event) {
           if (event.type === "models") models = event.models;
         },

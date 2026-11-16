@@ -65,7 +65,7 @@ export function ToolActivity({ task }: { task: AgentTask }) {
             />
             工具记录 · {task.toolCount || tools.length} 次
           </button>
-          <ul>{(expanded ? completed : completed.slice(-3)).map(row)}</ul>
+          {expanded && <ul>{completed.map(row)}</ul>}
         </>
       )}
     </section>

@@ -99,3 +99,49 @@ test("embedded host resolves Keygrant credentials without storing them in SQLite
     await rm(root, { recursive: true, force: true });
   }
 });
+
+test("catalog retries transient failures, reports auth errors without retrying, and reuses its response", async () => {
+  const { loadCopilotCatalog, withCopilotCatalog } =
+    await import("./copilot.mjs");
+  const original = globalThis.fetch;
+  const connection = copilotCredential(JSON.stringify(value));
+  const catalog = { data: [{ id: "fixture-model" }] };
+  let calls = 0;
+  try {
+    globalThis.fetch = async () =>
+      ++calls === 1
+        ? new Response(null, { status: 503 })
+        : Response.json(catalog);
+    expect(await loadCopilotCatalog(connection)).toEqual(catalog);
+    expect(calls).toBe(2);
+    const fetcher = withCopilotCatalog(
+      globalThis.fetch,
+      connection.endpoint,
+      catalog,
+    );
+    expect(
+      await (await fetcher(connection.endpoint + "/models")).json(),
+    ).toEqual(catalog);
+    expect(calls).toBe(2);
+    await fetcher(connection.endpoint + "/responses", { method: "POST" });
+    expect(calls).toBe(3);
+    calls = 0;
+    globalThis.fetch = async () => {
+      calls++;
+      return new Response(null, { status: 401 });
+    };
+    await expect(loadCopilotCatalog(connection)).rejects.toThrow("HTTP 401");
+    expect(calls).toBe(1);
+    calls = 0;
+    globalThis.fetch = async () => {
+      calls++;
+      throw new Error("transport details must not leak");
+    };
+    await expect(loadCopilotCatalog(connection)).rejects.toThrow(
+      "网络连接或代理超时",
+    );
+    expect(calls).toBe(2);
+  } finally {
+    globalThis.fetch = original;
+  }
+});

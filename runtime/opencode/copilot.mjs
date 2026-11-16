@@ -78,21 +78,66 @@ export function copilotCredentials(value) {
   };
 }
 
-export async function copilotModels({ value, endpoint }) {
-  const response = await fetch(`${endpoint}/models`, {
-    headers: {
-      Authorization: `Bearer ${value.refresh}`,
-      "User-Agent": "anvil/0.0.0",
-      "X-GitHub-Api-Version": "2026-08-01",
-    },
-    signal: AbortSignal.timeout(20000),
-  });
-  if (!response.ok)
-    throw new Error(
-      `Copilot model discovery failed (HTTP ${response.status}). Check subscription and organization access.`,
-    );
-  const body = await response.json();
-  if (!Array.isArray(body.data)) throw new Error("Invalid Copilot model list.");
+// Fetch before starting OpenCode: its native catalog loader times out after
+// five seconds and swallows failures without retrying the request.
+export async function loadCopilotCatalog({ value, endpoint }, signal) {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    let response;
+    try {
+      response = await fetch(`${endpoint}/models`, {
+        headers: {
+          Authorization: `Bearer ${value.refresh}`,
+          "User-Agent": "anvil/0.0.0",
+          "X-GitHub-Api-Version": "2026-08-01",
+        },
+        signal: signal
+          ? AbortSignal.any([signal, AbortSignal.timeout(20000)])
+          : AbortSignal.timeout(20000),
+      });
+    } catch {
+      if (signal?.aborted)
+        throw new Error("Copilot model discovery cancelled.");
+      if (attempt === 0) continue;
+      throw new Error(
+        "Copilot 模型目录获取失败：网络连接或代理超时，自动重试一次仍未成功。请稍后重试。",
+      );
+    }
+    if (!response.ok) {
+      await response.body?.cancel();
+      if (attempt === 0 && (response.status === 429 || response.status >= 500))
+        continue;
+      throw new Error(
+        `Copilot 模型目录获取失败（HTTP ${response.status}）。${response.status === 401 ? "请重新授权 Copilot。" : response.status === 403 ? "请检查 Copilot 套餐和组织权限。" : "请稍后重试。"}`,
+      );
+    }
+    try {
+      const body = await response.json();
+      if (!Array.isArray(body.data)) throw new Error();
+      return body;
+    } catch {
+      if (signal?.aborted)
+        throw new Error("Copilot model discovery cancelled.");
+      if (attempt === 0) continue;
+      throw new Error("Copilot 返回了无效的模型目录，自动重试一次仍未成功。");
+    }
+  }
+}
+
+// The native provider still performs model conversion and chooses its protocol.
+// Serve the catalog already fetched above, avoiding a second network request.
+export function withCopilotCatalog(fetcher, endpoint, catalog) {
+  return (input, init) => {
+    const url = input instanceof Request ? input.url : String(input);
+    const method =
+      init?.method || (input instanceof Request ? input.method : "GET");
+    if (url === `${endpoint}/models` && method.toUpperCase() === "GET")
+      return Promise.resolve(Response.json(catalog));
+    return fetcher(input, init);
+  };
+}
+
+export async function copilotModels(connection) {
+  const body = await loadCopilotCatalog(connection);
   return body.data
     .filter(
       (m) =>
