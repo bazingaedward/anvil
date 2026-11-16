@@ -41,6 +41,18 @@ export function validateModel(value: ModelProfile): ModelProfile {
     throw new Error("Use a model ID and a Keygrant environment variable name.");
   if (value.protocol !== undefined && !protocols.includes(value.protocol))
     throw new Error("Unsupported model protocol.");
+  if (value.connection !== undefined && value.connection !== "copilot")
+    throw new Error("Unsupported model connection.");
+  if (
+    (value.keyRef === "ANVIL_COPILOT_OAUTH" &&
+      value.connection !== "copilot") ||
+    (value.connection === "copilot" &&
+      (value.endpoint !== "https://api.githubcopilot.com" ||
+        value.keyRef !== "ANVIL_COPILOT_OAUTH"))
+  )
+    throw new Error(
+      "Copilot requires its native connection and Keygrant OAuth credential.",
+    );
   if (value.endpoint !== "" || value.id !== "ark-default")
     modelBaseURL(value.endpoint, value.protocol || "responses");
   for (const field of ["contextLimit", "outputLimit"] as const)
@@ -67,6 +79,9 @@ export function validateModel(value: ModelProfile): ModelProfile {
     endpoint: value.endpoint,
     keyRef: value.keyRef,
     vision: value.vision === true,
+    ...(value.connection === "copilot"
+      ? { connection: "copilot" as const }
+      : {}),
     ...(value.protocol !== undefined ? { protocol: value.protocol } : {}),
     ...(value.contextLimit !== undefined
       ? { contextLimit: value.contextLimit }

@@ -141,17 +141,35 @@ export function ModelPicker({
                   </span>
                   {model.id === value && <Check size={15} />}
                 </button>
-                {model.id !== codexModel.id && (
-                  <button
-                    disabled={disabled}
-                    aria-label={`配置 ${model.name}`}
-                    onClick={() => edit(model)}
-                  >
-                    ···
-                  </button>
-                )}
+                {model.id !== codexModel.id &&
+                  model.connection !== "copilot" && (
+                    <button
+                      disabled={disabled}
+                      aria-label={`配置 ${model.name}`}
+                      onClick={() => edit(model)}
+                    >
+                      ···
+                    </button>
+                  )}
               </div>
             ))}
+          <button
+            disabled={disabled || busy}
+            onClick={async () => {
+              setBusy(true);
+              setError("");
+              setEditing(undefined);
+              try {
+                accept(await window.anvil.copilotModels());
+              } catch (e) {
+                setError(String(e));
+              } finally {
+                setBusy(false);
+              }
+            }}
+          >
+            {busy ? "正在获取 Copilot 模型…" : "获取 / 刷新 Copilot 模型"}
+          </button>
           <button
             disabled={disabled}
             onClick={() =>

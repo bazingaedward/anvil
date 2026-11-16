@@ -130,3 +130,26 @@ test("agent sends chosen model and snapshots, resumes session, records metadata 
     /does not support images/,
   );
 });
+
+test("Copilot OAuth profiles cannot route credentials through custom API endpoints", () => {
+  const model = {
+    ...defaultModel,
+    id: "copilot-test",
+    connection: "copilot" as const,
+    endpoint: "https://api.githubcopilot.com",
+    keyRef: "ANVIL_COPILOT_OAUTH",
+  };
+  assert.equal(validateModel(model).connection, "copilot");
+  assert.throws(
+    () => validateModel({ ...model, endpoint: "https://example.invalid" }),
+    /Copilot/,
+  );
+  assert.throws(
+    () => validateModel({ ...model, connection: undefined }),
+    /Copilot/,
+  );
+  assert.throws(
+    () => validateModel({ ...model, keyRef: "OTHER_KEY" }),
+    /Copilot/,
+  );
+});

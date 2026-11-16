@@ -32,6 +32,7 @@ const api: DesktopAPI = {
   saveModel: (profile) => ipcRenderer.invoke("composer:save-model", profile),
   deleteModel: (id) => ipcRenderer.invoke("composer:delete-model", id),
   testModel: (id) => ipcRenderer.invoke("composer:test-model", id),
+  copilotModels: () => ipcRenderer.invoke("composer:copilot-models"),
   pickAttachments: () => ipcRenderer.invoke("composer:pick"),
   uploadAttachment: (name, bytes) =>
     ipcRenderer.invoke("composer:upload", name, bytes),

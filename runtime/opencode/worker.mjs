@@ -1,4 +1,7 @@
-import { modelBaseURL, runtimeProvider } from "../../desktop/shared/providers.ts";
+import {
+  modelBaseURL,
+  runtimeProvider,
+} from "../../desktop/shared/providers.ts";
 import { timedModelFetch } from "./request-timing.ts";
 import path from "node:path";
 import { createInterface } from "node:readline";
@@ -13,9 +16,10 @@ delete process.env.ANVIL_MODEL_ENDPOINT;
 delete process.env.BYTEPLUS_ARK_API_KEY;
 delete process.env.BYTEPLUS_ARK_RESPONSES_URL;
 const send = (message) => process.stdout.write(JSON.stringify(message) + "\n");
+const sensitive = [key, endpoint];
 const runtimeError = (error) => {
   let message = error instanceof Error ? error.message : String(error);
-  for (const value of [key, endpoint])
+  for (const value of sensitive)
     if (value) message = message.split(value).join("[REDACTED]");
   return `Agent runtime failed: ${message.slice(0, 1000)}`;
 };
@@ -36,11 +40,6 @@ async function close() {
 }
 async function run(input) {
   if (!key || !endpoint) throw new Error("Provider credentials are missing.");
-  globalThis.fetch = timedModelFetch(
-    globalThis.fetch.bind(globalThis),
-    modelBaseURL(endpoint, input.model?.protocol || "responses"),
-    send,
-  );
   await mkdir(input.state, { recursive: true });
   for (const kind of ["DATA", "CONFIG", "CACHE", "STATE"])
     process.env[`XDG_${kind}_HOME`] = path.join(
@@ -48,24 +47,75 @@ async function run(input) {
       kind.toLowerCase(),
     );
   process.env.OPENCODE_TEST_HOME = input.state;
-  const { OpenCode } = await import("@opencode/sdk");
+  const { copilotCredential, copilotCredentials, copilotModels } =
+    await import("./copilot.mjs");
+  const copilot =
+    input.model?.connection === "copilot" ? copilotCredential(key) : undefined;
+  if (copilot) sensitive.push(copilot.value.access, copilot.value.refresh);
+  if (input.listModels) {
+    if (!copilot) throw new Error("Copilot connection required.");
+    send({ type: "models", models: await copilotModels(copilot) });
+    send({ type: "done", status: "completed" });
+    await close();
+    return;
+  }
+  const providerID = copilot ? "github-copilot" : "ark";
+  globalThis.fetch = timedModelFetch(
+    globalThis.fetch.bind(globalThis),
+    copilot?.endpoint ||
+      modelBaseURL(endpoint, input.model?.protocol || "responses"),
+    send,
+  );
+  // Pinned 2.0.0's public wrapper drops the embedded service overrides.
+  // Use its underlying PromiseSdk to keep OAuth out of the session database.
+  const { PromiseSdk: OpenCode } =
+    await import("./node_modules/@opencode/sdk/dist/promise.js");
   const model = input.model?.model || "deepseek-v4-1-flash-261017";
-  host = await OpenCode.create({
-    app: { name: "anvil", version: "0.0.0" },
-    database: { path: path.join(input.state, "sessions.db") },
-    models: { fetch: false },
-    config: {
-      directory: path.join(input.state, "config"),
-      project: false,
-      content: JSON.stringify({
-        share: "disabled",
-        update: "disable",
-        snapshots: false,
-        providers: { ark: runtimeProvider(input.model, endpoint, key) },
-      }),
+  host = await OpenCode.create(
+    {
+      app: { name: "anvil", version: "0.0.0" },
+      database: { path: path.join(input.state, "sessions.db") },
+      models: { fetch: false },
+      config: {
+        directory: path.join(input.state, "config"),
+        project: false,
+        content: JSON.stringify({
+          share: "disabled",
+          update: "disable",
+          snapshots: false,
+          providers: copilot
+            ? {}
+            : { ark: runtimeProvider(input.model, endpoint, key) },
+        }),
+      },
+      fs: { filewatcher: false, fff: false },
     },
-    fs: { filewatcher: false, fff: false },
-  });
+    copilot ? copilotCredentials(copilot.value) : {},
+  );
+  if (copilot) {
+    const location = { location: { directory: input.repo } };
+    await host.integration.get({
+      ...location,
+      integrationID: "github-copilot",
+    });
+    await host.plugin.awaitActivation(location);
+    // The native Copilot plugin refreshes its account catalog in a background
+    // fiber. Plugin activation alone does not mean the selected model exists.
+    const deadline = Date.now() + 30000;
+    send({ type: "activity", text: "正在加载 Copilot 模型…" });
+    while (true) {
+      const { data } = await host.model.list(location);
+      if (
+        data.some((item) => item.providerID === providerID && item.id === model)
+      )
+        break;
+      if (Date.now() >= deadline)
+        throw new Error(
+          "Copilot model is unavailable after catalog refresh. Check subscription, organization access and network.",
+        );
+      await new Promise((resolve) => setTimeout(resolve, 200));
+    }
+  }
   const stream = host.events.subscribe({ signal: abort.signal });
   const consume = (async () => {
     for await (const event of stream) {
@@ -200,8 +250,9 @@ async function run(input) {
           send({
             type: "done",
             status: "failed",
-            error:
-              "Model execution failed. Check the provider configuration and retry.",
+            error: runtimeError(
+              new Error(`${d.error.type}: ${d.error.message}`),
+            ),
           });
           return;
       }
@@ -219,14 +270,14 @@ async function run(input) {
   } else {
     const session = await host.sessions.create({
       location: { directory: input.repo },
-      model: { providerID: "ark", id: model },
+      model: { providerID, id: model },
       permissions: [{ action: "*", resource: "*", effect: "ask" }],
     });
     sessionID = session.id;
   }
   await host.sessions.switchModel({
     sessionID,
-    model: { providerID: "ark", id: model },
+    model: { providerID, id: model },
   });
   send({ type: "session", id: sessionID });
   const folders = Array.isArray(input.directories)

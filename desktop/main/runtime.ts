@@ -2,6 +2,7 @@ import { diagnostic, diagnosticState } from "./diagnostics";
 import { spawn } from "node:child_process";
 import { executionEnvironment, killProcessTree } from "./acceptance";
 import { parseQuestionGroup } from "./agent-questions";
+import { validateModel } from "./composer";
 import type { RequestTiming } from "../../runtime/opencode/request-timing";
 import type {
   AgentQuestionGroup,
@@ -17,6 +18,7 @@ export type RuntimeResult = {
   error?: string;
 };
 export type RuntimeEvent =
+  | { type: "models"; models: ModelProfile[] }
   | {
       type: "compaction";
       status: "started" | "completed" | "failed";
@@ -53,6 +55,7 @@ export type RuntimeInput = {
   attachments?: StoredAttachment[];
   text: string;
   probe?: boolean;
+  listModels?: boolean;
   permissionMode?: PermissionMode;
 };
 export type RuntimeRun = {
@@ -78,6 +81,16 @@ function decode(
 ): RuntimeEvent | RequestTiming | ({ type: "done" } & RuntimeResult) {
   const m = JSON.parse(line);
   if (!m || typeof m !== "object") throw new Error("Invalid event");
+  if (
+    m.type === "models" &&
+    Array.isArray(m.models) &&
+    m.models.length <= 200
+  ) {
+    const models = m.models.map(validateModel);
+    if (models.some((model: ModelProfile) => model.connection !== "copilot"))
+      throw new Error("Invalid Copilot model");
+    return { type: "models", models };
+  }
   if (
     m.type === "model-timing" &&
     typeof m.id === "string" &&

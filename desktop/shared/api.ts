@@ -24,6 +24,7 @@ export type AccountDevice = {
   current: boolean;
 };
 export type ModelProfile = {
+  connection?: "copilot";
   protocol?: import("./providers").ModelProtocol;
   contextLimit?: number;
   outputLimit?: number;
@@ -220,6 +221,7 @@ export interface DesktopAPI {
   onAccountChange(listener: () => void): () => void;
 
   models(): Promise<ModelProfile[]>;
+  copilotModels(): Promise<ModelProfile[]>;
   saveModel(profile: ModelProfile): Promise<ModelProfile[]>;
   deleteModel(id: string): Promise<ModelProfile[]>;
   testModel(id: string): Promise<void>;

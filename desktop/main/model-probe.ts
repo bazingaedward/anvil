@@ -4,6 +4,50 @@ import os from "node:os";
 import { startRuntime } from "./runtime";
 import type { ModelProfile } from "../shared/api";
 
+export async function discoverCopilotModels(executable: string, key: string) {
+  const root = await mkdtemp(path.join(os.tmpdir(), "anvil-copilot-models-"));
+  let models: ModelProfile[] | undefined;
+  try {
+    const run = startRuntime(
+      {
+        listModels: true,
+        repo: root,
+        state: root,
+        directories: [],
+        text: "",
+        model: {
+          id: "copilot-discovery",
+          model: "discovery",
+          name: "Copilot",
+          provider: "GitHub Copilot",
+          connection: "copilot",
+          endpoint: "https://api.githubcopilot.com",
+          keyRef: "ANVIL_COPILOT_OAUTH",
+          vision: false,
+        },
+      },
+      {
+        executable,
+        key,
+        endpoint: "https://api.githubcopilot.com",
+        signal: AbortSignal.timeout(30000),
+        onEvent(event) {
+          if (event.type === "models") models = event.models;
+        },
+      },
+    );
+    const result = await run.done;
+    if (result.status !== "completed" || !models?.length)
+      throw new Error(
+        result.error ||
+          "Copilot 没有返回可用模型，请检查套餐、组织权限和网络。",
+      );
+    return models;
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+}
+
 export async function probeModel(
   executable: string,
   model: ModelProfile,

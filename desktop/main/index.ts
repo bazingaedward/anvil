@@ -1,6 +1,6 @@
 import { initDiagnostics, diagnostic, diagnosticState } from "./diagnostics";
 import { codexModel } from "../shared/providers";
-import { probeModel } from "./model-probe";
+import { probeModel, discoverCopilotModels } from "./model-probe";
 import { Account } from "./account";
 import { createHash, randomUUID } from "node:crypto";
 import { mkdir, cp, access } from "node:fs/promises";
@@ -53,6 +53,7 @@ let composerStore = new ComposerStore(
   path.join(app.getPath("userData"), "composer"),
 );
 const providerCredentials: Record<string, string | undefined> = {
+  ANVIL_COPILOT_OAUTH: process.env.ANVIL_COPILOT_OAUTH,
   BYTEPLUS_ARK_API_KEY: process.env.BYTEPLUS_ARK_API_KEY,
   BYTEPLUS_ARK_RESPONSES_URL: process.env.BYTEPLUS_ARK_RESPONSES_URL,
 };
@@ -62,6 +63,7 @@ for (const profile of composerStore.models()) {
   delete process.env[profile.keyRef];
 }
 delete process.env.BYTEPLUS_ARK_API_KEY;
+delete process.env.ANVIL_COPILOT_OAUTH;
 delete process.env.BYTEPLUS_ARK_RESPONSES_URL;
 function currentAgent() {
   const runtime =
@@ -645,7 +647,30 @@ function registerIPC() {
     await executor.deleteConversation(id);
     return true;
   });
-  const availableModels = () => [...composerStore.models(), codexModel];
+  let copilotModels: import("../shared/api").ModelProfile[] = [];
+  const availableModels = () => [
+    ...composerStore.models(),
+    ...copilotModels,
+    codexModel,
+  ];
+  const findModel = (id?: string) =>
+    copilotModels.find((model) => model.id === id) || composerStore.model(id);
+  handle("composer:copilot-models", async () => {
+    const key = providerCredentials.ANVIL_COPILOT_OAUTH;
+    if (!key)
+      throw new Error(
+        "请先运行 Copilot 授权，再通过 Keygrant 注入 ANVIL_COPILOT_OAUTH 启动 Anvil。",
+      );
+    const name =
+      process.platform === "win32" ? "anvil-runtime.exe" : "anvil-runtime";
+    copilotModels = await discoverCopilotModels(
+      app.isPackaged
+        ? path.join(process.resourcesPath, "runtime", name)
+        : path.resolve(here, "../../runtime/opencode/dist", name),
+      key,
+    );
+    return availableModels();
+  });
   handle("composer:models", availableModels);
   handle(
     "composer:save-model",
@@ -694,7 +719,7 @@ function registerIPC() {
     );
   });
   handle("composer:test-model", async (id: string) => {
-    const model = composerStore.model(id);
+    const model = findModel(id);
     const key = providerCredentials[model.keyRef];
     if (!key)
       throw new Error(
@@ -725,8 +750,7 @@ function registerIPC() {
       const userAtStart = activeUser;
       const modelID =
         options?.modelID || account.snapshot?.config.preferences.defaultModelID;
-      const model =
-        modelID === codexModel.id ? codexModel : composerStore.model(modelID);
+      const model = modelID === codexModel.id ? codexModel : findModel(modelID);
       const managedProxy =
         model.id === codexModel.id ? await codexProxy() : undefined;
       if (activeUser !== userAtStart || !account.user)
