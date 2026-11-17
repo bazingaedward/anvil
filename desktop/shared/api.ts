@@ -248,6 +248,7 @@ export interface DesktopAPI {
   deleteModel(id: string): Promise<ModelProfile[]>;
   testModel(id: string): Promise<void>;
   pickAttachments(): Promise<Attachment[]>;
+  imagePreview(id: string): Promise<string>;
   uploadAttachment(name: string, bytes: Uint8Array): Promise<Attachment>;
 
   openReviewRepository(): Promise<string | null>;

@@ -39,6 +39,10 @@ test("model profiles and attachment snapshots persist; reject unsafe endpoints, 
     store.attachments([image.id])[0].content,
     /^data:image\/png;base64,/,
   );
+  assert.equal(store.imagePreview(image.id), store.attachments([image.id])[0].content);
+  assert.throws(() => store.imagePreview(file.id), /not a previewable image/);
+  assert.throws(() => store.imagePreview("../../secret"), /valid attachments/);
+  assert.throws(() => new ComposerStore(path.join(root, "other-account")).imagePreview(image.id), /ENOENT/);
   assert.throws(() => store.attachments(["../../secret"]), /valid attachments/);
   assert.throws(() => store.attach("x", Buffer.from([0, 1])), /UTF-8/);
   assert.throws(() => store.attach("x", Buffer.from([255, 255])), /UTF-8/);

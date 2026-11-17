@@ -1,4 +1,5 @@
 import { ErrorToast } from "./error-toast";
+import { UserMessage } from "./user-message";
 import { AnswerActions } from "./answer-actions";
 import { TaskDuration, TaskProgress } from "./task-progress";
 import type { MemoryInput } from "../shared/memory";
@@ -796,6 +797,23 @@ export function ConversationWorkspace({
               <span className="conversation-title">
                 {conversationTitle(draft)}
               </span>
+              {!!draft.folders?.length && (
+                <details className="conversation-folders">
+                  <summary title="会话工作区目录">
+                    <Folder size={16} />
+                    <span>{draft.folders.length === 1
+                      ? draft.folders[0].split(/[\\/]/).filter(Boolean).pop() || draft.folders[0]
+                      : `工作区 · ${draft.folders.length}`}</span>
+                  </summary>
+                  <div role="group" aria-label="会话工作区目录">
+                    {draft.folders.map((root) => (
+                      <button key={root} title={root} onClick={() => onSelectDirectory(root)}>
+                        <Folder size={16} /><span>{root}</span>
+                      </button>
+                    ))}
+                  </div>
+                </details>
+              )}
               <details className="tools-menu" ref={toolsMenu}>
                 <summary aria-label="工作区工具" title="文件、变更和终端">
                   <Ellipsis size={20} />
@@ -861,39 +879,7 @@ export function ConversationWorkspace({
                   key={task.id}
                   id={`task-${task.id}`}
                 >
-                  <div className="agent-prompt">
-                    {task.prompt}
-                    {!!task.folders?.length && (
-                      <div
-                        className="sent-folders"
-                        role="group"
-                        aria-label="本条消息附带的目录"
-                      >
-                        <small>已附带目录</small>
-                        <div className="sent-attachments">
-                          {task.folders.map((root) => (
-                            <span key={root} title={root} aria-label={root}>
-                              <Folder size={14} aria-hidden="true" />
-                              <span>
-                                {root.split(/[\\/]/).filter(Boolean).pop() ||
-                                  root}
-                              </span>
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    {!!task.attachments?.length && (
-                      <div className="sent-attachments">
-                        {task.attachments.map((file) => (
-                          <span key={file.id}>
-                            <Paperclip size={13} />
-                            {file.name}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+                  <UserMessage text={task.prompt} attachments={task.attachments} />
                   {(task.steering || []).map((message, index, messages) => (
                     <div key={message.id} className="steering-message">
                       <MarkdownResponse
@@ -902,29 +888,7 @@ export function ConversationWorkspace({
                           message.offset,
                         )}
                       />
-                      <div className="agent-prompt">
-                        {message.text}
-                        {!!message.folders?.length && (
-                          <div className="sent-attachments">
-                            {message.folders.map((root) => (
-                              <span key={root} title={root}>
-                                <Folder size={14} />
-                                {root.split(/[\\/]/).pop()}
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                        {!!message.attachments?.length && (
-                          <div className="sent-attachments">
-                            {message.attachments.map((file) => (
-                              <span key={file.id}>
-                                <Paperclip size={13} />
-                                {file.name}
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                      </div>
+                      <UserMessage text={message.text} attachments={message.attachments} />
                       <small
                         className={`task-state ${message.status}`}
                         role="status"

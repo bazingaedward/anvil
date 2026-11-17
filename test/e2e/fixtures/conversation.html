@@ -34,9 +34,12 @@
         keyRef: "TEST",
         vision: true,
       };
+      const image = { id: "image-1", name: "screen.png", mime: "image/png", size: 68 };
       window.failSteer = false;
       window.anvil = {
         platform: "darwin",
+        uploadAttachment: async () => image,
+        imagePreview: async () => "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/l9sAAAAASUVORK5CYII=",
         onAccountChange: () => () => {},
         models: async () => [model],
         conversations: async () => ({
@@ -56,6 +59,7 @@
             id: String(tasks.length),
             conversationID: id,
             prompt: text,
+            attachments: options.attachmentIDs.map(() => image),
             text: "",
             folders: [...chat.folders],
             status: tasks.some((t) => t.status === "running")
@@ -68,7 +72,7 @@
           emit(task);
           return task;
         },
-        steerTask: async (id, text) => {
+        steerTask: async (id, text, attachmentIDs) => {
           if (window.failSteer) throw new Error("转向被拒绝");
           window.calls.push({ type: "steer", text });
           const t = tasks.find((t) => t.id === id);
@@ -77,6 +81,7 @@
             text,
             offset: 0,
             status: "delivered",
+            attachments: attachmentIDs.map(() => image),
             folders: [...chat.folders],
           });
           emit(t);

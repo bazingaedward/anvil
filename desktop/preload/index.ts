@@ -35,6 +35,7 @@ const api: DesktopAPI = {
   testModel: (id) => ipcRenderer.invoke("composer:test-model", id),
   copilotModels: () => ipcRenderer.invoke("composer:copilot-models"),
   pickAttachments: () => ipcRenderer.invoke("composer:pick"),
+  imagePreview: (id) => ipcRenderer.invoke("composer:image-preview", id),
   uploadAttachment: (name, bytes) =>
     ipcRenderer.invoke("composer:upload", name, bytes),
   openReviewRepository: () => ipcRenderer.invoke("review:open"),

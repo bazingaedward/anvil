@@ -704,6 +704,7 @@ function registerIPC() {
     });
     return availableModels();
   });
+  handle("composer:image-preview", (id: string) => composerStore.imagePreview(id));
   handle("composer:upload", (name: string, bytes: Uint8Array) =>
     composerStore.attach(name, bytes),
   );

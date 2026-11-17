@@ -2188,30 +2188,110 @@ kbd {
 .sent-attachments {
   padding-top: 10px;
 }
-.sent-folders {
-  margin-top: 12px;
+.message-images {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+  white-space: normal;
 }
-.sent-folders > small {
+.message-image {
+  width: 180px;
+  height: 140px;
+  max-width: 100%;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid #ffffff30;
+  border-radius: 10px;
+  background: #192c4c;
+  cursor: zoom-in;
+}
+.message-image img {
   display: block;
-  font-size: calc(var(--ui-font-size) - 2px);
-  color: #c3d3ee;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
-.sent-folders .sent-attachments {
-  padding: 6px 0 0;
+.message-image > span {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  padding: 12px;
+  overflow-wrap: anywhere;
 }
-.sent-folders .sent-attachments > span {
-  background: #ffffff12;
-  border-color: #ffffff30;
-  color: inherit;
+.attachment-preview {
+  max-width: 90vw;
+  max-height: 90vh;
+  padding: 12px;
+  border: 1px solid #555;
+  border-radius: 12px;
+  background: #242424;
+  color: #eee;
+}
+.attachment-preview::backdrop { background: #000b; }
+.attachment-preview header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 10px;
+}
+.attachment-preview header span {
   min-width: 0;
-}
-.sent-folders svg {
-  flex-shrink: 0;
-}
-.sent-folders .sent-attachments > span > span {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.attachment-preview header button { flex-shrink: 0; }
+.attachment-preview > img {
+  display: block;
+  max-width: 100%;
+  max-height: calc(90vh - 80px);
+  object-fit: contain;
+  margin: auto;
+}
+.conversation-folders {
+  position: relative;
+  max-width: 45%;
+  min-width: 0;
+  font-size: calc(var(--ui-font-size) - 1px);
+  color: #bbb;
+}
+.conversation-folders summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+.conversation-folders summary::-webkit-details-marker { display: none; }
+.conversation-folders summary span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.conversation-folders svg { flex-shrink: 0; }
+.conversation-folders > div {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 10px);
+  z-index: 20;
+  width: max-content;
+  max-width: min(440px, 75vw);
+  padding: 6px;
+  border: 1px solid #444;
+  border-radius: 8px;
+  background: #292929;
+  box-shadow: 0 8px 24px #0006;
+}
+.conversation-folders button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px;
+  text-align: left;
+  overflow-wrap: anywhere;
 }
 .composer .draft-notice {
   margin: 6px 0;

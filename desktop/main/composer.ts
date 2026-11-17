@@ -184,6 +184,15 @@ export class ComposerStore {
     );
     return attachment;
   }
+  imagePreview(id: string): string {
+    const file = this.attachments([id])[0];
+    if (
+      !["image/png", "image/jpeg", "image/gif", "image/webp"].includes(file.mime) ||
+      !file.content.startsWith(`data:${file.mime};base64,`)
+    )
+      throw new Error("This attachment is not a previewable image.");
+    return file.content;
+  }
   attachments(ids: string[] = []): StoredAttachment[] {
     if (
       !Array.isArray(ids) ||
