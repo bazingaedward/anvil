@@ -1908,15 +1908,14 @@ kbd {
   font-size: calc(var(--ui-font-size) - 1px);
   line-height: 1.6;
 }
-.agent-progress-dot {
-  width: 6px;
-  height: 6px;
-  flex: 0 0 6px;
-  border-radius: 50%;
-  background: #b9b9b9;
+.agent-progress-mark {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  color: #d99a78;
   animation: agent-breathe 1.6s ease-in-out infinite;
 }
-.agent-progress-dot.paused {
+.agent-progress-mark.paused {
   animation: none;
   opacity: 0.6;
 }
@@ -1930,7 +1929,7 @@ kbd {
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .agent-progress-dot {
+  .agent-progress-mark {
     animation: none;
   }
 }
@@ -3040,17 +3039,3 @@ kbd {
 }
 
 .question-option-description { display: block; margin-top: 4px; font-size: .85em; color: #aaa; line-height: 1.5; }
-
-.tool-activity { margin: 16px 0; color: #aaa; }
-.tool-activity ul { list-style: none; padding: 0; margin: 8px 0; }
-.tool-activity li { display: flex; align-items: flex-start; gap: 8px; padding: 8px 0; border-bottom: 1px solid #333; }
-.tool-activity li > svg { flex: none; margin-top: 3px; }
-.tool-activity li > div { flex: 1; min-width: 0; }
-.tool-activity strong { font-weight: 500; color: #ddd; }
-.tool-activity code { display: block; white-space: pre-wrap; overflow-wrap: anywhere; font-size: var(--code-font-size); margin-top: 4px; }
-.tool-activity small { flex: none; font-variant-numeric: tabular-nums; }
-.tool-activity button { background: none; border: 0; padding: 4px 0; color: inherit; gap: 4px; }
-.task-duration { margin-left: 0.5em; color: #999; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.tool-spinner { animation: tool-spin 1s linear infinite; transform-origin: center; }
-@keyframes tool-spin { to { transform: rotate(360deg); } }
-@media (prefers-reduced-motion: reduce) { .tool-spinner { animation: none; } }

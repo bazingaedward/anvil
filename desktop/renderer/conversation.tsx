@@ -1,6 +1,4 @@
 import { ErrorToast } from "./error-toast";
-import { ToolActivity } from "./tool-activity";
-import { TaskDuration } from "./task-duration";
 import { AnswerActions } from "./answer-actions";
 import type { MemoryInput } from "../shared/memory";
 import { MarkdownResponse } from "./markdown-response";
@@ -21,6 +19,7 @@ import {
 } from "react";
 import {
   ArrowUp,
+  Asterisk,
   ListPlus,
   Square,
   Shield,
@@ -946,7 +945,6 @@ export function ConversationWorkspace({
                       text={task.text.slice(task.steering?.at(-1)?.offset || 0)}
                     />
                   )}
-                  <ToolActivity task={task} />
                   {task.questions?.map((group) => (
                     <AgentQuestions
                       key={group.id}
@@ -989,24 +987,22 @@ export function ConversationWorkspace({
                       className="agent-progress"
                       role="status"
                       aria-live="polite"
+                      aria-label="处理中"
                     >
-                      <span
-                        className={`agent-progress-dot ${task.permissions.length || task.phase === "stopping" ? "paused" : ""}`}
+                      <Asterisk
+                        size={24}
+                        className={`agent-progress-mark ${task.permissions.length || task.phase === "stopping" || task.questions?.some((group) => group.blocking && !group.answer && !group.readOnly) ? "paused" : ""}`}
                         aria-hidden="true"
                       />
-                      <span>
-                        {task.phase === "stopping"
-                          ? "正在停止…"
-                          : task.permissions.length
-                            ? "等待授权"
-                            : task.phase === "checking"
-                              ? "正在检查…"
-                              : task.phase === "repairing"
-                                ? `正在修复 · 第 ${(task.round || 1) - 1} 次`
-                                : task.activity ||
-                                  (task.text ? "正在继续…" : "处理中…")}
-                      </span>
-                      <TaskDuration task={task} />
+                      {task.phase === "stopping" ? (
+                        <span>正在停止…</span>
+                      ) : task.permissions.length ? (
+                        <span>等待授权</span>
+                      ) : task.questions?.some(
+                          (group) => group.blocking && !group.answer && !group.readOnly,
+                        ) ? (
+                        <span>等待你的回答</span>
+                      ) : null}
                     </div>
                   ) : (
                     <small
@@ -1026,7 +1022,6 @@ export function ConversationWorkspace({
                           : task.status === "limit"
                             ? "已达到限制"
                             : task.status}
-                      <TaskDuration task={task} />
                     </small>
                   )}
                   {task.text && task.status !== "running" && (
@@ -1064,8 +1059,7 @@ export function ConversationWorkspace({
                                 ? "已超时"
                                 : check.error
                                   ? "无法运行"
-                                  : `退出码 ${check.exitCode}`}{" "}
-                            · {(check.durationMs / 1000).toFixed(1)}s
+                                  : `退出码 ${check.exitCode}`}
                           </strong>
                           <pre>
                             {check.error || check.output || "（无输出）"}
