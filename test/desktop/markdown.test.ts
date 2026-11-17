@@ -30,3 +30,18 @@ test("assistant Markdown does not execute HTML or unsafe URLs, and accepts parti
   assert.ok(!html.includes("<img"));
   assert.ok(html.includes("partial"));
 });
+
+test("code blocks expose copy controls and language labels, inline code does not", () => {
+  const html = renderToStaticMarkup(
+    createElement(MarkdownResponse, {
+      text: "`inline`\n\n```sh\ncd /tmp\npnpm dev\n```\n\n```\n  plain text\n```\n\n```ts\npartial",
+    }),
+  );
+  assert.equal((html.match(/aria-label="复制代码块"/g) || []).length, 3);
+  assert.ok(html.includes("<span>sh</span>"));
+  assert.ok(html.includes("<span>文本</span>"));
+  assert.ok(html.includes("<span>ts</span>"));
+  assert.ok(html.includes("<code>inline</code>"));
+  assert.ok(html.includes("cd /tmp\npnpm dev\n"));
+  assert.ok(html.includes("  plain text\n"));
+});

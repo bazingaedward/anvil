@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer } from "electron";
 import type { DesktopAPI, TerminalEvent, AgentTask } from "../shared/api";
 const api: DesktopAPI = {
   openExternalLink: (url) => ipcRenderer.invoke("links:open", url),
+  copyText: (text) => ipcRenderer.invoke("clipboard:write-text", text),
   setAutoMemory: (id, enabled) =>
     ipcRenderer.invoke("context:auto-memory", id, enabled),
   openMemoryFolder: (id) => ipcRenderer.invoke("context:open-folder", id),

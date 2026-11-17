@@ -1,5 +1,6 @@
 import { ErrorToast } from "./error-toast";
 import { AnswerActions } from "./answer-actions";
+import { TaskDuration, TaskProgress } from "./task-progress";
 import type { MemoryInput } from "../shared/memory";
 import { MarkdownResponse } from "./markdown-response";
 import { ContextDialog } from "./context-dialog";
@@ -19,7 +20,6 @@ import {
 } from "react";
 import {
   ArrowUp,
-  Asterisk,
   ListPlus,
   Square,
   Shield,
@@ -983,27 +983,7 @@ export function ConversationWorkspace({
                       </button>
                     </div>
                   ) : task.status === "running" ? (
-                    <div
-                      className="agent-progress"
-                      role="status"
-                      aria-live="polite"
-                      aria-label="处理中"
-                    >
-                      <Asterisk
-                        size={24}
-                        className={`agent-progress-mark ${task.permissions.length || task.phase === "stopping" || task.questions?.some((group) => group.blocking && !group.answer && !group.readOnly) ? "paused" : ""}`}
-                        aria-hidden="true"
-                      />
-                      {task.phase === "stopping" ? (
-                        <span>正在停止…</span>
-                      ) : task.permissions.length ? (
-                        <span>等待授权</span>
-                      ) : task.questions?.some(
-                          (group) => group.blocking && !group.answer && !group.readOnly,
-                        ) ? (
-                        <span>等待你的回答</span>
-                      ) : null}
-                    </div>
+                    <TaskProgress task={task} />
                   ) : (
                     <small
                       className={`task-state ${task.status}`}
@@ -1021,7 +1001,8 @@ export function ConversationWorkspace({
                               : "已结束 · 未验证"
                           : task.status === "limit"
                             ? "已达到限制"
-                            : task.status}
+                            : task.status}{" "}
+                      <TaskDuration task={task} />
                     </small>
                   )}
                   {task.text && task.status !== "running" && (

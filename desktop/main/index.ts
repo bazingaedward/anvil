@@ -16,6 +16,7 @@ import { realpath } from "node:fs/promises";
 import {
   app,
   BrowserWindow,
+  clipboard,
   dialog,
   ipcMain,
   Menu,
@@ -293,6 +294,10 @@ function registerIPC() {
     trusted(event);
     if (kind === "error" || kind === "unhandledrejection")
       diagnostic("renderer." + kind);
+  });
+  handle("clipboard:write-text", (text) => {
+    if (typeof text !== "string") throw new Error("Invalid clipboard text.");
+    clipboard.writeText(text);
   });
   handle("links:open", async (value) => {
     if (typeof value !== "string" || value.length > 8192)

@@ -20,7 +20,7 @@ export function AnswerActions({
   }, [copied]);
   async function copy() {
     try {
-      await navigator.clipboard.writeText(text);
+      await window.anvil.copyText(text);
       setCopied(true);
       setError("");
     } catch {

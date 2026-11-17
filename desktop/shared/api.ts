@@ -221,6 +221,7 @@ export type ReviewOptions = {
 };
 export interface DesktopAPI {
   openExternalLink(url: string): Promise<void>;
+  copyText(text: string): Promise<void>;
   setAutoMemory(id: string, enabled: boolean): Promise<ContextState>;
   openMemoryFolder(id: string): Promise<void>;
   contextState(id: string): Promise<ContextState>;
