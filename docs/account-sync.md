@@ -23,3 +23,5 @@
 后端需要 D1 migration、Google OAuth Web client ID、GOOGLE_CLIENT_SECRET、域名路由。部署脚本在独立后端目录，密钥通过 Keygrant 注入，不写入配置文件。
 
 自动化检查覆盖账号隔离、未登录拒绝、一次性登录交换、revision 冲突、会话撤销、Group 同步保留本地数据。真实 Google 登录和两台电脑同步仍需实际账号验收；仅入口重定向成功不代表完整 OAuth 已验收。
+
+默认模型设置包含已保存配置和本机已获取的 Copilot 模型目录。选择尚未保存的 Copilot 模型时，先保存其模型配置，再更新账号默认模型；不保存 OAuth 值。此设置用于新聊天，已有聊天保留原选择。本地 Codex 执行器不作为 API 模型保存。

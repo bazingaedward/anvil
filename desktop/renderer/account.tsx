@@ -1,3 +1,4 @@
+import { codexModel } from "../shared/providers";
 import { AppearanceSettings } from "./appearance";
 import googleLogo from "./google-logo.png";
 import { useEffect, useState, useRef, type ReactNode } from "react";
@@ -10,7 +11,7 @@ import {
   RefreshCw,
   SlidersHorizontal,
 } from "lucide-react";
-import type { AccountState, AccountDevice } from "../shared/api";
+import type { AccountState, AccountDevice, ModelProfile } from "../shared/api";
 export let accountScope = "";
 export let defaultModelID = "ark-default";
 export function AccountGate({ children }: { children: ReactNode }) {
@@ -79,7 +80,14 @@ export function AccountGate({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (open) {
       settingsRef.current?.showModal();
-      void action(async () => setDevices(await window.anvil.accountDevices()));
+      void action(async () => {
+        const [devices, models] = await Promise.all([
+          window.anvil.accountDevices(),
+          window.anvil.models(),
+        ]);
+        setDevices(devices);
+        setModels(models.filter((model) => model.id !== codexModel.id));
+      });
     } else settingsRef.current?.close();
   }, [open]);
   useEffect(() => {
@@ -93,6 +101,7 @@ export function AccountGate({ children }: { children: ReactNode }) {
     return () => document.removeEventListener("keydown", key);
   }, [state?.user]);
   const [devices, setDevices] = useState<AccountDevice[]>([]);
+  const [models, setModels] = useState<ModelProfile[]>([]);
   function accept(next: AccountState) {
     accountScope = next.user?.id || "";
     defaultModelID = next.config?.preferences.defaultModelID || "ark-default";
@@ -319,15 +328,20 @@ export function AccountGate({ children }: { children: ReactNode }) {
                     id="default-model"
                     disabled={busy}
                     value={state.config.preferences.defaultModelID}
-                    onChange={(e) =>
-                      void action(async () =>
-                        accept(
-                          await window.anvil.setDefaultModel(e.target.value),
-                        ),
-                      )
-                    }
+                    onChange={(e) => {
+                      const id = e.target.value;
+                      void action(async () => {
+                        const model = models.find((model) => model.id === id);
+                        if (
+                          model &&
+                          !state.config?.models.some((saved) => saved.id === id)
+                        )
+                          await window.anvil.saveModel(model);
+                        accept(await window.anvil.setDefaultModel(id));
+                      });
+                    }}
                   >
-                    {state.config.models.map((m) => (
+                    {(models.length ? models : state.config.models).map((m) => (
                       <option key={m.id} value={m.id}>
                         {m.name}
                       </option>
