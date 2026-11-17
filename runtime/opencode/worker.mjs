@@ -3,9 +3,16 @@ import {
   runtimeProvider,
 } from "../../desktop/shared/providers.ts";
 import { timedModelFetch } from "./request-timing.ts";
+import { browserConfig } from "./browser.ts";
 import path from "node:path";
 import { createInterface } from "node:readline";
 import { mkdir } from "node:fs/promises";
+import { format } from "node:util";
+
+// The SDK logs MCP process startup through console. Keep stdout exclusively
+// for protocol frames, including while embedded plugins initialize.
+for (const level of ["log", "info", "warn", "error", "debug"])
+  console[level] = (...values) => process.stderr.write(format(...values) + "\n");
 
 // The only upstream-specific adapter. stdout is Anvil's JSONL protocol.
 const key = process.env.ANVIL_MODEL_API_KEY || process.env.BYTEPLUS_ARK_API_KEY;
@@ -154,6 +161,7 @@ async function run(input) {
           share: "disabled",
           update: "disable",
           snapshots: false,
+          ...browserConfig(input.probe || input.listModels ? undefined : input.browser),
           providers: copilot
             ? {}
             : { ark: runtimeProvider(input.model, endpoint, key) },

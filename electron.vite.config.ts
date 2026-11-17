@@ -8,6 +8,7 @@ export default defineConfig({
         input: {
           index: resolve("desktop/main/index.ts"),
           "codex-worker": resolve("desktop/main/codex-worker.ts"),
+          "browser-worker": resolve("desktop/main/browser-worker.ts"),
         },
       },
     },

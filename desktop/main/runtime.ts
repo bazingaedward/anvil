@@ -4,6 +4,7 @@ import { executionEnvironment, killProcessTree } from "./acceptance";
 import { parseQuestionGroup } from "./agent-questions";
 import { validateModel } from "./composer";
 import type { RequestTiming } from "../../runtime/opencode/request-timing";
+import type { BrowserRuntime } from "../../runtime/opencode/browser";
 import type {
   AgentQuestionGroup,
   QuestionAnswer,
@@ -52,6 +53,7 @@ export type RuntimeEvent =
     }
   | { type: "permission-resolved"; id: string };
 export type RuntimeInput = {
+  browser?: BrowserRuntime;
   repo: string;
   state: string;
   directories: string[];

@@ -98,6 +98,9 @@ function currentAgent() {
       executable: process.execPath,
       args: [path.join(here, "codex-worker.js")],
     },
+    process.platform === "darwin"
+      ? [process.execPath, path.join(here, "browser-worker.js")]
+      : undefined,
   ));
 }
 let terminal: pty.IPty | undefined;
