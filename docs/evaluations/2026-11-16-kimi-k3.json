@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "state": "incomplete-environment-interruption",
+  "state": "completed",
   "model": "kimi-k3",
   "sameConfigurationAsSonnetGptBaseline": {
     "suiteHash": true,
@@ -15,17 +15,21 @@
   "revisionChanged": true,
   "revisionNote": "The evaluation and documentation commit changed HEAD; runner, validator, fixture and runtime hashes are identical.",
   "validResultIDs": [
-    "repo-edit-integrity"
+    "repo-edit-integrity",
+    "repo-task-outcomes",
+    "repo-provider-history"
   ],
-  "overallPassRate": null,
+  "overallPassRate": 0.6666666666666666,
   "excludedResults": [
     {
       "id": "repo-task-outcomes",
-      "reason": "macOS system sleep during execution; wall duration 1014.842 seconds exceeds 180-second budget."
+      "reason": "macOS system sleep during execution; wall duration 1014.842 seconds exceeds 180-second budget.",
+      "runStartedAt": "2026-11-16T11:40:02.693Z"
     },
     {
       "id": "repo-provider-history",
-      "reason": "macOS system sleep during execution; wall duration 1081.984 seconds exceeds 180-second budget."
+      "reason": "macOS system sleep during execution; wall duration 1081.984 seconds exceeds 180-second budget.",
+      "runStartedAt": "2026-11-16T11:40:02.693Z"
     }
   ],
   "sleepEvidence": {
@@ -57,8 +61,12 @@
     ]
   },
   "recovery": {
-    "state": "awaiting-user-authorization",
-    "reason": "Keygrant approval dialog timed out; access denied; no automatic retry."
+    "state": "completed",
+    "startedAt": "2026-11-17T03:30:43.353Z",
+    "finishedAt": "2026-11-17T03:33:39.079Z",
+    "reason": "User reauthorized Keygrant after the earlier approval timeout; reran only the two sleep-interrupted tasks.",
+    "sleepPrevention": "caffeinate -is; system assertions verified while running and released after completion",
+    "previousAttempt": "Keygrant approval timed out before recovery started; no model run was performed then."
   },
   "runs": [
     {
@@ -306,6 +314,292 @@
         }
       ],
       "finishedAt": "2026-11-16T12:16:42.576Z"
+    },
+    {
+      "schemaVersion": 1,
+      "suite": "repository",
+      "state": "completed",
+      "evaluatorHash": "b7b8f76d03e510aa6b02f0ba6ac93a8f9e8021033e18a6345c720117f7333c3d",
+      "runnerHash": "d95e8f7406aa26c1b995313ed478b4fb0fa6103232fb0b203a643e2760e2c70f",
+      "startedAt": "2026-11-17T03:30:45.379Z",
+      "model": "kimi-k3",
+      "protocol": "copilot-native",
+      "revision": "0c669d0cda8168a5a3221d6a9088f3069d505676",
+      "suiteHash": "462bb1312de9af3b30d959d52b5fb4b94967e4cf11c69a77662f4b4cc7c0bb5d",
+      "runtimeHash": "28b96eb46023bc6295058e00938f7794618073ea85984041736d412f9a1b8b41",
+      "platform": "darwin",
+      "timeoutMs": 180000,
+      "permissions": "allow-all; trusted evaluation fixtures only; not sandboxed",
+      "tokens": null,
+      "cost": null,
+      "results": [
+        {
+          "id": "repo-task-outcomes",
+          "category": "repository-regression",
+          "status": "completed",
+          "passed": true,
+          "verification": {
+            "passed": true
+          },
+          "elapsedMs": 123228,
+          "toolActivities": 45,
+          "permissionRequests": 15,
+          "textChars": 2328,
+          "turns": 1,
+          "firstTextMs": 63590,
+          "firstToolMs": 6718,
+          "toolCalls": [
+            {
+              "name": "read",
+              "status": "completed",
+              "startedMs": 6718,
+              "endedMs": 6729
+            },
+            {
+              "name": "shell",
+              "status": "completed",
+              "startedMs": 7508,
+              "endedMs": 7548
+            },
+            {
+              "name": "read",
+              "status": "completed",
+              "startedMs": 10233,
+              "endedMs": 10239
+            },
+            {
+              "name": "read",
+              "status": "completed",
+              "startedMs": 10806,
+              "endedMs": 10812
+            },
+            {
+              "name": "read",
+              "status": "completed",
+              "startedMs": 13012,
+              "endedMs": 13016
+            },
+            {
+              "name": "read",
+              "status": "completed",
+              "startedMs": 13648,
+              "endedMs": 13653
+            },
+            {
+              "name": "read",
+              "status": "completed",
+              "startedMs": 16234,
+              "endedMs": 16239
+            },
+            {
+              "name": "read",
+              "status": "completed",
+              "startedMs": 16852,
+              "endedMs": 16857
+            },
+            {
+              "name": "read",
+              "status": "completed",
+              "startedMs": 17580,
+              "endedMs": 17584
+            },
+            {
+              "name": "read",
+              "status": "completed",
+              "startedMs": 64866,
+              "endedMs": 64871
+            },
+            {
+              "name": "shell",
+              "status": "completed",
+              "startedMs": 65629,
+              "endedMs": 66083
+            },
+            {
+              "name": "edit",
+              "status": "completed",
+              "startedMs": 96008,
+              "endedMs": 96014
+            },
+            {
+              "name": "edit",
+              "status": "completed",
+              "startedMs": 98228,
+              "endedMs": 98234
+            },
+            {
+              "name": "shell",
+              "status": "completed",
+              "startedMs": 100842,
+              "endedMs": 101284
+            },
+            {
+              "name": "shell",
+              "status": "completed",
+              "startedMs": 112132,
+              "endedMs": 112176
+            }
+          ],
+          "tokens": null,
+          "cost": null,
+          "toolBusyMs": 1043
+        }
+      ],
+      "finishedAt": "2026-11-17T03:32:48.676Z"
+    },
+    {
+      "schemaVersion": 1,
+      "suite": "repository",
+      "state": "completed",
+      "evaluatorHash": "b7b8f76d03e510aa6b02f0ba6ac93a8f9e8021033e18a6345c720117f7333c3d",
+      "runnerHash": "d95e8f7406aa26c1b995313ed478b4fb0fa6103232fb0b203a643e2760e2c70f",
+      "startedAt": "2026-11-17T03:32:50.908Z",
+      "model": "kimi-k3",
+      "protocol": "copilot-native",
+      "revision": "0c669d0cda8168a5a3221d6a9088f3069d505676",
+      "suiteHash": "462bb1312de9af3b30d959d52b5fb4b94967e4cf11c69a77662f4b4cc7c0bb5d",
+      "runtimeHash": "28b96eb46023bc6295058e00938f7794618073ea85984041736d412f9a1b8b41",
+      "platform": "darwin",
+      "timeoutMs": 180000,
+      "permissions": "allow-all; trusted evaluation fixtures only; not sandboxed",
+      "tokens": null,
+      "cost": null,
+      "results": [
+        {
+          "id": "repo-provider-history",
+          "category": "repository-regression",
+          "status": "completed",
+          "passed": false,
+          "verification": {
+            "passed": false,
+            "reason": "assertions-failed"
+          },
+          "elapsedMs": 48106,
+          "toolActivities": 40,
+          "permissionRequests": 13,
+          "textChars": 1861,
+          "turns": 1,
+          "firstTextMs": 25837,
+          "firstToolMs": 4802,
+          "toolCalls": [
+            {
+              "name": "read",
+              "status": "completed",
+              "startedMs": 4802,
+              "endedMs": 4815
+            },
+            {
+              "name": "glob",
+              "status": "completed",
+              "startedMs": 5659,
+              "endedMs": 5678
+            },
+            {
+              "name": "read",
+              "status": "completed",
+              "startedMs": 8152,
+              "endedMs": 8156
+            },
+            {
+              "name": "read",
+              "status": "completed",
+              "startedMs": 8744,
+              "endedMs": 8749
+            },
+            {
+              "name": "read",
+              "status": "completed",
+              "startedMs": 9338,
+              "endedMs": 9345
+            },
+            {
+              "name": "read",
+              "status": "completed",
+              "startedMs": 9877,
+              "endedMs": 9882
+            },
+            {
+              "name": "read",
+              "status": "completed",
+              "startedMs": 13470,
+              "endedMs": 13475
+            },
+            {
+              "name": "read",
+              "status": "completed",
+              "startedMs": 14094,
+              "endedMs": 14100
+            },
+            {
+              "name": "read",
+              "status": "completed",
+              "startedMs": 16794,
+              "endedMs": 16798
+            },
+            {
+              "name": "shell",
+              "status": "completed",
+              "startedMs": 20223,
+              "endedMs": 20605
+            },
+            {
+              "name": "shell",
+              "status": "completed",
+              "startedMs": 23921,
+              "endedMs": 24291
+            },
+            {
+              "name": "edit",
+              "status": "completed",
+              "startedMs": 32918,
+              "endedMs": 32927
+            },
+            {
+              "name": "shell",
+              "status": "completed",
+              "startedMs": 41811,
+              "endedMs": 42192
+            }
+          ],
+          "tokens": null,
+          "cost": null,
+          "toolBusyMs": 1210
+        }
+      ],
+      "finishedAt": "2026-11-17T03:33:39.072Z"
+    }
+  ],
+  "selectedResults": [
+    {
+      "runStartedAt": "2026-11-16T11:40:02.693Z",
+      "id": "repo-edit-integrity"
+    },
+    {
+      "runStartedAt": "2026-11-17T03:30:45.379Z",
+      "id": "repo-task-outcomes"
+    },
+    {
+      "runStartedAt": "2026-11-17T03:32:50.908Z",
+      "id": "repo-provider-history"
+    }
+  ],
+  "aggregate": {
+    "passed": 2,
+    "total": 3,
+    "elapsedMs": 274317,
+    "toolCalls": 42,
+    "toolBusyMs": 3561
+  },
+  "failureAnalysis": [
+    {
+      "task": "repo-provider-history",
+      "classification": "omitted-requirement",
+      "finding": "Restored assistant state but omitted status !== completed validation.",
+      "reproduction": {
+        "method": "Mock fetch returning status incomplete with an empty output array",
+        "expected": "reject",
+        "actual": "accepted"
+      }
     }
   ]
 }
