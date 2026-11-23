@@ -118,3 +118,21 @@ test("sent images appear above text and open an accessible preview, including st
   await preview.getByRole("button", { name: "关闭图片预览" }).click();
   await expect(preview).toHaveCount(0);
 });
+
+test("a repository-bound review skill can be selected from chat after enabling the plugin", async ({
+  page,
+}) => {
+  await page.goto(url + "test/e2e/fixtures/conversation.html");
+  await page.getByRole("button", { name: "添加文件夹（可选）" }).click();
+  await page.getByRole("button", { name: "扩展", exact: true }).first().click();
+  await page.getByRole("button", { name: "启用整套扩展" }).click();
+  await page.getByRole("button", { name: "GitHub · MCP →" }).click();
+  await page.getByLabel("GitHub 登录名").fill("alice");
+  await page.getByRole("button", { name: "保存绑定" }).click();
+  await expect(page.getByText("本机账号已匹配")).toBeVisible();
+  await page.getByRole("button", { name: "聊天", exact: true }).click();
+  const input = page.getByRole("textbox", { name: "向 Anvil 发送消息" });
+  await input.fill("/rev");
+  await page.getByRole("button", { name: "/review-pr", exact: true }).click();
+  await expect(input).toHaveValue("/review-pr ");
+});

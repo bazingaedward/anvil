@@ -53,6 +53,8 @@ export type RuntimeEvent =
     }
   | { type: "permission-resolved"; id: string };
 export type RuntimeInput = {
+  requireGithub?: boolean;
+  github?: import("../shared/extensions").Binding;
   browser?: BrowserRuntime;
   repo: string;
   state: string;

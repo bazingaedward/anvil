@@ -41,7 +41,7 @@ try {
       `--compile-executable-path=${compiler}`,
       "--no-compile-autoload-dotenv",
       "--no-compile-autoload-bunfig",
-      path.join(root, "worker.mjs"),
+      path.join(root, "entry.mjs"),
       "--outfile",
       path.join(dist, `anvil-runtime${suffix}`),
     ],

@@ -1,3 +1,5 @@
+import { ExtensionsPage, useExtensions } from "./extensions";
+import { Blocks } from "lucide-react";
 import { ErrorToast } from "./error-toast";
 import { UserMessage } from "./user-message";
 import { AnswerActions } from "./answer-actions";
@@ -592,7 +594,53 @@ export function ConversationWorkspace({
     });
     setManaging(false);
   }
-  const [reviewOpen, setReviewOpen] = useState(false);
+  const [section, setSection] = useState<"chat" | "review" | "extensions">(
+    "chat",
+  );
+  const reviewOpen = section === "review";
+  const library = useExtensions();
+  const managed = composerDraft.modelID === codexModel.id;
+  const folder = draft.folders?.includes(repo?.root || "")
+    ? repo?.root
+    : draft.folders?.[0];
+  const [chatRepo, setChatRepo] = useState<{
+    folder: string;
+    repo: string | null;
+  }>();
+  useEffect(() => {
+    let live = true;
+    if (folder && library.state?.config.enabled.includes("github"))
+      window.anvil
+        .extensionRepo(folder)
+        .then((repo) => {
+          if (live) setChatRepo({ folder, repo });
+        })
+        .catch(() => {
+          if (live) setChatRepo(undefined);
+        });
+    return () => {
+      live = false;
+    };
+  }, [folder, library.state?.config.enabled.includes("github")]);
+  const canReview =
+    !managed &&
+    library.state?.config.enabled.includes("github") &&
+    folder &&
+    chatRepo?.folder === folder &&
+    library.state.config.bindings.some((b) => b.repo === chatRepo.repo);
+  const commands = [
+    ...(canReview && library.state?.config.enabled.includes("review-pr")
+      ? ["review-pr"]
+      : []),
+    ...(library.state?.config.skills
+      .filter((s) => s.enabled)
+      .map((s) => s.id) || []),
+  ];
+  function useSkill(id: string) {
+    setSection("chat");
+    update("/" + id + " ");
+    requestAnimationFrame(() => input.current?.focus());
+  }
   return (
     <div className="workspace-shell">
       <ErrorToast message={agentError} onDismiss={() => setAgentError("")} />
@@ -600,8 +648,8 @@ export function ConversationWorkspace({
         <button
           title="聊天"
           aria-label="聊天"
-          aria-pressed={!reviewOpen}
-          onClick={() => setReviewOpen(false)}
+          aria-pressed={section === "chat"}
+          onClick={() => setSection("chat")}
         >
           <MessageSquare size={22} />
         </button>
@@ -609,12 +657,30 @@ export function ConversationWorkspace({
           title="代码审查"
           aria-label="代码审查"
           aria-pressed={reviewOpen}
-          onClick={() => setReviewOpen(true)}
+          onClick={() => setSection("review")}
         >
           <GitPullRequest size={22} />
         </button>
+        <button
+          title="扩展"
+          aria-label="扩展"
+          aria-pressed={section === "extensions"}
+          onClick={() => setSection("extensions")}
+        >
+          <Blocks size={22} />
+        </button>
       </nav>
+      {section === "extensions" && (
+        <ExtensionsPage
+          library={library}
+          folder={folder || repo?.root}
+          reviewAvailable={!!canReview}
+          managed={managed}
+          onUse={useSkill}
+        />
+      )}
       <ReviewWorkspace
+        hideChat={section === "extensions"}
         roots={repo?.directories || (repo ? [repo.root] : [])}
         open={reviewOpen}
         sidebarOpen={sidebarOpen}
@@ -1149,6 +1215,23 @@ export function ConversationWorkspace({
                     </button>
                   </div>
                 )}
+                {/^\/[a-z0-9-]*$/.test(draft.text) &&
+                  commands.some((id) =>
+                    id.startsWith(draft.text.slice(1)),
+                  ) && (
+                    <div
+                      className="skill-suggestions"
+                      aria-label="选择 Skill"
+                    >
+                      {commands
+                        .filter((id) => id.startsWith(draft.text.slice(1)))
+                        .map((id) => (
+                          <button key={id} onClick={() => useSkill(id)}>
+                            /{id}
+                          </button>
+                        ))}
+                    </div>
+                  )}
                 <textarea
                   ref={input}
                   aria-label="向 Anvil 发送消息"
@@ -1181,7 +1264,19 @@ export function ConversationWorkspace({
                     </summary>
                     <div className="context-popover">
                       <button
-                        disabled={readOnly || sending || managing || attaching}
+                        onClick={(e) => {
+                          e.currentTarget
+                            .closest("details")
+                            ?.removeAttribute("open");
+                          setSection("extensions");
+                        }}
+                      >
+                        <Blocks size={16} /> 扩展
+                      </button>
+                      <button
+                        disabled={
+                          readOnly || sending || managing || attaching
+                        }
                         onClick={(event) => {
                           event.currentTarget
                             .closest("details")

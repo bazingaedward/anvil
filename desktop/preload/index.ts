@@ -13,6 +13,14 @@ const api: DesktopAPI = {
     ipcRenderer.invoke("context:delete-memory", id, noteID, revision),
   saveHandoff: (id, input) =>
     ipcRenderer.invoke("context:save-handoff", id, input),
+  extensionRepo: (folder) => ipcRenderer.invoke("extensions:repo", folder),
+  saveExtensions: (value, revision) =>
+    ipcRenderer.invoke("extensions:save", value, revision),
+  importSkill: (revision, source) =>
+    ipcRenderer.invoke("extensions:import", revision, source),
+  browserAvailable: () => ipcRenderer.invoke("extensions:browser"),
+  connectGithub: (login) => ipcRenderer.invoke("extensions:connect", login),
+  githubIdentity: () => ipcRenderer.invoke("extensions:identity"),
   accountStatus: (refresh) => ipcRenderer.invoke("account:status", refresh),
   accountLogin: () => ipcRenderer.invoke("account:login"),
   accountPoll: () => ipcRenderer.invoke("account:poll"),

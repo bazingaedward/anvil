@@ -3127,3 +3127,23 @@ kbd {
 }
 
 .question-option-description { display: block; margin-top: 4px; font-size: .85em; color: #aaa; line-height: 1.5; }
+
+.extensions-page { flex: 1; min-width: 0; padding: 24px clamp(16px, 4vw, 60px); overflow: auto; }
+.extensions-page header, .extension-search, .extension-row, .extensions-page header button { display: flex; align-items: center; gap: 10px; }
+.extensions-page header { justify-content: space-between; border-bottom: 1px solid #373737; margin-bottom: 22px; }
+.extensions-page h1 { font-size: calc(var(--ui-font-size) + 10px); }
+.extensions-columns { display: grid; grid-template-columns: minmax(180px, 32%) minmax(200px, 1fr); gap: clamp(18px, 4vw, 60px); }
+.extensions-page input, .extensions-page select { min-width: 0; color: inherit; background: #282828; border: 1px solid #494949; border-radius: 6px; padding: 7px 10px; }
+.extension-search input { width: 100%; }
+.extension-filters, .extension-detail-links { display: flex; gap: 4px; margin: 12px 0; flex-wrap: wrap; }
+.extensions-page button, .skill-suggestions button { border-radius: 6px; padding: 7px 10px; }
+.extensions-page button:hover, .extensions-page button[aria-pressed=true], .skill-suggestions button:hover { background: #343434; }
+.extension-row { width: 100%; text-align: left; }
+.extension-row small { display: block; }
+.extensions-page small { color: #aaa; }
+.extensions-page fieldset { border: 0; border-top: 1px solid #424242; margin: 24px 0; padding: 12px 0; }
+.extensions-page fieldset label { display: grid; gap: 5px; margin: 10px 0; max-width: 26em; }
+.extensions-columns article { overflow-wrap: anywhere; }
+.skill-suggestions { grid-column: 1 / -1; max-height: 140px; overflow: auto; }
+.extension-import { display: flex; align-items: end; flex-wrap: wrap; gap: 12px; margin: 0 0 18px; }
+.extension-import label { flex: 1; display: grid; gap: 4px; }

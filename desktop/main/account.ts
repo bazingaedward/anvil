@@ -141,8 +141,16 @@ export class Account {
   }
   async refresh() {
     await this.require();
-    this.snapshot = await this.request("/config");
-    this.snapshot!.config = restoreConnections(this.snapshot!.config);
+    const token = this.token;
+    const next = await this.request<{ revision: number; config: CloudConfig }>(
+      "/config",
+    );
+    if (token !== this.token) throw Error("账号已切换，请刷新。");
+    if (!this.snapshot || this.snapshot.revision <= next.revision)
+      this.snapshot = {
+        revision: next.revision,
+        config: restoreConnections(next.config),
+      };
     return this.state();
   }
   async mutate(change: (config: CloudConfig) => CloudConfig) {

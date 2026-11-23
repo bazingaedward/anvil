@@ -1,6 +1,14 @@
 import { initDiagnostics, diagnostic, diagnosticState } from "./diagnostics";
 import { codexModel } from "../shared/providers";
 import { probeModel, discoverCopilotModels } from "./model-probe";
+import { defaultExtensions, validateExtensions } from "../shared/extensions";
+import {
+  githubIdentity,
+  githubRepo,
+  githubSkill,
+  readSkill,
+} from "./extensions";
+import { connectGithub } from "./github-connection";
 import { Account } from "./account";
 import { createHash, randomUUID } from "node:crypto";
 import { mkdir, cp, access } from "node:fs/promises";
@@ -76,7 +84,10 @@ function currentAgent() {
       ? path.join(process.resourcesPath, "runtime", runtime)
       : path.resolve(here, "../../runtime/opencode/dist", runtime),
     (task) => {
-      const current = task.status === "running" ? task : agent?.list().find((item) => item.status === "running") || task;
+      const current =
+        task.status === "running"
+          ? task
+          : agent?.list().find((item) => item.status === "running") || task;
       diagnosticState("task", {
         id: current.id,
         conversationID: current.conversationID,
@@ -84,7 +95,8 @@ function currentAgent() {
         phase: current.phase,
         activity: current.activity,
         updated: current.updated,
-        pendingQuestions: current.questions?.filter((q) => !q.answer).length || 0,
+        pendingQuestions:
+          current.questions?.filter((q) => !q.answer).length || 0,
         pendingPermissions: current.permissions.length,
         model: current.model?.model,
         error: current.error,
@@ -101,6 +113,18 @@ function currentAgent() {
     process.platform === "darwin"
       ? [process.execPath, path.join(here, "browser-worker.js")]
       : undefined,
+    async (folder) => {
+      const config = account.snapshot?.config.extensions || defaultExtensions;
+      const repo =
+        folder && config.enabled.includes("github")
+          ? await githubRepo(folder)
+          : null;
+      return {
+        config,
+        repo,
+        binding: config.bindings.find((b) => b.repo === repo),
+      };
+    },
   ));
 }
 let terminal: pty.IPty | undefined;
@@ -154,7 +178,19 @@ async function selectRepository(root: string) {
 function announceAccount() {
   if (!window.isDestroyed()) window.webContents.send("account:changed");
 }
+let githubLogin: AbortController | undefined;
+async function ensureGithub(login: string) {
+  if (githubLogin) throw Error("已有 GitHub 授权正在进行。");
+  const controller = new AbortController();
+  githubLogin = controller;
+  try {
+    await connectGithub(window, login, controller.signal);
+  } finally {
+    if (githubLogin === controller) githubLogin = undefined;
+  }
+}
 async function deactivate() {
+  githubLogin?.abort();
   stopTerminal();
   await agent?.close();
   agent = undefined;
@@ -331,6 +367,78 @@ function registerIPC() {
   handle("context:save-handoff", (id, input) =>
     currentAgent().saveHandoff(id, input),
   );
+  handle("extensions:repo", async (folder: string) => {
+    const known =
+      directories.includes(folder) ||
+      currentAgent()
+        .conversations()
+        .conversations.some((c) => c.folders?.includes(folder));
+    return known ? githubRepo(folder) : null;
+  });
+  handle(
+    "extensions:browser",
+    () =>
+      process.platform === "darwin" &&
+      access(
+        "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      ).then(
+        () => true,
+        () => false,
+      ),
+  );
+  handle("extensions:identity", githubIdentity);
+  handle("extensions:connect", ensureGithub);
+  function saveExtensions(value: unknown, revision: number, user = activeUser) {
+    const extensions = validateExtensions(value);
+    return changeConfig((config) => {
+      if (
+        !user ||
+        activeUser !== user ||
+        account.user?.id !== user ||
+        revision !== account.snapshot?.revision
+      )
+        throw Error("账号或扩展已变更，请刷新后重试。");
+      return { ...config, extensions };
+    });
+  }
+  handle("extensions:save", saveExtensions);
+  handle("extensions:import", async (revision: number, source?: string) => {
+    const user = activeUser;
+    const current = account.snapshot?.config.extensions || defaultExtensions;
+    let skill;
+    if (source)
+      skill = await githubSkill(source, (url, init) =>
+        net.fetch(String(url), init),
+      );
+    else {
+      const picked = await dialog.showOpenDialog(window, {
+        title: "选择包含 SKILL.md 的文件夹",
+        properties: ["openDirectory"],
+      });
+      if (picked.canceled) return account.state();
+      skill = await readSkill(picked.filePaths[0]);
+    }
+    const overwrite = current.skills.some((s) => s.id === skill.id);
+    const answer = await dialog.showMessageBox(window, {
+      type: "question",
+      message: `${overwrite ? "更新" : "保存"} /${skill.id} 到 ${account.user?.email}？`,
+      detail:
+        "以下文本文件将随账号同步。请确认其中没有凭据。\n" +
+        skill.files.map((f) => f.path).join("\n"),
+      buttons: ["取消", "保存到账号"],
+      defaultId: 0,
+      cancelId: 0,
+    });
+    if (answer.response !== 1) return account.state();
+    return saveExtensions(
+      {
+        ...current,
+        skills: [...current.skills.filter((s) => s.id !== skill.id), skill],
+      },
+      revision,
+      user,
+    );
+  });
   handle("account:status", async (refresh = false) => {
     try {
       await activateAccount();
@@ -772,19 +880,32 @@ function registerIPC() {
       const folders =
         executor.conversations().conversations.find((item) => item.id === id)
           ?.folders || [];
-      return executor.start(
-        id,
-        text,
-        folders,
-        folders.includes(workspace?.root || "") ? workspace!.root : folders[0],
-        acceptance,
-        {
-          model,
-          managedProxy,
-          attachments: composerStore.attachments(options?.attachmentIDs),
-          delivery: options?.delivery,
-        },
-      );
+      const directory = folders.includes(workspace?.root || "")
+        ? workspace!.root
+        : folders[0];
+      if (
+        directory &&
+        /^\/review-pr(?:\s|$)/.test(text.trim()) &&
+        model.id !== codexModel.id
+      ) {
+        const extensions = account.snapshot?.config.extensions;
+        if (
+          extensions?.enabled.includes("github") &&
+          extensions.enabled.includes("review-pr")
+        ) {
+          const repo = await githubRepo(directory);
+          const binding = extensions.bindings.find((b) => b.repo === repo);
+          if (binding?.auth === "cli") await ensureGithub(binding.login);
+          if (activeUser !== userAtStart || executor !== agent)
+            throw Error("账号已切换，请重新发送。");
+        }
+      }
+      return executor.start(id, text, folders, directory, acceptance, {
+        model,
+        managedProxy,
+        attachments: composerStore.attachments(options?.attachmentIDs),
+        delivery: options?.delivery,
+      });
     },
   );
   handle(

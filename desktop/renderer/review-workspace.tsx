@@ -32,11 +32,13 @@ const colors = [
 ];
 export function ReviewWorkspace({
   children,
+  hideChat = false,
   roots,
   open,
   sidebarOpen,
 }: {
   children: ReactNode;
+  hideChat?: boolean;
   roots: string[];
   open: boolean;
   sidebarOpen: boolean;
@@ -182,7 +184,7 @@ export function ReviewWorkspace({
   }
   return (
     <>
-      <div style={{ display: open ? "none" : "contents" }}>{children}</div>
+      <div style={{ display: open || hideChat ? "none" : "contents" }}>{children}</div>
       <div className="review-workspace" hidden={!open}>
         <aside
           ref={sidebarRef}

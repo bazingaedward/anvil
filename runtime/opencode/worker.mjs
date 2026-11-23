@@ -3,6 +3,8 @@ import {
   runtimeProvider,
 } from "../../desktop/shared/providers.ts";
 import { timedModelFetch } from "./request-timing.ts";
+import { extensionCommand } from "../../desktop/main/extension-command.ts";
+import { githubKey } from "../../desktop/shared/extensions.ts";
 import { browserConfig } from "./browser.ts";
 import path from "node:path";
 import { createInterface } from "node:readline";
@@ -161,7 +163,7 @@ async function run(input) {
           share: "disabled",
           update: "disable",
           snapshots: false,
-          ...browserConfig(input.probe || input.listModels ? undefined : input.browser),
+          ...extensionServers(input),
           providers: copilot
             ? {}
             : { ark: runtimeProvider(input.model, endpoint, key) },
@@ -171,6 +173,25 @@ async function run(input) {
     },
     copilot ? copilotCredentials(copilot.value) : {},
   );
+  if (input.github) {
+    const location = { directory: input.repo };
+    await host.plugin.awaitActivation({ location });
+    const deadline = Date.now() + (input.github.auth === "keygrant" ? 120000 : 15000);
+    while (!abort.signal.aborted) {
+      const { data } = await host.mcp.list({ location });
+      const status = data.find(server => server.name === "anvil_github")?.status.status;
+      if (status === "connected") break;
+      if ((status && status !== "pending") || Date.now() >= deadline) {
+        if (input.requireGithub)
+          throw Error("GitHub MCP 未连接，请在扩展页检查本机连接和账号授权。");
+        break;
+      }
+      await new Promise(resolve => setTimeout(resolve, 75));
+    }
+    // OpenCode 2.0 debounces its model-facing MCP tool registry by 100 ms
+    // after reporting connected. Its public SDK exposes only the connection state.
+    await new Promise(resolve => setTimeout(resolve, 200));
+  }
   if (copilot) {
     const location = { location: { directory: input.repo } };
     await host.integration.get({
@@ -432,3 +453,22 @@ lines.on("line", (line) => {
   });
 });
 lines.on("close", () => void close());
+
+function extensionServers(input) {
+  if (input.probe || input.listModels) return {};
+  const servers = browserConfig(input.browser).mcp?.servers || {};
+  if (input.github) {
+    const { repo, login, auth } = input.github;
+    let command = [process.execPath, "--github-mcp", repo, login, auth];
+    if (auth === "keygrant")
+      command = [
+        extensionCommand("keygrant"),
+        "exec",
+        githubKey(login),
+        "--",
+        ...command,
+      ];
+    servers.anvil_github = { type: "local", command, codemode: false, ...(auth === "keygrant" ? { timeout: { startup: 120000 } } : {}) };
+  }
+  return Object.keys(servers).length ? { mcp: { servers } } : {};
+}

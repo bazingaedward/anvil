@@ -36,11 +36,23 @@
       };
       const image = { id: "image-1", name: "screen.png", mime: "image/png", size: 68 };
       window.failSteer = false;
+      const accountListeners=new Set();
+      let accountConfig={extensions:{enabled:["playwright"],bindings:[],skills:[]}}, revision=1;
       window.anvil = {
+        accountStatus: async()=>({revision,config:structuredClone(accountConfig)}),
+        extensionRepo: async()=>"example/project",
+        githubIdentity: async()=>"alice",
+        browserAvailable: async()=>true,
+        saveExtensions: async(extensions,r)=>{
+          if(r!==revision) throw Error("Conflict");
+          accountConfig={extensions:structuredClone(extensions)};revision++;
+          for(const fn of accountListeners)fn();
+          return {revision,config:accountConfig};
+        },
         platform: "darwin",
         uploadAttachment: async () => image,
         imagePreview: async () => "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/l9sAAAAASUVORK5CYII=",
-        onAccountChange: () => () => {},
+        onAccountChange: f => {accountListeners.add(f);return ()=>accountListeners.delete(f);},
         models: async () => [model],
         conversations: async () => ({
           conversations: [structuredClone(chat)],

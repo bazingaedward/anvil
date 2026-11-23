@@ -1,5 +1,6 @@
 import type { ContextState, MemoryInput, Handoff } from "./memory";
 export type CloudConfig = {
+  extensions?: import("./extensions").Extensions;
   models: ModelProfile[];
   groups: { id: string; name: string }[];
   preferences: { defaultModelID: string };
@@ -232,6 +233,15 @@ export interface DesktopAPI {
     revision: number,
   ): Promise<ContextState>;
   saveHandoff(id: string, input: Handoff): Promise<ContextState>;
+  extensionRepo(folder: string): Promise<string | null>;
+  saveExtensions(
+    value: import("./extensions").Extensions,
+    revision: number,
+  ): Promise<AccountState>;
+  importSkill(revision: number, source?: string): Promise<AccountState>;
+  browserAvailable(): Promise<boolean>;
+  connectGithub(login: string): Promise<void>;
+  githubIdentity(): Promise<string | null>;
   accountStatus(refresh?: boolean): Promise<AccountState>;
   accountLogin(): Promise<void>;
   accountPoll(): Promise<AccountState>;

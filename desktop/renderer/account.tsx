@@ -177,9 +177,9 @@ export function AccountGate({ children }: { children: ReactNode }) {
           <h1>Anvil</h1>
           <h2>在每台电脑上继续你的编程工作。</h2>
           <p>
-            登录后同步模型设置和分组。
+            登录后同步模型、分组和扩展。
             <br />
-            聊天、文件和目录权限保存在本机。
+            聊天、项目文件和目录授权保存在本机。
           </p>
           <button
             className="google-sign-in"
