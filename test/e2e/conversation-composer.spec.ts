@@ -33,7 +33,8 @@ test("compact composer expands for references, clears sent chips, and supports s
   expect((await composer.boundingBox())!.height).toBeGreaterThan(compact);
   await input.fill("");
   await expect(composer).toHaveClass(/is-compact/);
-  await page.getByRole("button", { name: "添加文件夹（可选）" }).click();
+  await page.getByLabel("添加上下文", { exact: true }).click();
+  await page.getByRole("button", { name: "添加本地文件夹…" }).click();
   await expect(composer.locator(".attachment-chip")).toContainText(
     "echo-english",
   );
@@ -43,7 +44,9 @@ test("compact composer expands for references, clears sent chips, and supports s
   await expect(input).toHaveValue("");
   await expect(composer.locator(".attachment-chip")).toHaveCount(0);
   await expect(page.locator(".agent-prompt")).not.toContainText("echo-english");
-  await expect(page.locator(".conversation-folders summary")).toContainText("echo-english");
+  await expect(page.locator(".conversation-folders summary")).toContainText(
+    "echo-english",
+  );
   await expect(composer).toHaveClass(/is-compact/);
   await input.fill("改成中文");
   await input.press("Enter");
@@ -87,24 +90,37 @@ test("IME Enter does not send and existing sent directories stay out of the comp
   await expect(input).toHaveValue("");
 });
 
-
-test("sent images appear above text and open an accessible preview, including steering", async ({ page }) => {
+test("sent images appear above text and open an accessible preview, including steering", async ({
+  page,
+}) => {
   await page.goto(url + "test/e2e/fixtures/conversation.html");
   const input = page.getByRole("textbox", { name: "向 Anvil 发送消息" });
   async function attachImage() {
     await page.locator(".composer").evaluate((el) => {
       const data = new DataTransfer();
-      data.items.add(new File(["fixture"], "screen.png", { type: "image/png" }));
-      el.dispatchEvent(new DragEvent("drop", { dataTransfer: data, bubbles: true, cancelable: true }));
+      data.items.add(
+        new File(["fixture"], "screen.png", { type: "image/png" }),
+      );
+      el.dispatchEvent(
+        new DragEvent("drop", {
+          dataTransfer: data,
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
     });
-    await expect(page.locator(".composer-attachments")).toContainText("screen.png");
+    await expect(page.locator(".composer-attachments")).toContainText(
+      "screen.png",
+    );
   }
   await attachImage();
   await input.fill("检查图片");
   await input.press("Enter");
   const message = page.locator(".agent-prompt").first();
   await expect(message.locator(".message-image img")).toBeVisible();
-  expect(await message.evaluate((el) => el.firstElementChild?.className)).toBe("message-images");
+  expect(await message.evaluate((el) => el.firstElementChild?.className)).toBe(
+    "message-images",
+  );
   await message.getByRole("button", { name: "预览图片：screen.png" }).click();
   const preview = page.getByRole("dialog", { name: "screen.png" });
   await expect(preview.getByRole("img")).toBeVisible();
@@ -113,7 +129,9 @@ test("sent images appear above text and open an accessible preview, including st
   await attachImage();
   await input.fill("再看这张");
   await input.press("Enter");
-  await expect(page.locator(".steering-message .message-image img")).toBeVisible();
+  await expect(
+    page.locator(".steering-message .message-image img"),
+  ).toBeVisible();
   await page.locator(".steering-message .message-image").click();
   await preview.getByRole("button", { name: "关闭图片预览" }).click();
   await expect(preview).toHaveCount(0);
@@ -123,7 +141,8 @@ test("a repository-bound review skill can be selected from chat after enabling t
   page,
 }) => {
   await page.goto(url + "test/e2e/fixtures/conversation.html");
-  await page.getByRole("button", { name: "添加文件夹（可选）" }).click();
+  await page.getByLabel("添加上下文", { exact: true }).click();
+  await page.getByRole("button", { name: "添加本地文件夹…" }).click();
   await page.getByRole("button", { name: "扩展", exact: true }).first().click();
   await page.getByRole("button", { name: "启用整套扩展" }).click();
   await page.getByRole("button", { name: "GitHub · MCP →" }).click();

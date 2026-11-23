@@ -867,14 +867,24 @@ export function ConversationWorkspace({
                 <details className="conversation-folders">
                   <summary title="会话工作区目录">
                     <Folder size={16} />
-                    <span>{draft.folders.length === 1
-                      ? draft.folders[0].split(/[\\/]/).filter(Boolean).pop() || draft.folders[0]
-                      : `工作区 · ${draft.folders.length}`}</span>
+                    <span>
+                      {draft.folders.length === 1
+                        ? draft.folders[0]
+                            .split(/[\\/]/)
+                            .filter(Boolean)
+                            .pop() || draft.folders[0]
+                        : `工作区 · ${draft.folders.length}`}
+                    </span>
                   </summary>
                   <div role="group" aria-label="会话工作区目录">
                     {draft.folders.map((root) => (
-                      <button key={root} title={root} onClick={() => onSelectDirectory(root)}>
-                        <Folder size={16} /><span>{root}</span>
+                      <button
+                        key={root}
+                        title={root}
+                        onClick={() => onSelectDirectory(root)}
+                      >
+                        <Folder size={16} />
+                        <span>{root}</span>
                       </button>
                     ))}
                   </div>
@@ -926,17 +936,8 @@ export function ConversationWorkspace({
                   <p>
                     {draft.folders?.length
                       ? "了解代码、规划修改，或开始开发。"
-                      : "开始聊天，或添加文件夹来处理代码。"}
+                      : "开始聊天，或通过输入框的「＋」添加文件夹。"}
                   </p>
-                  {!draft.folders?.length && (
-                    <button
-                      className="primary-button"
-                      disabled={!loaded}
-                      onClick={() => void addFolders()}
-                    >
-                      添加文件夹（可选）
-                    </button>
-                  )}
                 </div>
               )}
               {conversationTasks.map((task) => (
@@ -945,7 +946,10 @@ export function ConversationWorkspace({
                   key={task.id}
                   id={`task-${task.id}`}
                 >
-                  <UserMessage text={task.prompt} attachments={task.attachments} />
+                  <UserMessage
+                    text={task.prompt}
+                    attachments={task.attachments}
+                  />
                   {(task.steering || []).map((message, index, messages) => (
                     <div key={message.id} className="steering-message">
                       <MarkdownResponse
@@ -954,7 +958,10 @@ export function ConversationWorkspace({
                           message.offset,
                         )}
                       />
-                      <UserMessage text={message.text} attachments={message.attachments} />
+                      <UserMessage
+                        text={message.text}
+                        attachments={message.attachments}
+                      />
                       <small
                         className={`task-state ${message.status}`}
                         role="status"
@@ -1216,13 +1223,8 @@ export function ConversationWorkspace({
                   </div>
                 )}
                 {/^\/[a-z0-9-]*$/.test(draft.text) &&
-                  commands.some((id) =>
-                    id.startsWith(draft.text.slice(1)),
-                  ) && (
-                    <div
-                      className="skill-suggestions"
-                      aria-label="选择 Skill"
-                    >
+                  commands.some((id) => id.startsWith(draft.text.slice(1))) && (
+                    <div className="skill-suggestions" aria-label="选择 Skill">
                       {commands
                         .filter((id) => id.startsWith(draft.text.slice(1)))
                         .map((id) => (
@@ -1274,9 +1276,7 @@ export function ConversationWorkspace({
                         <Blocks size={16} /> 扩展
                       </button>
                       <button
-                        disabled={
-                          readOnly || sending || managing || attaching
-                        }
+                        disabled={readOnly || sending || managing || attaching}
                         onClick={(event) => {
                           event.currentTarget
                             .closest("details")
@@ -1295,7 +1295,7 @@ export function ConversationWorkspace({
                         }}
                         disabled={readOnly || sending || managing}
                       >
-                        添加本地文件夹…
+                        <Folder size={16} /> 添加本地文件夹…
                       </button>
                     </div>
                   </details>
