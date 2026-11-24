@@ -155,3 +155,22 @@ test("a repository-bound review skill can be selected from chat after enabling t
   await page.getByRole("button", { name: "/review-pr", exact: true }).click();
   await expect(input).toHaveValue("/review-pr ");
 });
+
+test("unavailable draft model opens picker and preserves the unsent message", async ({
+  page,
+}) => {
+  await page.goto(url + "test/e2e/fixtures/conversation.html?missing-model");
+  const input = page.getByRole("textbox", { name: "向 Anvil 发送消息" });
+  await input.fill("保留草稿");
+  await input.press("Enter");
+  const picker = page.getByRole("button", { name: /^GPT-6 Luna/ });
+  await expect(picker).toBeVisible();
+  await expect(input).toHaveValue("保留草稿");
+  expect(await page.evaluate(() => (window as any).calls.length)).toBe(0);
+  await picker.click();
+  await input.press("Enter");
+  await expect(input).toHaveValue("");
+  expect(
+    await page.evaluate(() => (window as any).calls[0].options.modelID),
+  ).toBe("available-model");
+});

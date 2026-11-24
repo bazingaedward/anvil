@@ -87,7 +87,8 @@ export function ConversationWorkspace({
     (model) => model.id === composerDraft.modelID,
   );
   const imageMismatch =
-    !selectedModel?.vision &&
+    !!selectedModel &&
+    !selectedModel.vision &&
     composerDraft.attachments.some((item) => item.mime.startsWith("image/"));
   async function attach(files?: File[]) {
     const target = selected;
@@ -260,6 +261,15 @@ export function ConversationWorkspace({
   const submitting = useRef(false);
   async function send(delivery: "steer" | "queue" = "steer") {
     if (submitting.current) return;
+    if (
+      !(running?.conversationID === selected && delivery === "steer") &&
+      models.length &&
+      !selectedModel
+    ) {
+      setAgentError("所选模型当前不可用，请选择其他模型后发送。");
+      setModelOpenRequest((n) => n + 1);
+      return;
+    }
     submitting.current = true;
     const target = selected;
     const text = draft.text;
@@ -450,7 +460,7 @@ export function ConversationWorkspace({
     managing ||
     attaching ||
     imageMismatch ||
-    !selectedModel ||
+    models.length === 0 ||
     !!(
       running &&
       (running.conversationID !== selected || running.phase === "stopping")

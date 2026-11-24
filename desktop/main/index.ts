@@ -764,18 +764,38 @@ function registerIPC() {
     await executor.deleteConversation(id);
     return true;
   });
-  let copilotModels: import("../shared/api").ModelProfile[] = [];
-  const availableModels = () => [
-    ...new Map(
-      [...composerStore.models(), ...copilotModels, codexModel].map((model) => [
-        model.id,
-        model,
-      ]),
-    ).values(),
-  ];
-  const findModel = (id?: string) =>
-    copilotModels.find((model) => model.id === id) || composerStore.model(id);
-  handle("composer:copilot-models", async () => {
+  type ModelProfile = import("../shared/api").ModelProfile;
+  let copilotModels: ModelProfile[] | undefined;
+  let discovery: Promise<ModelProfile[]> | undefined;
+  function availableModels() {
+    const saved = composerStore.models().flatMap((model) => {
+      if (!copilotModels || model.connection !== "copilot") return [model];
+      const live = copilotModels.find((item) => item.model === model.model);
+      return live ? [{ ...live, id: model.id }] : [];
+    });
+    return [
+      ...new Map(
+        [...saved, ...(copilotModels || []), codexModel].map((model) => [
+          model.id,
+          model,
+        ]),
+      ).values(),
+    ];
+  }
+  function findModel(id?: string) {
+    const model = availableModels().find((item) => item.id === id);
+    if (model) return model;
+    if (
+      id &&
+      copilotModels &&
+      composerStore
+        .models()
+        .some((m) => m.id === id && m.connection === "copilot")
+    )
+      throw new Error("所选 Copilot 模型当前不可用，请选择其他模型。");
+    return composerStore.model(id);
+  }
+  async function refreshCopilotModels() {
     const key = providerCredentials.ANVIL_COPILOT_OAUTH;
     if (!key)
       throw new Error(
@@ -783,15 +803,23 @@ function registerIPC() {
       );
     const name =
       process.platform === "win32" ? "anvil-runtime.exe" : "anvil-runtime";
-    copilotModels = await discoverCopilotModels(
+    discovery ??= discoverCopilotModels(
       app.isPackaged
         ? path.join(process.resourcesPath, "runtime", name)
         : path.resolve(here, "../../runtime/opencode/dist", name),
       key,
-    );
+    ).finally(() => {
+      discovery = undefined;
+    });
+    copilotModels = await discovery;
+    return availableModels();
+  }
+  handle("composer:copilot-models", refreshCopilotModels);
+  handle("composer:models", async () => {
+    if (!copilotModels && providerCredentials.ANVIL_COPILOT_OAUTH)
+      return refreshCopilotModels().catch(() => availableModels());
     return availableModels();
   });
-  handle("composer:models", availableModels);
   handle(
     "composer:save-model",
     async (value: import("../shared/api").ModelProfile) => {
@@ -815,7 +843,9 @@ function registerIPC() {
     });
     return availableModels();
   });
-  handle("composer:image-preview", (id: string) => composerStore.imagePreview(id));
+  handle("composer:image-preview", (id: string) =>
+    composerStore.imagePreview(id),
+  );
   handle("composer:upload", (name: string, bytes: Uint8Array) =>
     composerStore.attach(name, bytes),
   );

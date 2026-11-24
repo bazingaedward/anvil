@@ -21,7 +21,7 @@
 1. 先安装 `runtime/opencode` 的依赖并执行 `npm run runtime:build`。
 2. 首次授权：用该目录依赖里的 Bun 执行 `runtime/opencode/copilot-login.mjs <github-login>`，按输出的 device URL / 验证码授权。脚本核对 GitHub 账号后，通过 stdin 写入 Keygrant。隔离 OpenCode 的 XDG 目录不会改变 Keygrant 的保存位置。
 3. 通过 Keygrant 注入 `ANVIL_COPILOT_OAUTH` 启动 Anvil，例如 `keygrant exec ANVIL_COPILOT_OAUTH -- npm run dev`。同时需要其他 provider 时，按 Keygrant 的多密钥参数注入。OAuth 值不放进命令参数或配置文件。
-4. 打开输入框的模型菜单，点击「获取 / 刷新 Copilot 模型」，再选择标注 GitHub Copilot 的模型。列表在进程内缓存，重启后需重新获取。当前版本授权由本地脚本完成，尚未提供应用内登录按钮。
+4. 输入框首次加载时自动获取 Copilot 目录，本次启动内复用结果。也可点击「获取 / 刷新 Copilot 模型」手动刷新。成功获取目录后，只列出其中可用的 Copilot 模型。若草稿或默认配置引用了已下线的模型，发送时保留草稿并提示重新选择。当前版本授权由本地脚本完成，尚未提供应用内登录按钮。
 
 模型选择沿用现有会话和权限流程。Copilot 模型不能编辑 endpoint/keyRef；OAuth 不能被配置成普通 API key。网络访问使用启动进程的代理环境。套餐限制和组织权限以 GitHub 的实际响应为准。
 

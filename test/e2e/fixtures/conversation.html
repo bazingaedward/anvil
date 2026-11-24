@@ -27,7 +27,7 @@
         listeners.forEach((f) => f(structuredClone(t)));
       };
       const model = {
-        id: "ark-default",
+        id: location.search === "?missing-model" ? "available-model" : "ark-default",
         name: "GPT-6 Luna",
         model: "test",
         endpoint: "https://test.invalid",
