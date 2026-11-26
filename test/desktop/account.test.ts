@@ -144,3 +144,44 @@ test("Copilot defaults round-trip through the legacy cloud schema without exposi
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+test("without Copilot credentials only local Codex remains for a Copilot-only account", () => {
+  const root = mkdtempSync(path.join(os.tmpdir(), "anvil-no-copilot-"));
+  try {
+    const account = new Account(
+      root,
+      Buffer.from,
+      (b) => b.toString(),
+      fetch,
+      false,
+    );
+    const profile = {
+      ...defaultModel,
+      connection: "copilot" as const,
+      id: "copilot-example",
+    };
+    account.snapshot = {
+      revision: 2,
+      config: {
+        models: [profile],
+        groups: [],
+        preferences: { defaultModelID: profile.id },
+      },
+    };
+    assert.deepEqual(account.state().config?.models, []);
+    assert.equal(
+      account.state().config?.preferences.defaultModelID,
+      "managed-codex",
+    );
+    assert.equal(account.snapshot.config.models.length, 1);
+    account.snapshot.config.models.push(defaultModel);
+    account.snapshot.config.preferences.defaultModelID = defaultModel.id;
+    assert.deepEqual(account.state().config?.models, [defaultModel]);
+    assert.equal(
+      account.state().config?.preferences.defaultModelID,
+      defaultModel.id,
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});

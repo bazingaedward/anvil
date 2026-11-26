@@ -12,7 +12,7 @@ import { connectGithub } from "./github-connection";
 import { Account } from "./account";
 import { createHash, randomUUID } from "node:crypto";
 import { mkdir, cp, access } from "node:fs/promises";
-import { ComposerStore, validateModel } from "./composer";
+import { ComposerStore, defaultModel, validateModel } from "./composer";
 import { openRepositoryTerminal } from "./repository-terminal";
 import {
   fetchRemotes,
@@ -200,7 +200,7 @@ async function deactivate() {
   dirty = false;
 }
 function applyConfig() {
-  const config = account.snapshot?.config;
+  const config = account.state().config;
   if (!config) return;
   composerStore.replaceProfiles(config.models);
   currentAgent().replaceGroups(config.groups);
@@ -263,7 +263,8 @@ async function activateProfile() {
   composerStore = new ComposerStore(path.join(dataRoot, "composer"));
   await account.refresh();
   if (account.snapshot!.revision === 0) {
-    const models = composerStore.models();
+    const savedModels = composerStore.models();
+    const models = savedModels.length ? savedModels : [defaultModel];
     const groups = currentAgent()
       .conversations()
       .groups.map(({ id, name }) => ({ id, name }));
@@ -900,7 +901,7 @@ function registerIPC() {
     ) => {
       const userAtStart = activeUser;
       const modelID =
-        options?.modelID || account.snapshot?.config.preferences.defaultModelID;
+        options?.modelID || account.state().config?.preferences.defaultModelID;
       const model = modelID === codexModel.id ? codexModel : findModel(modelID);
       const managedProxy =
         model.id === codexModel.id ? await codexProxy() : undefined;
@@ -1065,6 +1066,7 @@ app.whenReady().then(() => {
     },
     (value) => safeStorage.decryptString(value),
     (url, options) => net.fetch(url, options),
+    !!providerCredentials.ANVIL_COPILOT_OAUTH,
   );
   const icon = path.join(app.getAppPath(), "assets", "icon.png");
   if (process.platform === "darwin") app.dock?.setIcon(icon);

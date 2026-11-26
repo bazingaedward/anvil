@@ -1,5 +1,6 @@
 import { randomBytes, createHash } from "node:crypto";
 import { readFileSync, writeFileSync, mkdirSync, rmSync } from "node:fs";
+import { codexModel } from "../shared/providers";
 import path from "node:path";
 import os from "node:os";
 import type {
@@ -36,6 +37,7 @@ export class Account {
     private decrypt: (value: Buffer) => string,
     private fetchAccount: (url: string, options: RequestInit) => Promise<Response> =
       globalThis.fetch,
+    private copilotConnected = true,
   ) {
     try {
       this.token = this.decrypt(
@@ -47,10 +49,18 @@ export class Account {
     return !!this.token;
   }
   state(): AccountState {
+    let config = this.snapshot?.config;
+    if (config && !this.copilotConnected) {
+      const models = config.models.filter(m => m.connection !== "copilot");
+      const preferred = config.preferences.defaultModelID;
+      const useLocal = config.models.some(m => m.connection === "copilot" && m.id === preferred);
+      config = { ...config, models, preferences: useLocal ? {defaultModelID: codexModel.id} : config.preferences };
+    }
     return {
+      copilotConnected: this.copilotConnected,
       user: this.user,
       revision: this.snapshot?.revision || 0,
-      config: this.snapshot?.config,
+      config,
       pending: !!this.pending,
     };
   }

@@ -12,6 +12,7 @@ import {
   SlidersHorizontal,
 } from "lucide-react";
 import type { AccountState, AccountDevice, ModelProfile } from "../shared/api";
+export let copilotConnected = true;
 export let accountScope = "";
 export let defaultModelID = "ark-default";
 export function AccountGate({ children }: { children: ReactNode }) {
@@ -86,7 +87,13 @@ export function AccountGate({ children }: { children: ReactNode }) {
           window.anvil.models(),
         ]);
         setDevices(devices);
-        setModels(models.filter((model) => model.id !== codexModel.id));
+        setModels(
+          models.filter(
+            (model) =>
+              model.id !== codexModel.id ||
+              state?.config?.preferences.defaultModelID === codexModel.id,
+          ),
+        );
       });
     } else settingsRef.current?.close();
   }, [open]);
@@ -103,6 +110,7 @@ export function AccountGate({ children }: { children: ReactNode }) {
   const [devices, setDevices] = useState<AccountDevice[]>([]);
   const [models, setModels] = useState<ModelProfile[]>([]);
   function accept(next: AccountState) {
+    copilotConnected = next.copilotConnected !== false;
     accountScope = next.user?.id || "";
     defaultModelID = next.config?.preferences.defaultModelID || "ark-default";
     setState(next);

@@ -111,7 +111,6 @@ export class ComposerStore {
     return values;
   }
   replaceProfiles(values: ModelProfile[]) {
-    if (!values.length) throw new Error("Keep at least one model.");
     return this.save(values.map(validateModel));
   }
   put(value: ModelProfile) {

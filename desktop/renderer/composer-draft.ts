@@ -1,4 +1,5 @@
-import { accountScope, defaultModelID } from "./account";
+import { codexModel } from "../shared/providers";
+import { accountScope, copilotConnected, defaultModelID } from "./account";
 import { useEffect, useState } from "react";
 import type { Attachment } from "../shared/api";
 type Draft = {
@@ -64,5 +65,9 @@ export function useComposerDraft(id: string) {
         [target]: { ...draft, attachments: [...draft.attachments, ...items] },
       };
     });
-  return { ...value, update, add, storageError };
+  const modelID =
+    !copilotConnected && value.modelID.startsWith("copilot-")
+      ? codexModel.id
+      : value.modelID;
+  return { ...value, modelID, update, add, storageError };
 }

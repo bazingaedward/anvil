@@ -12,6 +12,7 @@ export type AccountUser = {
   expires: number;
 };
 export type AccountState = {
+  copilotConnected?: boolean;
   user: AccountUser | null;
   revision: number;
   config?: CloudConfig;

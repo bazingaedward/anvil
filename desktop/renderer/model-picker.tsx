@@ -1,5 +1,5 @@
 import { codexModel, providerPresets, protocols } from "../shared/providers";
-import { accountScope } from "./account";
+import { accountScope, copilotConnected } from "./account";
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown, X, Plus, Check } from "lucide-react";
 import type { ModelProfile } from "../shared/api";
@@ -153,23 +153,25 @@ export function ModelPicker({
                   )}
               </div>
             ))}
-          <button
-            disabled={disabled || busy}
-            onClick={async () => {
-              setBusy(true);
-              setError("");
-              setEditing(undefined);
-              try {
-                accept(await window.anvil.copilotModels());
-              } catch (e) {
-                setError(String(e));
-              } finally {
-                setBusy(false);
-              }
-            }}
-          >
-            {busy ? "正在获取 Copilot 模型…" : "获取 / 刷新 Copilot 模型"}
-          </button>
+          {copilotConnected && (
+            <button
+              disabled={disabled || busy}
+              onClick={async () => {
+                setBusy(true);
+                setError("");
+                setEditing(undefined);
+                try {
+                  accept(await window.anvil.copilotModels());
+                } catch (e) {
+                  setError(String(e));
+                } finally {
+                  setBusy(false);
+                }
+              }}
+            >
+              {busy ? "正在获取 Copilot 模型…" : "获取 / 刷新 Copilot 模型"}
+            </button>
+          )}
           <button
             disabled={disabled}
             onClick={() =>
