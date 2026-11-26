@@ -174,3 +174,33 @@ test("unavailable draft model opens picker and preserves the unsent message", as
     await page.evaluate(() => (window as any).calls[0].options.modelID),
   ).toBe("available-model");
 });
+
+test("permission and model controls share a row below the composer at both window widths", async ({
+  page,
+}) => {
+  await page.goto(url + "test/e2e/fixtures/conversation.html");
+  const input = page.getByRole("textbox", { name: "向 Anvil 发送消息" });
+  const permission = page.getByLabel("权限模式", { exact: true });
+  const model = page.getByLabel("选择模型", { exact: true });
+  for (const width of [1200, 900]) {
+    await page.setViewportSize({ width, height: 800 });
+    for (const text of ["", "第一行\n第二行"]) {
+      await input.fill(text);
+      const composer = page.locator(".composer");
+      await expect(composer).toHaveClass(text ? /is-expanded/ : /is-compact/);
+      const box = (await composer.boundingBox())!;
+      const left = (await permission.boundingBox())!;
+      const right = (await model.boundingBox())!;
+      expect(Math.min(left.y, right.y)).toBeGreaterThanOrEqual(
+        box.y + box.height,
+      );
+      expect(left.x + left.width).toBeLessThan(right.x);
+      expect(
+        Math.abs(left.y + left.height / 2 - right.y - right.height / 2),
+      ).toBeLessThan(2);
+      expect(right.x + right.width).toBeLessThanOrEqual(box.x + box.width);
+    }
+  }
+  await model.click();
+  await expect(page.getByRole("textbox", { name: "搜索模型" })).toBeVisible();
+});

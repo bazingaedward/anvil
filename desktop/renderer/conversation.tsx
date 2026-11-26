@@ -1309,39 +1309,6 @@ export function ConversationWorkspace({
                       </button>
                     </div>
                   </details>
-                  <label
-                    className={`permission-control ${draft.permissionMode === "full" ? "full-access" : ""}`}
-                  >
-                    <Shield size={17} />
-                    <select
-                      className="permission-mode"
-                      aria-label="权限模式"
-                      title={
-                        selectedModel?.id === codexModel.id
-                          ? "Codex：逐次询问使用只读沙箱，额外权限需审批；自动模式允许沙箱内命令和工作区修改，额外权限需审批；完全访问不使用沙箱或审批。Codex 可能读取附加目录之外的文件。"
-                          : "逐次询问：编辑和命令需确认。自动模式：允许授权范围内的文件修改，命令及未知操作需确认。完全访问：允许所有工具操作。"
-                      }
-                      value={draft.permissionMode || "ask"}
-                      disabled={readOnly || sending || !!running || managing}
-                      onChange={(event) =>
-                        void changePermissionMode(
-                          event.target.value as PermissionMode,
-                        )
-                      }
-                    >
-                      <option value="ask">逐次询问</option>
-                      <option value="auto">自动</option>
-                      <option value="full">完全访问</option>
-                    </select>
-                  </label>
-                  <ModelPicker
-                    openRequest={modelOpenRequest}
-                    value={composerDraft.modelID}
-                    onChange={(modelID) => composerDraft.update({ modelID })}
-                    onModels={setModels}
-                    disabled={readOnly || sending || !!running || managing}
-                  />
-
                   {running?.conversationID === selected && (
                     <>
                       <button
@@ -1386,6 +1353,40 @@ export function ConversationWorkspace({
                     <ArrowUp size={19} />
                   </button>
                 </div>
+              </div>
+              <div className="composer-settings">
+                <label
+                  className={`permission-control ${draft.permissionMode === "full" ? "full-access" : ""}`}
+                >
+                  <Shield size={17} />
+                  <select
+                    className="permission-mode"
+                    aria-label="权限模式"
+                    title={
+                      selectedModel?.id === codexModel.id
+                        ? "Codex：逐次询问使用只读沙箱，额外权限需审批；自动模式允许沙箱内命令和工作区修改，额外权限需审批；完全访问不使用沙箱或审批。Codex 可能读取附加目录之外的文件。"
+                        : "逐次询问：编辑和命令需确认。自动模式：允许授权范围内的文件修改，命令及未知操作需确认。完全访问：允许所有工具操作。"
+                    }
+                    value={draft.permissionMode || "ask"}
+                    disabled={readOnly || sending || !!running || managing}
+                    onChange={(event) =>
+                      void changePermissionMode(
+                        event.target.value as PermissionMode,
+                      )
+                    }
+                  >
+                    <option value="ask">逐次询问</option>
+                    <option value="auto">自动</option>
+                    <option value="full">完全访问</option>
+                  </select>
+                </label>
+                <ModelPicker
+                  openRequest={modelOpenRequest}
+                  value={composerDraft.modelID}
+                  onChange={(modelID) => composerDraft.update({ modelID })}
+                  onModels={setModels}
+                  disabled={readOnly || sending || !!running || managing}
+                />
               </div>
               {(storageError || composerDraft.storageError || attaching) && (
                 <p className="draft-notice" role="status">
